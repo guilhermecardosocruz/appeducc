@@ -3,7 +3,6 @@ import Link from "next/link";
 export default function LoginPage() {
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* Topbar simples */}
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <div className="text-sm font-semibold tracking-[0.18em] text-sky-700">
@@ -17,7 +16,6 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Conteúdo central */}
       <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-5xl flex-col items-center justify-center px-4 py-10">
         <div className="mb-6 flex flex-col items-center gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
@@ -38,7 +36,6 @@ export default function LoginPage() {
 
         <div className="w-full max-w-lg">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200 sm:p-7">
-            {/* Botão Google (stub por enquanto) */}
             <button
               type="button"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
@@ -47,15 +44,17 @@ export default function LoginPage() {
               <span>Entrar com Google</span>
             </button>
 
-            {/* Divider */}
             <div className="mt-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
               <span>ou entre com e-mail</span>
               <span className="h-px flex-1 bg-slate-200" />
             </div>
 
-            {/* Formulário */}
-            <form className="mt-5 space-y-4">
+            <form
+              className="mt-5 space-y-4"
+              method="POST"
+              action="/api/auth/login"
+            >
               <div className="space-y-1.5">
                 <label
                   htmlFor="email"
