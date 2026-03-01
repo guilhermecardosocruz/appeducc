@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-50">
       <div className="w-full max-w-md px-6">
@@ -8,15 +8,33 @@ export default function LoginPage() {
           <h1 className="text-sm font-semibold tracking-[0.2em] text-sky-400">
             EDUCC
           </h1>
-          <p className="mt-2 text-2xl font-semibold">Entrar na plataforma</p>
+          <p className="mt-2 text-2xl font-semibold">Criar conta</p>
           <p className="mt-1 text-sm text-slate-400">
-            Use seu e-mail e senha para acessar suas escolas, turmas e
-            relatórios.
+            Comece configurando seu acesso como gestor, coordenador ou
+            professor.
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl shadow-sky-500/5">
           <form className="space-y-4">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-slate-200"
+              >
+                Nome completo
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/40"
+                placeholder="Seu nome"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <label
                 htmlFor="email"
@@ -36,28 +54,20 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-200"
-                >
-                  Senha
-                </label>
-                <Link
-                  href="/recover"
-                  className="text-xs font-medium text-sky-400 hover:text-sky-300"
-                >
-                  Esqueceu a senha?
-                </Link>
-              </div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-200"
+              >
+                Senha
+              </label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
                 className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 outline-none ring-0 transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/40"
-                placeholder="••••••••"
+                placeholder="Defina uma senha segura"
               />
             </div>
 
@@ -65,27 +75,20 @@ export default function LoginPage() {
               type="submit"
               className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
-              Entrar
+              Criar conta
             </button>
           </form>
 
-          <div className="mt-4 flex flex-col items-center gap-2 text-xs text-slate-400">
-            <span className="h-px w-12 bg-slate-800" />
-            <p>
-              Ainda não tem conta?{" "}
-              <Link
-                href="/register"
-                className="font-medium text-sky-400 hover:text-sky-300"
-              >
-                Criar conta
-              </Link>
-            </p>
-          </div>
+          <p className="mt-4 text-center text-xs text-slate-500">
+            Já tem conta?{" "}
+            <Link
+              href="/login"
+              className="font-medium text-sky-400 hover:text-sky-300"
+            >
+              Voltar para o login
+            </Link>
+          </p>
         </div>
-
-        <p className="mt-6 text-center text-[11px] text-slate-500">
-          EDUCC • Plataforma de gestão educacional em desenvolvimento
-        </p>
       </div>
     </main>
   );
