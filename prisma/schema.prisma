@@ -7,15 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
+// ==========================
+// MODELO USER E SESSION (EXISTENTES)
+// ==========================
+//
+
 model User {
-  id           String   @id @default(cuid())
+  id           String          @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String          @unique
   passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   sessions     Session[]
+  groupMembers GroupMember[]
+  schoolMembers SchoolMember[]
+  classes      Class[]         @relation("ClassTeacher")
 }
 
 model Session {
@@ -27,3 +36,97 @@ model Session {
 
   @@index([userId])
 }
+
+//
+// ==========================
+// MODELOS DE GRUPOS DE ESCOLAS
+// ==========================
+//
+
+model Group {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  members   GroupMember[]
+  schools   School[]
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId   String
+
+  role      String   // OWNER, DIRECTOR, VIEWER
+  createdAt DateTime @default(now())
+
+  @@unique([userId, groupId])
+}
+
+//
+// ==========================
+// MODELOS DE ESCOLAS
+// ==========================
+//
+
+model School {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId   String
+
+  members   SchoolMember[]
+  classes   Class[]
+}
+
+model SchoolMember {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId  String
+
+  role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+  createdAt DateTime @default(now())
+
+  @@unique([userId, schoolId])
+}
+
+//
+// ==========================
+// MODELOS DE TURMAS E ALUNOS
+// ==========================
+//
+
+model Class {
+  id        String        @id @default(cuid())
+  name      String
+  year      Int?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId  String
+
+  teacher   User?         @relation("ClassTeacher", fields: [teacherId], references: [id])
+  teacherId String?
+
+  students  Student[]
+}
+
+model Student {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  class     Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId   String
+}
+
