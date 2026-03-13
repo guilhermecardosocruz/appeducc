@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import CreateGroupModal from "./CreateGroupModal";
 
@@ -89,7 +90,7 @@ export default function GroupsDashboardClient({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         {loadingList && (
-          <p className="text-sm text-slate-500 mb-3">Atualizando grupos…</p>
+          <p className="mb-3 text-sm text-slate-500">Atualizando grupos…</p>
         )}
 
         {groups.length === 0 ? (
@@ -100,22 +101,28 @@ export default function GroupsDashboardClient({
         ) : (
           <ul className="space-y-3">
             {groups.map((group) => (
-              <li
-                key={group.id}
-                className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 hover:bg-slate-50"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-900">
-                    {group.name}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {group._count.schools === 0
-                      ? "Nenhuma escola cadastrada ainda"
-                      : group._count.schools === 1
-                      ? "1 escola cadastrada"
-                      : `${group._count.schools} escolas cadastradas`}
-                  </p>
-                </div>
+              <li key={group.id}>
+                <Link
+                  href={`/groups/${group.id}`}
+                  className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">
+                      {group.name}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {group._count.schools === 0
+                        ? "Nenhuma escola cadastrada ainda"
+                        : group._count.schools === 1
+                        ? "1 escola cadastrada"
+                        : `${group._count.schools} escolas cadastradas`}
+                    </p>
+                  </div>
+
+                  <span className="text-sm font-medium text-sky-700">
+                    Abrir
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
