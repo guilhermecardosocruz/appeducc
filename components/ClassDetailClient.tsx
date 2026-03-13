@@ -40,42 +40,41 @@ export default function ClassDetailClient({
   schoolId,
 }: Props) {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <section className="bg-blue-600 px-4 py-10 text-white">
-        <div className="mx-auto flex w-full max-w-5xl items-start justify-between gap-6">
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="mb-6">
           <Link
             href={`/schools/${schoolId}`}
-            className="rounded-2xl bg-white/15 px-6 py-3 text-lg font-semibold text-white transition hover:bg-white/20"
+            className="text-sm font-medium text-sky-700 hover:text-sky-800"
           >
-            Voltar
+            ← Voltar para turmas
           </Link>
-
-          <div className="max-w-xl text-right">
-            <h1 className="text-3xl font-bold">{className}</h1>
-            <p className="mt-3 text-lg text-white/90">
-              Gerencie a turma acessando Chamadas e Conteúdos.
-            </p>
-          </div>
         </div>
-      </section>
 
-      <section className="px-4 py-10">
-        <div className="mx-auto w-full max-w-5xl rounded-[28px] border border-slate-300 bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900">Ações</h2>
-          <p className="mt-4 max-w-2xl text-lg text-slate-600">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">{className}</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Gerencie a turma acessando chamadas, conteúdos, relatórios e ações
+            de apoio.
+          </p>
+        </div>
+
+        <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Ações</h2>
+          <p className="mt-2 text-sm text-slate-500">
             Use os atalhos abaixo para gerenciar a turma.
           </p>
 
-          <div className="mt-8 space-y-5">
+          <div className="mt-6 space-y-3">
             {actions.map((action) => (
               <Link
                 key={action.title}
                 href={action.href(classId)}
                 className={[
-                  "block rounded-[22px] border px-6 py-6 text-center text-2xl font-semibold transition",
+                  "block rounded-md border px-4 py-4 text-center text-base font-medium transition focus:outline-none focus:ring-2 focus:ring-sky-500",
                   action.primary
-                    ? "border-blue-600 bg-blue-600 text-white shadow-md hover:bg-blue-700"
-                    : "border-slate-400 bg-white text-slate-800 hover:bg-slate-50",
+                    ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700"
+                    : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
                 ].join(" ")}
               >
                 {action.title}
@@ -83,7 +82,7 @@ export default function ClassDetailClient({
             ))}
           </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
