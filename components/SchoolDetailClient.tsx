@@ -107,27 +107,29 @@ export default function SchoolDetailClient({
           ) : (
             <ul className="space-y-3">
               {classes.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {item.name}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {item.year ? `Ano letivo ${item.year} • ` : ""}
-                      {item._count.students === 0
-                        ? "Nenhum aluno cadastrado ainda"
-                        : item._count.students === 1
-                        ? "1 aluno cadastrado"
-                        : `${item._count.students} alunos cadastrados`}
-                    </p>
-                  </div>
+                <li key={item.id}>
+                  <Link
+                    href={`/classes/${item.id}`}
+                    className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {item.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {item.year ? `Ano letivo ${item.year} • ` : ""}
+                        {item._count.students === 0
+                          ? "Nenhum aluno cadastrado ainda"
+                          : item._count.students === 1
+                          ? "1 aluno cadastrado"
+                          : `${item._count.students} alunos cadastrados`}
+                      </p>
+                    </div>
 
-                  <span className="text-sm font-medium text-slate-400">
-                    Em breve
-                  </span>
+                    <span className="text-sm font-medium text-sky-700">
+                      Abrir
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
