@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import CreateAttendanceForm, {
-  getTodayDateInputValue,
-} from "@/components/CreateAttendanceForm";
+import CreateAttendanceForm from "@/components/CreateAttendanceForm";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{ classId: string }>;
 };
+
+function getTodayDateInputValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, "0");
+  const day = `${now.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export default async function NewAttendancePage({ params }: PageProps) {
   const user = await getSessionUser();
