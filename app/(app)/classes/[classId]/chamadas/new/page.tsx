@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import CreateAttendanceForm from "@/components/CreateAttendanceForm";
+import CreateAttendanceForm, {
+  getTodayDateInputValue,
+} from "@/components/CreateAttendanceForm";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -21,6 +23,9 @@ export default async function NewAttendancePage({ params }: PageProps) {
     where: { id: classId },
     include: {
       school: true,
+      students: {
+        orderBy: { name: "asc" },
+      },
     },
   });
 
@@ -41,6 +46,11 @@ export default async function NewAttendancePage({ params }: PageProps) {
     notFound();
   }
 
+  const students = foundClass.students.map((student) => ({
+    id: student.id,
+    name: student.name,
+  }));
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-4xl">
@@ -53,7 +63,11 @@ export default async function NewAttendancePage({ params }: PageProps) {
           </Link>
         </div>
 
-        <CreateAttendanceForm classId={classId} />
+        <CreateAttendanceForm
+          classId={classId}
+          initialLessonDate={getTodayDateInputValue()}
+          students={students}
+        />
       </div>
     </main>
   );

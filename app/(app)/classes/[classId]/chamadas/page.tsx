@@ -29,7 +29,7 @@ export default async function ClassChamadasPage({ params }: PageProps) {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ lessonDate: "desc" }, { createdAt: "desc" }],
       },
     },
   });
@@ -114,7 +114,7 @@ export default async function ClassChamadasPage({ params }: PageProps) {
                           {attendance.title}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {attendance.createdAt.toLocaleDateString("pt-BR")} •{" "}
+                          {attendance.lessonDate.toLocaleDateString("pt-BR")} •{" "}
                           {presents} presentes de {total}
                         </p>
                       </div>

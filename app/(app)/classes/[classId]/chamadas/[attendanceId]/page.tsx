@@ -8,6 +8,13 @@ type PageProps = {
   params: Promise<{ classId: string; attendanceId: string }>;
 };
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default async function AttendanceDetailPage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -85,6 +92,7 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
           attendanceId={attendance.id}
           classId={classId}
           initialTitle={attendance.title}
+          initialLessonDate={formatDateInput(attendance.lessonDate)}
           initialPresences={initialPresences}
         />
       </div>

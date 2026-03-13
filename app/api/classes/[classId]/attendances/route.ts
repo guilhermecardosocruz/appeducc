@@ -55,7 +55,7 @@ export async function GET(
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ lessonDate: "desc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json(attendances);
@@ -79,6 +79,8 @@ export async function POST(
 
   const data = await req.json();
   const title = String(data.title ?? "").trim();
+  const lessonDateRaw = String(data.lessonDate ?? "").trim();
+  const presencesInput = Array.isArray(data.presences) ? data.presences : [];
 
   if (!title) {
     return NextResponse.json(
@@ -87,14 +89,38 @@ export async function POST(
     );
   }
 
+  if (!lessonDateRaw) {
+    return NextResponse.json(
+      { error: "Missing attendance date" },
+      { status: 400 }
+    );
+  }
+
+  const lessonDate = new Date(`${lessonDateRaw}T12:00:00`);
+
+  if (Number.isNaN(lessonDate.getTime())) {
+    return NextResponse.json(
+      { error: "Invalid attendance date" },
+      { status: 400 }
+    );
+  }
+
+  const presentByStudentId = new Map<string, boolean>();
+  for (const item of presencesInput) {
+    const studentId = String(item?.studentId ?? "");
+    if (!studentId) continue;
+    presentByStudentId.set(studentId, Boolean(item?.present));
+  }
+
   const attendance = await prisma.attendance.create({
     data: {
       title,
       classId,
+      lessonDate,
       presences: {
         create: foundClass.students.map((student) => ({
           studentId: student.id,
-          present: false,
+          present: presentByStudentId.get(student.id) ?? false,
         })),
       },
     },

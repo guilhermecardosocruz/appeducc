@@ -82,6 +82,7 @@ export async function PATCH(
 
   const data = await req.json();
   const title = String(data.title ?? "").trim();
+  const lessonDateRaw = String(data.lessonDate ?? "").trim();
   const presences = Array.isArray(data.presences) ? data.presences : [];
 
   if (!title) {
@@ -91,10 +92,29 @@ export async function PATCH(
     );
   }
 
+  if (!lessonDateRaw) {
+    return NextResponse.json(
+      { error: "Missing attendance date" },
+      { status: 400 }
+    );
+  }
+
+  const lessonDate = new Date(`${lessonDateRaw}T12:00:00`);
+
+  if (Number.isNaN(lessonDate.getTime())) {
+    return NextResponse.json(
+      { error: "Invalid attendance date" },
+      { status: 400 }
+    );
+  }
+
   await prisma.$transaction([
     prisma.attendance.update({
       where: { id: attendanceId },
-      data: { title },
+      data: {
+        title,
+        lessonDate,
+      },
     }),
     ...presences.map((presence: { id: string; present: boolean }) =>
       prisma.attendancePresence.update({
