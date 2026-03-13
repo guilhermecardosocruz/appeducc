@@ -38,6 +38,8 @@ export default function CreateAttendanceForm({
     }))
   );
   const [loading, setLoading] = useState(false);
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [newStudentName, setNewStudentName] = useState("");
 
   const summary = useMemo(() => {
     const total = presences.length;
@@ -60,6 +62,43 @@ export default function CreateAttendanceForm({
         present: value,
       }))
     );
+  }
+
+  async function handleAddStudent() {
+    const name = newStudentName.trim();
+    if (!name) return;
+
+    setAddingStudent(true);
+
+    try {
+      const res = await fetch(`/api/classes/${classId}/students`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!res.ok) {
+        console.error("Erro ao adicionar aluno");
+        return;
+      }
+
+      const data = await res.json();
+
+      setPresences((current) => [
+        ...current,
+        {
+          studentId: data.student.id,
+          studentName: data.student.name,
+          present: false,
+        },
+      ]);
+
+      setNewStudentName("");
+    } catch (error) {
+      console.error("Erro ao adicionar aluno", error);
+    } finally {
+      setAddingStudent(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -154,6 +193,25 @@ export default function CreateAttendanceForm({
                 className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Desmarcar todos
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <input
+                type="text"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                placeholder="Nome do novo aluno"
+                value={newStudentName}
+                onChange={(e) => setNewStudentName(e.target.value)}
+              />
+
+              <button
+                type="button"
+                onClick={handleAddStudent}
+                disabled={addingStudent}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {addingStudent ? "Adicionando..." : "Adicionar aluno"}
               </button>
             </div>
 
