@@ -14,17 +14,17 @@ datasource db {
 //
 
 model User {
-  id           String          @id @default(cuid())
-  name         String
-  email        String          @unique
-  passwordHash String
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  name          String
+  email         String          @unique
+  passwordHash  String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  sessions     Session[]
-  groupMembers GroupMember[]
+  sessions      Session[]
+  groupMembers  GroupMember[]
   schoolMembers SchoolMember[]
-  classes      Class[]         @relation("ClassTeacher")
+  classes       Class[]         @relation("ClassTeacher")
 }
 
 model Session {
@@ -44,10 +44,10 @@ model Session {
 //
 
 model Group {
-  id        String         @id @default(cuid())
+  id        String        @id @default(cuid())
   name      String
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   members   GroupMember[]
   schools   School[]
@@ -100,33 +100,62 @@ model SchoolMember {
 
 //
 // ==========================
-// MODELOS DE TURMAS E ALUNOS
+// MODELOS DE TURMAS, ALUNOS E CHAMADAS
 // ==========================
 //
 
 model Class {
-  id        String        @id @default(cuid())
-  name      String
-  year      Int?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id          String              @id @default(cuid())
+  name        String
+  year        Int?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  schoolId  String
+  school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId    String
 
-  teacher   User?         @relation("ClassTeacher", fields: [teacherId], references: [id])
-  teacherId String?
+  teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+  teacherId   String?
 
-  students  Student[]
+  students    Student[]
+  attendances Attendance[]
 }
 
 model Student {
-  id        String      @id @default(cuid())
-  name      String
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id         String               @id @default(cuid())
+  name       String
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
 
-  class     Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId   String
+  class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId    String
+
+  presences  AttendancePresence[]
 }
 
+model Attendance {
+  id         String               @id @default(cuid())
+  title      String
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId    String
+
+  presences  AttendancePresence[]
+}
+
+model AttendancePresence {
+  id           String      @id @default(cuid())
+  present      Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  attendanceId String
+
+  student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String
+
+  @@unique([attendanceId, studentId])
+}
