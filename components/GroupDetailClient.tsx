@@ -103,26 +103,28 @@ export default function GroupDetailClient({
           ) : (
             <ul className="space-y-3">
               {schools.map((school) => (
-                <li
-                  key={school.id}
-                  className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {school.name}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {school._count.classes === 0
-                        ? "Nenhuma turma cadastrada ainda"
-                        : school._count.classes === 1
-                        ? "1 turma cadastrada"
-                        : `${school._count.classes} turmas cadastradas`}
-                    </p>
-                  </div>
+                <li key={school.id}>
+                  <Link
+                    href={`/schools/${school.id}`}
+                    className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {school.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {school._count.classes === 0
+                          ? "Nenhuma turma cadastrada ainda"
+                          : school._count.classes === 1
+                          ? "1 turma cadastrada"
+                          : `${school._count.classes} turmas cadastradas`}
+                      </p>
+                    </div>
 
-                  <span className="text-sm font-medium text-slate-400">
-                    Em breve
-                  </span>
+                    <span className="text-sm font-medium text-sky-700">
+                      Abrir
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
