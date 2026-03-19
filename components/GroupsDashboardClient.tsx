@@ -221,26 +221,31 @@ export default function GroupsDashboardClient({
           ) : (
             <ul className="space-y-3">
               {teachers.map((teacher) => (
-                <li
-                  key={teacher.id}
-                  className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {teacher.name}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">{teacher.email}</p>
-                  </div>
+                <li key={teacher.id}>
+                  <Link
+                    href={`/teachers/${teacher.id}`}
+                    className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {teacher.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">{teacher.email}</p>
+                    </div>
 
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-slate-700">
-                      {teacher._count.classes === 0
-                        ? "Nenhuma turma vinculada"
-                        : teacher._count.classes === 1
-                        ? "1 turma vinculada"
-                        : `${teacher._count.classes} turmas vinculadas`}
-                    </p>
-                  </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-slate-700">
+                        {teacher._count.classes === 0
+                          ? "Nenhuma turma vinculada"
+                          : teacher._count.classes === 1
+                          ? "1 turma vinculada"
+                          : `${teacher._count.classes} turmas vinculadas`}
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-sky-700">
+                        Abrir
+                      </p>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>
