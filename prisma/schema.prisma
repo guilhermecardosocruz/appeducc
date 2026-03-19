@@ -18,9 +18,13 @@ model User {
   name          String
   email         String          @unique
   passwordHash  String
+  isTeacher     Boolean         @default(false)
+  createdById   String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  createdBy     User?           @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers  User[]          @relation("CreatedUsers")
   sessions      Session[]
   groupMembers  GroupMember[]
   schoolMembers SchoolMember[]

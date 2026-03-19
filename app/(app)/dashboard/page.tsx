@@ -6,7 +6,6 @@ export default async function DashboardPage() {
   const user = await getSessionUser();
 
   if (!user) {
-    // Se em algum momento tiver middleware de auth, isso quase não aparece.
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="max-w-xl text-center">
@@ -36,6 +35,21 @@ export default async function DashboardPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  const teachersRaw = await prisma.user.findMany({
+    where: {
+      createdById: user.id,
+      isTeacher: true,
+    },
+    include: {
+      _count: {
+        select: {
+          classes: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   const groups = groupsRaw.map((g) => ({
     id: g.id,
     name: g.name,
@@ -43,22 +57,34 @@ export default async function DashboardPage() {
     _count: { schools: g._count.schools },
   }));
 
+  const teachers = teachersRaw.map((teacher) => ({
+    id: teacher.id,
+    name: teacher.name,
+    email: teacher.email,
+    isTeacher: teacher.isTeacher,
+    createdAt: teacher.createdAt.toISOString(),
+    _count: {
+      classes: teacher._count.classes,
+    },
+  }));
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-3xl">
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto w-full max-w-4xl">
         <h1 className="text-2xl font-semibold text-slate-900">
           Organização das escolas
         </h1>
-        <p className="mt-2 text-sm text-slate-500 max-w-2xl">
+        <p className="mt-2 max-w-2xl text-sm text-slate-500">
           Aqui você gerencia sua estrutura educacional em níveis:{" "}
           <span className="font-medium">
             Grupos de escolas → Escolas → Turmas → Professores e Alunos
           </span>
-          . Neste primeiro passo, vamos começar pelos grupos.
+          .
         </p>
 
         <GroupsDashboardClient
           initialGroups={groups}
+          initialTeachers={teachers}
           userName={user.name}
           userEmail={user.email}
         />
