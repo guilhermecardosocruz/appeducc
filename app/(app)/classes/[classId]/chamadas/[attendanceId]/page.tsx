@@ -24,6 +24,69 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
 
   const { classId, attendanceId } = await params;
 
+  const attendanceBase = await prisma.attendance.findUnique({
+    where: { id: attendanceId },
+    include: {
+      class: {
+        include: {
+          school: true,
+          students: {
+            select: {
+              id: true,
+              name: true,
+            },
+            orderBy: {
+              name: "asc",
+            },
+          },
+        },
+      },
+      presences: {
+        select: {
+          id: true,
+          studentId: true,
+          present: true,
+        },
+      },
+    },
+  });
+
+  if (!attendanceBase || attendanceBase.classId !== classId) {
+    notFound();
+  }
+
+  const membership = await prisma.schoolMember.findUnique({
+    where: {
+      userId_schoolId: {
+        userId: user.id,
+        schoolId: attendanceBase.class.schoolId,
+      },
+    },
+  });
+
+  if (!membership) {
+    notFound();
+  }
+
+  const existingStudentIds = new Set(
+    attendanceBase.presences.map((item) => item.studentId)
+  );
+
+  const missingStudents = attendanceBase.class.students.filter(
+    (student) => !existingStudentIds.has(student.id)
+  );
+
+  if (missingStudents.length > 0) {
+    await prisma.attendancePresence.createMany({
+      data: missingStudents.map((student) => ({
+        attendanceId,
+        studentId: student.id,
+        present: false,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
   const attendance = await prisma.attendance.findUnique({
     where: { id: attendanceId },
     include: {
@@ -51,19 +114,6 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
   });
 
   if (!attendance || attendance.classId !== classId) {
-    notFound();
-  }
-
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId: user.id,
-        schoolId: attendance.class.schoolId,
-      },
-    },
-  });
-
-  if (!membership) {
     notFound();
   }
 
