@@ -127,11 +127,11 @@ export default function StudentsManagerClient({
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a
-                    href="/templates/students-template.csv"
+                    href="/templates/students-template.xlsx"
                     download
                     className="text-sm px-3 py-2 border rounded-md bg-white hover:bg-slate-100"
                   >
-                    ⬇ Baixar modelo
+                    ⬇ Baixar modelo Excel (.xlsx)
                   </a>
 
                   <input
@@ -148,7 +148,7 @@ export default function StudentsManagerClient({
                 </div>
 
                 <p className="text-xs text-slate-500 mt-2">
-                  Use a coluna Nome. Evite linhas vazias.
+                  Use a coluna Nome na primeira coluna.
                 </p>
 
                 {importMessage && (
