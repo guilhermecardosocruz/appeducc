@@ -76,12 +76,42 @@ export async function POST(
     return NextResponse.json({ error: "Missing student name" }, { status: 400 });
   }
 
+  const existingStudent = await prisma.student.findFirst({
+    where: {
+      classId,
+      name,
+    },
+  });
+
+  if (existingStudent) {
+    return NextResponse.json(
+      { error: "Student already exists in this class" },
+      { status: 409 }
+    );
+  }
+
   const createdStudent = await prisma.student.create({
     data: {
       name,
       classId,
     },
   });
+
+  const classAttendances = await prisma.attendance.findMany({
+    where: { classId },
+    select: { id: true },
+  });
+
+  if (classAttendances.length > 0) {
+    await prisma.attendancePresence.createMany({
+      data: classAttendances.map((attendance) => ({
+        attendanceId: attendance.id,
+        studentId: createdStudent.id,
+        present: false,
+      })),
+      skipDuplicates: true,
+    });
+  }
 
   let createdPresence = null;
 
@@ -97,11 +127,10 @@ export async function POST(
       );
     }
 
-    createdPresence = await prisma.attendancePresence.create({
-      data: {
+    createdPresence = await prisma.attendancePresence.findFirst({
+      where: {
         attendanceId,
         studentId: createdStudent.id,
-        present: false,
       },
       include: {
         student: {

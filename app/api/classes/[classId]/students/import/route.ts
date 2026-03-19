@@ -149,12 +149,45 @@ export async function POST(
     uniqueNamesToCreate.push(rawName.trim());
   }
 
+  let createdStudents: { id: string; name: string }[] = [];
+
   if (uniqueNamesToCreate.length > 0) {
     await prisma.student.createMany({
       data: uniqueNamesToCreate.map((name) => ({
         name,
         classId,
       })),
+    });
+
+    createdStudents = await prisma.student.findMany({
+      where: {
+        classId,
+        name: {
+          in: uniqueNamesToCreate,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+  }
+
+  const classAttendances = await prisma.attendance.findMany({
+    where: { classId },
+    select: { id: true },
+  });
+
+  if (classAttendances.length > 0 && createdStudents.length > 0) {
+    await prisma.attendancePresence.createMany({
+      data: classAttendances.flatMap((attendance) =>
+        createdStudents.map((student) => ({
+          attendanceId: attendance.id,
+          studentId: student.id,
+          present: false,
+        }))
+      ),
+      skipDuplicates: true,
     });
   }
 
