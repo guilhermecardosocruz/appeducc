@@ -35,6 +35,13 @@ export default async function SchoolPage({ params }: PageProps) {
       group: true,
       classes: {
         include: {
+          teacher: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           _count: {
             select: { students: true },
           },
@@ -48,11 +55,32 @@ export default async function SchoolPage({ params }: PageProps) {
     notFound();
   }
 
+  const teachersRaw = await prisma.user.findMany({
+    where: {
+      createdById: user.id,
+      isTeacher: true,
+    },
+    orderBy: { name: "asc" },
+  });
+
+  const teachers = teachersRaw.map((teacher) => ({
+    id: teacher.id,
+    name: teacher.name,
+    email: teacher.email,
+  }));
+
   const classes = school.classes.map((item) => ({
     id: item.id,
     name: item.name,
     year: item.year,
     createdAt: item.createdAt.toISOString(),
+    teacher: item.teacher
+      ? {
+          id: item.teacher.id,
+          name: item.teacher.name,
+          email: item.teacher.email,
+        }
+      : null,
     _count: {
       students: item._count.students,
     },
@@ -63,6 +91,7 @@ export default async function SchoolPage({ params }: PageProps) {
       schoolId={school.id}
       schoolName={school.name}
       groupId={school.groupId}
+      teachers={teachers}
       initialClasses={classes}
     />
   );

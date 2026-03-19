@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 
+type TeacherOption = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 type Props = {
   schoolId: string;
+  teachers: TeacherOption[];
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
@@ -11,12 +18,14 @@ type Props = {
 
 export default function CreateClassModal({
   schoolId,
+  teachers,
   open,
   onClose,
   onCreated,
 }: Props) {
   const [name, setName] = useState("");
   const [year, setYear] = useState("");
+  const [teacherId, setTeacherId] = useState("");
   const [loading, setLoading] = useState(false);
 
   if (!open) return null;
@@ -34,12 +43,14 @@ export default function CreateClassModal({
         body: JSON.stringify({
           name,
           year: year.trim() ? Number(year) : null,
+          teacherId: teacherId || null,
         }),
       });
 
       if (res.ok) {
         setName("");
         setYear("");
+        setTeacherId("");
         onCreated();
         onClose();
       } else {
@@ -53,8 +64,8 @@ export default function CreateClassModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">
           Criar nova Turma
         </h2>
@@ -84,6 +95,24 @@ export default function CreateClassModal({
               value={year}
               onChange={(e) => setYear(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700">
+              Professor responsável
+            </label>
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+              value={teacherId}
+              onChange={(e) => setTeacherId(e.target.value)}
+            >
+              <option value="">Selecionar depois</option>
+              {teachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.name} — {teacher.email}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex justify-end gap-2">

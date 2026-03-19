@@ -4,11 +4,22 @@ import Link from "next/link";
 import { useState } from "react";
 import CreateClassModal from "./CreateClassModal";
 
+type TeacherOption = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 type ClassItem = {
   id: string;
   name: string;
   year: number | null;
   createdAt: string;
+  teacher: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
   _count: {
     students: number;
   };
@@ -18,6 +29,7 @@ type Props = {
   schoolId: string;
   schoolName: string;
   groupId: string;
+  teachers: TeacherOption[];
   initialClasses: ClassItem[];
 };
 
@@ -25,6 +37,7 @@ export default function SchoolDetailClient({
   schoolId,
   schoolName,
   groupId,
+  teachers,
   initialClasses,
 }: Props) {
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
@@ -48,6 +61,13 @@ export default function SchoolDetailClient({
             name: item.name,
             year: item.year ?? null,
             createdAt: item.createdAt,
+            teacher: item.teacher
+              ? {
+                  id: item.teacher.id,
+                  name: item.teacher.name,
+                  email: item.teacher.email,
+                }
+              : null,
             _count: {
               students: item._count?.students ?? 0,
             },
@@ -124,6 +144,11 @@ export default function SchoolDetailClient({
                           ? "1 aluno cadastrado"
                           : `${item._count.students} alunos cadastrados`}
                       </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {item.teacher
+                          ? `Professor: ${item.teacher.name}`
+                          : "Professor não vinculado"}
+                      </p>
                     </div>
 
                     <span className="text-sm font-medium text-sky-700">
@@ -138,6 +163,7 @@ export default function SchoolDetailClient({
 
         <CreateClassModal
           schoolId={schoolId}
+          teachers={teachers}
           open={openModal}
           onClose={() => setOpenModal(false)}
           onCreated={refreshClasses}

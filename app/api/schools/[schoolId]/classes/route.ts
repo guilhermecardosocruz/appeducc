@@ -37,6 +37,13 @@ export async function GET(
   const classes = await prisma.class.findMany({
     where: { schoolId },
     include: {
+      teacher: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       _count: {
         select: { students: true },
       },
@@ -66,6 +73,7 @@ export async function POST(
   const data = await req.json();
   const name = String(data.name ?? "").trim();
   const yearRaw = data.year;
+  const teacherIdRaw = String(data.teacherId ?? "").trim();
 
   if (!name) {
     return NextResponse.json({ error: "Missing class name" }, { status: 400 });
@@ -74,13 +82,42 @@ export async function POST(
   const year =
     typeof yearRaw === "number" && Number.isFinite(yearRaw) ? yearRaw : null;
 
+  let teacherId: string | null = null;
+
+  if (teacherIdRaw) {
+    const teacher = await prisma.user.findFirst({
+      where: {
+        id: teacherIdRaw,
+        isTeacher: true,
+        createdById: user.id,
+      },
+    });
+
+    if (!teacher) {
+      return NextResponse.json(
+        { error: "Invalid teacher for this account" },
+        { status: 400 }
+      );
+    }
+
+    teacherId = teacher.id;
+  }
+
   const createdClass = await prisma.class.create({
     data: {
       name,
       year,
       schoolId,
+      teacherId,
     },
     include: {
+      teacher: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       _count: {
         select: { students: true },
       },
