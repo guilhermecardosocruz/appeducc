@@ -31,29 +31,14 @@ export default function StudentsManagerClient({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function refreshStudents() {
-    try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      });
+    const res = await fetch(`/api/classes/${classId}/students`, {
+      cache: "no-store",
+    });
 
-      if (!res.ok) {
-        console.error("Erro ao carregar alunos");
-        return;
-      }
+    if (!res.ok) return;
 
-      const data = (await res.json()) as StudentItem[];
-      setStudents(
-        data.map((student) => ({
-          id: student.id,
-          name: student.name,
-          createdAt: student.createdAt,
-        }))
-      );
-    } catch (error) {
-      console.error("Erro ao atualizar alunos", error);
-    }
+    const data = await res.json();
+    setStudents(data);
   }
 
   async function handleAddStudent(name: string) {
@@ -66,16 +51,11 @@ export default function StudentsManagerClient({
         body: JSON.stringify({ name }),
       });
 
-      if (!res.ok) {
-        console.error("Erro ao adicionar aluno");
-        return;
-      }
+      if (!res.ok) return;
 
       await refreshStudents();
       setOpenAddModal(false);
       setImportMessage(null);
-    } catch (error) {
-      console.error("Erro ao adicionar aluno", error);
     } finally {
       setAddingStudent(false);
     }
@@ -97,29 +77,17 @@ export default function StudentsManagerClient({
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("Erro ao importar planilha", data);
         setImportMessage(data.error ?? "Erro ao importar planilha.");
         return;
       }
 
-      setStudents(
-        (data.students as StudentItem[]).map((student) => ({
-          id: student.id,
-          name: student.name,
-          createdAt: student.createdAt,
-        }))
-      );
+      setStudents(data.students);
 
       setImportMessage(
-        `Importação concluída: ${data.imported} aluno(s) importado(s), ${data.skipped} ignorado(s).`
+        `Importado: ${data.imported} | Ignorados: ${data.skipped}`
       );
 
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Erro ao importar planilha", error);
-      setImportMessage("Erro ao importar planilha.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } finally {
       setImporting(false);
     }
@@ -130,98 +98,76 @@ export default function StudentsManagerClient({
       <main className="min-h-screen bg-slate-50 px-4 py-10">
         <div className="mx-auto w-full max-w-4xl">
           <div className="mb-6">
-            <Link
-              href={`/classes/${classId}`}
-              className="text-sm font-medium text-sky-700 hover:text-sky-800"
-            >
-              ← Voltar para turma
+            <Link href={`/classes/${classId}`} className="text-sky-700">
+              ← Voltar
             </Link>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="bg-white p-6 rounded-lg border shadow-sm">
+            <div className="flex justify-between items-start flex-wrap gap-3">
               <div>
-                <h1 className="text-2xl font-semibold text-slate-900">
+                <h1 className="text-xl font-semibold">
                   Alunos — {className}
                 </h1>
-                <p className="mt-2 text-sm text-slate-500">
-                  Gerencie os alunos cadastrados nesta turma.
-                </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpenAddModal(true)}
-                  className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-                >
-                  + Adicionar aluno
-                </button>
-              </div>
+              <button
+                onClick={() => setOpenAddModal(true)}
+                className="bg-sky-600 text-white px-4 py-2 rounded-md"
+              >
+                + Adicionar aluno
+              </button>
             </div>
 
             {canImportSpreadsheet && (
-              <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Importar alunos por planilha
+              <div className="mt-6 border rounded-lg p-4 bg-slate-50">
+                <h2 className="font-semibold text-sm">
+                  Importar via planilha
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Envie um arquivo Excel (.xlsx, .xls) ou CSV com a lista de
-                  alunos. A primeira coluna ou o cabeçalho &quot;Nome&quot; será usado.
-                </p>
 
-                <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href="/templates/students-template.csv"
+                    download
+                    className="text-sm px-3 py-2 border rounded-md bg-white hover:bg-slate-100"
+                  >
+                    ⬇ Baixar modelo
+                  </a>
+
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".xlsx,.xls,.csv"
-                    className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) {
-                        void handleImportFile(file);
-                      }
+                      if (file) handleImportFile(file);
                     }}
                     disabled={importing}
+                    className="text-sm"
                   />
-
-                  <div className="text-sm text-slate-500">
-                    {importing ? "Importando planilha..." : "Somente gestor"}
-                  </div>
                 </div>
 
+                <p className="text-xs text-slate-500 mt-2">
+                  Use a coluna Nome. Evite linhas vazias.
+                </p>
+
                 {importMessage && (
-                  <p className="mt-3 text-sm text-slate-600">{importMessage}</p>
+                  <p className="text-sm mt-2">{importMessage}</p>
                 )}
               </div>
             )}
 
-            <div className="mt-6">
-              {students.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  Ainda não há alunos cadastrados nesta turma.
-                </p>
-              ) : (
-                <ul className="overflow-hidden rounded-md border border-slate-200">
-                  <li className="grid grid-cols-[56px_1fr] items-center gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                    <span>#</span>
-                    <span>Aluno</span>
-                  </li>
+            <ul className="mt-6 border rounded-md overflow-hidden">
+              <li className="bg-slate-100 px-4 py-2 text-sm font-semibold">
+                Lista de alunos
+              </li>
 
-                  {students.map((student, index) => (
-                    <li
-                      key={student.id}
-                      className="grid grid-cols-[56px_1fr] items-center gap-3 border-t border-slate-200 px-4 py-3"
-                    >
-                      <span className="text-sm text-slate-500">{index + 1}</span>
-                      <span className="text-sm font-medium text-slate-900">
-                        {student.name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+              {students.map((s, i) => (
+                <li key={s.id} className="px-4 py-2 border-t text-sm">
+                  {i + 1}. {s.name}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </main>
