@@ -8,6 +8,11 @@ type Props = {
 
 const actions = [
   {
+    title: "Alunos",
+    href: (classId: string) => `/classes/${classId}/students`,
+    primary: false,
+  },
+  {
     title: "Ir para Chamadas",
     href: (classId: string) => `/classes/${classId}/chamadas`,
     primary: true,
@@ -54,8 +59,8 @@ export default function ClassDetailClient({
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{className}</h1>
           <p className="mt-2 text-sm text-slate-500">
-            Gerencie a turma acessando chamadas, conteúdos, relatórios e ações
-            de apoio.
+            Gerencie a turma acessando alunos, chamadas, conteúdos, relatórios e
+            ações de apoio.
           </p>
         </div>
 

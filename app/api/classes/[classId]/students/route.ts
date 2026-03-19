@@ -26,6 +26,31 @@ async function ensureClassAccess(userId: string, classId: string) {
   return foundClass;
 }
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ classId: string }> }
+) {
+  const user = await getSessionUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { classId } = await params;
+  const foundClass = await ensureClassAccess(user.id, classId);
+
+  if (!foundClass) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const students = await prisma.student.findMany({
+    where: { classId },
+    orderBy: { name: "asc" },
+  });
+
+  return NextResponse.json(students);
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ classId: string }> }
