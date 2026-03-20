@@ -41,22 +41,8 @@ export default function LoginPage() {
               <PwaInstallButton />
             </div>
 
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-            >
-              <span className="text-lg">G</span>
-              <span>Entrar com Google</span>
-            </button>
-
-            <div className="mt-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" />
-              <span>ou entre com e-mail</span>
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
-
             <form
-              className="mt-5 space-y-4"
+              className="space-y-4"
               method="POST"
               action="/api/auth/login"
             >
