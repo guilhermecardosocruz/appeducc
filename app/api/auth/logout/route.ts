@@ -3,5 +3,5 @@ import { destroySession } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   await destroySession();
-  return NextResponse.redirect(new URL("/login", req.url));
+  return NextResponse.redirect(new URL("/login", req.url), 303);
 }

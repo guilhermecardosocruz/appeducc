@@ -12,6 +12,13 @@ function isIos() {
   return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 }
 
+function isMobileOrTablet() {
+  if (typeof window === "undefined") return false;
+  return /android|iphone|ipad|ipod|mobile|tablet/i.test(
+    window.navigator.userAgent
+  );
+}
+
 function isInStandaloneMode() {
   if (typeof window === "undefined") return false;
 
@@ -32,8 +39,11 @@ export default function PwaInstallButton() {
     isInStandaloneMode()
   );
   const [showIosHelp, setShowIosHelp] = useState(false);
+  const [isMobileDevice] = useState<boolean>(() => isMobileOrTablet());
 
   useEffect(() => {
+    if (!isMobileDevice) return;
+
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js").catch((error) => {
         console.error("Erro ao registrar service worker", error);
@@ -64,7 +74,7 @@ export default function PwaInstallButton() {
       );
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
-  }, []);
+  }, [isMobileDevice]);
 
   const canUsePrompt = useMemo(
     () => !installed && Boolean(deferredPrompt),
@@ -72,7 +82,7 @@ export default function PwaInstallButton() {
   );
 
   async function handleInstall() {
-    if (installed) return;
+    if (installed || !isMobileDevice) return;
 
     if (deferredPrompt) {
       await deferredPrompt.prompt();
@@ -91,6 +101,10 @@ export default function PwaInstallButton() {
     );
   }
 
+  if (!isMobileDevice) {
+    return null;
+  }
+
   if (installed) {
     return (
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -106,7 +120,7 @@ export default function PwaInstallButton() {
         onClick={() => void handleInstall()}
         className="inline-flex w-full items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
       >
-        {canUsePrompt ? "Instalar no celular" : "Instalar no celular"}
+        {canUsePrompt ? "Instalar no dispositivo" : "Instalar no dispositivo"}
       </button>
 
       {showIosHelp && (
