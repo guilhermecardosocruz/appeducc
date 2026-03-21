@@ -44,7 +44,7 @@ export default function StudentsManagerClient({
   }
 
   async function handleDeleteStudent(studentId: string) {
-    const reason = prompt("Motivo da solicitação de exclusão:");
+    const reason = prompt("Motivo da exclusão:");
     if (!reason) return;
 
     const res = await fetch(`/api/classes/${classId}/students/${studentId}`, {
@@ -54,8 +54,16 @@ export default function StudentsManagerClient({
     });
 
     if (!res.ok) {
-      alert("Não foi possível solicitar a exclusão do aluno.");
+      alert("Não foi possível excluir/solicitar exclusão do aluno.");
       return;
+    }
+
+    const data = await res.json();
+
+    if (data?.mode === "deleted_directly") {
+      alert("Aluno excluído diretamente pela gestão.");
+    } else if (data?.mode === "requested_delete") {
+      alert("Solicitação de exclusão enviada para aprovação da gestão.");
     }
 
     await refreshStudents();
@@ -141,7 +149,7 @@ export default function StudentsManagerClient({
                           }}
                           className="text-xs text-red-600"
                         >
-                          Solicitar exclusão
+                          Excluir
                         </button>
                       )}
                     </div>

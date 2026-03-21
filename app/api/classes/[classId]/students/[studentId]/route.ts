@@ -7,31 +7,7 @@ function isManagerRole(role: string | null | undefined) {
   return ["ADMIN", "GESTOR", "MANAGER", "OWNER"].includes(normalized);
 }
 
-async function ensureClassAccess(userId: string, classId: string) {
-  const foundClass = await prisma.class.findUnique({
-    where: { id: classId },
-    include: {
-      school: true,
-    },
-  });
-
-  if (!foundClass) return null;
-
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId,
-        schoolId: foundClass.schoolId,
-      },
-    },
-  });
-
-  if (!membership) return null;
-
-  return foundClass;
-}
-
-async function getApprovalContext(userId: string, classId: string) {
+async function getAccessContext(userId: string, classId: string) {
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
     include: {
@@ -61,13 +37,13 @@ async function getApprovalContext(userId: string, classId: string) {
   ]);
 
   const hasAccess = Boolean(schoolMembership);
-  const canApprove =
+  const canManageDelete =
     isManagerRole(schoolMembership?.role) || isManagerRole(groupMembership?.role);
 
   return {
     foundClass,
     hasAccess,
-    canApprove,
+    canManageDelete,
   };
 }
 
@@ -81,7 +57,7 @@ export async function GET(
   }
 
   const { classId, studentId } = await params;
-  const access = await getApprovalContext(user.id, classId);
+  const access = await getAccessContext(user.id, classId);
 
   if (!access?.hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -109,7 +85,7 @@ export async function GET(
     status: student.status,
     deletedAt: student.deletedAt,
     deletedReason: student.deletedReason,
-    canApproveDelete: access.canApprove,
+    canApproveDelete: access.canManageDelete,
     stats: {
       total,
       presents,
@@ -131,8 +107,8 @@ export async function PATCH(
   const { classId, studentId } = await params;
   const { name } = await req.json();
 
-  const foundClass = await ensureClassAccess(user.id, classId);
-  if (!foundClass) {
+  const access = await getAccessContext(user.id, classId);
+  if (!access?.hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -172,9 +148,9 @@ export async function DELETE(
   }
 
   const { classId, studentId } = await params;
-  const foundClass = await ensureClassAccess(user.id, classId);
+  const access = await getAccessContext(user.id, classId);
 
-  if (!foundClass) {
+  if (!access?.hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -201,6 +177,23 @@ export async function DELETE(
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
+  if (access.canManageDelete) {
+    await prisma.student.update({
+      where: { id: studentId },
+      data: {
+        status: "DELETED",
+        deletedReason: reason,
+        deletedById: user.id,
+        deletedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      mode: "deleted_directly",
+    });
+  }
+
   await prisma.student.update({
     where: { id: studentId },
     data: {
@@ -211,5 +204,8 @@ export async function DELETE(
     },
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    mode: "requested_delete",
+  });
 }
