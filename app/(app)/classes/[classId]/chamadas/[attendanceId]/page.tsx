@@ -31,6 +31,9 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
         include: {
           school: true,
           students: {
+            where: {
+              deletedAt: null,
+            },
             select: {
               id: true,
               name: true,

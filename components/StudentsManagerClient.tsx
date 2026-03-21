@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import AddStudentModal from "./AddStudentModal";
+import StudentModal from "./StudentModal";
 
 type StudentItem = {
   id: string;
@@ -22,15 +23,11 @@ type Props = {
 export default function StudentsManagerClient({
   classId,
   className,
-  canImportSpreadsheet,
   initialStudents,
 }: Props) {
   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
   const [openAddModal, setOpenAddModal] = useState(false);
-  const [addingStudent, setAddingStudent] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
   async function refreshStudents() {
     const res = await fetch(`/api/classes/${classId}/students`, {
@@ -43,79 +40,17 @@ export default function StudentsManagerClient({
     setStudents(data);
   }
 
-  async function handleAddStudent(name: string) {
-    setAddingStudent(true);
-
-    try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-
-      if (!res.ok) return;
-
-      await refreshStudents();
-      setOpenAddModal(false);
-      setImportMessage(null);
-    } finally {
-      setAddingStudent(false);
-    }
-  }
-
   async function handleDeleteStudent(studentId: string) {
-    const confirmDelete = confirm("Deseja realmente excluir este aluno?");
-    if (!confirmDelete) return;
-
     const reason = prompt("Motivo da exclusão:");
     if (!reason) return;
 
-    const res = await fetch(
-      `/api/classes/${classId}/students/${studentId}`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
-      }
-    );
+    await fetch(`/api/classes/${classId}/students/${studentId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
 
-    if (res.ok) {
-      await refreshStudents();
-    } else {
-      alert("Erro ao excluir aluno.");
-    }
-  }
-
-  async function handleImportFile(file: File) {
-    setImporting(true);
-    setImportMessage(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch(`/api/classes/${classId}/students/import`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setImportMessage(data.error ?? "Erro ao importar planilha.");
-        return;
-      }
-
-      setStudents(data.students);
-
-      setImportMessage(
-        `Importado: ${data.imported} | Ignorados: ${data.skipped}`
-      );
-
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } finally {
-      setImporting(false);
-    }
+    await refreshStudents();
   }
 
   return (
@@ -130,11 +65,9 @@ export default function StudentsManagerClient({
 
           <div className="bg-white p-6 rounded-lg border shadow-sm">
             <div className="flex justify-between items-start flex-wrap gap-3">
-              <div>
-                <h1 className="text-xl font-semibold">
-                  Alunos — {className}
-                </h1>
-              </div>
+              <h1 className="text-xl font-semibold">
+                Alunos — {className}
+              </h1>
 
               <button
                 onClick={() => setOpenAddModal(true)}
@@ -144,44 +77,6 @@ export default function StudentsManagerClient({
               </button>
             </div>
 
-            {canImportSpreadsheet && (
-              <div className="mt-6 border rounded-lg p-4 bg-slate-50">
-                <h2 className="font-semibold text-sm">
-                  Importar via planilha
-                </h2>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href="/templates/students-template.xlsx"
-                    download
-                    className="text-sm px-3 py-2 border rounded-md bg-white hover:bg-slate-100"
-                  >
-                    ⬇ Baixar modelo Excel (.xlsx)
-                  </a>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImportFile(file);
-                    }}
-                    disabled={importing}
-                    className="text-sm"
-                  />
-                </div>
-
-                <p className="text-xs text-slate-500 mt-2">
-                  Use a coluna Nome na primeira coluna.
-                </p>
-
-                {importMessage && (
-                  <p className="text-sm mt-2">{importMessage}</p>
-                )}
-              </div>
-            )}
-
             <ul className="mt-6 border rounded-md overflow-hidden">
               <li className="bg-slate-100 px-4 py-2 text-sm font-semibold">
                 Lista de alunos
@@ -190,10 +85,10 @@ export default function StudentsManagerClient({
               {students.map((s, i) => (
                 <li
                   key={s.id}
-                  className={`px-4 py-2 border-t text-sm flex justify-between items-center ${
+                  onClick={() => setSelectedStudent(s.id)}
+                  className={`px-4 py-2 border-t text-sm flex justify-between items-center cursor-pointer ${
                     s.deletedAt ? "bg-red-50 text-red-700 line-through" : ""
                   }`}
-                  title={s.deletedReason ?? ""}
                 >
                   <span>
                     {i + 1}. {s.name}
@@ -206,7 +101,10 @@ export default function StudentsManagerClient({
 
                   {!s.deletedAt && (
                     <button
-                      onClick={() => handleDeleteStudent(s.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteStudent(s.id);
+                      }}
                       className="text-red-600 text-xs"
                     >
                       Excluir
@@ -222,8 +120,19 @@ export default function StudentsManagerClient({
       <AddStudentModal
         open={openAddModal}
         onClose={() => setOpenAddModal(false)}
-        onSubmit={handleAddStudent}
-        loading={addingStudent}
+        onSubmit={async () => {
+          await refreshStudents();
+          setOpenAddModal(false);
+        }}
+        loading={false}
+      />
+
+      <StudentModal
+        open={!!selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+        classId={classId}
+        studentId={selectedStudent}
+        onUpdated={refreshStudents}
       />
     </>
   );

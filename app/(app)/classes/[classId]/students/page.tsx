@@ -47,6 +47,8 @@ export default async function ClassStudentsPage({ params }: PageProps) {
     id: student.id,
     name: student.name,
     createdAt: student.createdAt.toISOString(),
+    deletedAt: student.deletedAt?.toISOString() ?? null,
+    deletedReason: student.deletedReason ?? null,
   }));
 
   return (

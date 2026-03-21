@@ -30,6 +30,9 @@ export default async function NewAttendancePage({ params }: PageProps) {
     include: {
       school: true,
       students: {
+        where: {
+          deletedAt: null,
+        },
         orderBy: { name: "asc" },
       },
     },
