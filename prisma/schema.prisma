@@ -29,6 +29,8 @@ model User {
   groupMembers  GroupMember[]
   schoolMembers SchoolMember[]
   classes       Class[]         @relation("ClassTeacher")
+
+  deletedStudents Student[]     @relation("DeletedByUser")
 }
 
 model Session {
@@ -126,15 +128,20 @@ model Class {
 }
 
 model Student {
-  id         String               @id @default(cuid())
-  name       String
-  createdAt  DateTime             @default(now())
-  updatedAt  DateTime             @updatedAt
+  id            String               @id @default(cuid())
+  name          String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
-  class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId    String
+  class         Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId       String
 
-  presences  AttendancePresence[]
+  presences     AttendancePresence[]
+
+  deletedAt     DateTime?
+  deletedReason String?
+  deletedById   String?
+  deletedBy     User? @relation("DeletedByUser", fields: [deletedById], references: [id])
 }
 
 model Attendance {
