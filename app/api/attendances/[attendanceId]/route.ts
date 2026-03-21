@@ -17,6 +17,7 @@ async function ensureAttendanceAccess(userId: string, attendanceId: string) {
             select: {
               id: true,
               name: true,
+              deletedAt: true,
             },
           },
         },
@@ -60,6 +61,10 @@ export async function GET(
   if (!attendance) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  attendance.presences = attendance.presences.filter(
+    (p) => !p.student.deletedAt
+  );
 
   return NextResponse.json(attendance);
 }
@@ -138,6 +143,7 @@ export async function PATCH(
             select: {
               id: true,
               name: true,
+              deletedAt: true,
             },
           },
         },
@@ -149,6 +155,12 @@ export async function PATCH(
       },
     },
   });
+
+  if (updated) {
+    updated.presences = updated.presences.filter(
+      (p) => !p.student.deletedAt
+    );
+  }
 
   return NextResponse.json(updated);
 }

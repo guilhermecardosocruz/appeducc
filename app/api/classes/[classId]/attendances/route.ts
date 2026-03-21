@@ -112,13 +112,17 @@ export async function POST(
     presentByStudentId.set(studentId, Boolean(item?.present));
   }
 
+  const activeStudents = foundClass.students.filter(
+    (student) => !student.deletedAt
+  );
+
   const attendance = await prisma.attendance.create({
     data: {
       title,
       classId,
       lessonDate,
       presences: {
-        create: foundClass.students.map((student) => ({
+        create: activeStudents.map((student) => ({
           studentId: student.id,
           present: presentByStudentId.get(student.id) ?? false,
         })),
