@@ -49,6 +49,7 @@ export async function GET(
     select: {
       id: true,
       name: true,
+      status: true,
       createdAt: true,
       deletedAt: true,
       deletedReason: true,
@@ -101,6 +102,7 @@ export async function POST(
     data: {
       name,
       classId,
+      status: "ACTIVE",
     },
   });
 

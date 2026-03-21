@@ -8,22 +8,22 @@ datasource db {
 }
 
 model User {
-  id            String          @id @default(cuid())
-  name          String
-  email         String          @unique
-  cpf           String?         @unique
-  passwordHash  String
-  isTeacher     Boolean         @default(false)
-  createdById   String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  cpf            String?        @unique
+  passwordHash   String
+  isTeacher      Boolean        @default(false)
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  createdBy     User?           @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
-  createdUsers  User[]          @relation("CreatedUsers")
-  sessions      Session[]
-  groupMembers  GroupMember[]
-  schoolMembers SchoolMember[]
-  classes       Class[]         @relation("ClassTeacher")
+  createdBy      User?          @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers   User[]         @relation("CreatedUsers")
+  sessions       Session[]
+  groupMembers   GroupMember[]
+  schoolMembers  SchoolMember[]
+  classes        Class[]        @relation("ClassTeacher")
 
   deletedStudents Student[]     @relation("DeletedByUser")
 }
@@ -107,6 +107,7 @@ model Class {
 model Student {
   id            String               @id @default(cuid())
   name          String
+  status        String               @default("ACTIVE")
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -118,7 +119,7 @@ model Student {
   deletedAt     DateTime?
   deletedReason String?
   deletedById   String?
-  deletedBy     User? @relation("DeletedByUser", fields: [deletedById], references: [id])
+  deletedBy     User?                @relation("DeletedByUser", fields: [deletedById], references: [id])
 }
 
 model Attendance {

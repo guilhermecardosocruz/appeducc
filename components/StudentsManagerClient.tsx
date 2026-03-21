@@ -5,9 +5,12 @@ import { useState } from "react";
 import AddStudentModal from "./AddStudentModal";
 import StudentModal from "./StudentModal";
 
+type StudentStatus = "ACTIVE" | "PENDING_DELETE" | "DELETED";
+
 type StudentItem = {
   id: string;
   name: string;
+  status: StudentStatus;
   createdAt: string;
   deletedAt?: string | null;
   deletedReason?: string | null;
@@ -41,16 +44,49 @@ export default function StudentsManagerClient({
   }
 
   async function handleDeleteStudent(studentId: string) {
-    const reason = prompt("Motivo da exclusão:");
+    const reason = prompt("Motivo da solicitação de exclusão:");
     if (!reason) return;
 
-    await fetch(`/api/classes/${classId}/students/${studentId}`, {
+    const res = await fetch(`/api/classes/${classId}/students/${studentId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
     });
 
+    if (!res.ok) {
+      alert("Não foi possível solicitar a exclusão do aluno.");
+      return;
+    }
+
     await refreshStudents();
+  }
+
+  function getItemClasses(student: StudentItem) {
+    if (student.status === "ACTIVE") {
+      return "bg-white";
+    }
+
+    return "bg-red-50 text-red-700";
+  }
+
+  function getStatusBadge(student: StudentItem) {
+    if (student.status === "PENDING_DELETE") {
+      return (
+        <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+          Aguardando aprovação da gestão
+        </span>
+      );
+    }
+
+    if (student.status === "DELETED") {
+      return (
+        <span className="ml-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800">
+          Excluído
+        </span>
+      );
+    }
+
+    return null;
   }
 
   return (
@@ -63,55 +99,61 @@ export default function StudentsManagerClient({
             </Link>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border shadow-sm">
-            <div className="flex justify-between items-start flex-wrap gap-3">
+          <div className="rounded-lg border bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <h1 className="text-xl font-semibold">
                 Alunos — {className}
               </h1>
 
               <button
                 onClick={() => setOpenAddModal(true)}
-                className="bg-sky-600 text-white px-4 py-2 rounded-md"
+                className="rounded-md bg-sky-600 px-4 py-2 text-white"
               >
                 + Adicionar aluno
               </button>
             </div>
 
-            <ul className="mt-6 border rounded-md overflow-hidden">
+            <ul className="mt-6 overflow-hidden rounded-md border">
               <li className="bg-slate-100 px-4 py-2 text-sm font-semibold">
                 Lista de alunos
               </li>
 
-              {students.map((s, i) => (
-                <li
-                  key={s.id}
-                  onClick={() => setSelectedStudent(s.id)}
-                  className={`px-4 py-2 border-t text-sm flex justify-between items-center cursor-pointer ${
-                    s.deletedAt ? "bg-red-50 text-red-700 line-through" : ""
-                  }`}
-                >
-                  <span>
-                    {i + 1}. {s.name}
-                    {s.deletedAt && (
-                      <span className="ml-2 text-xs">
-                        (Excluído)
-                      </span>
-                    )}
-                  </span>
+              {students.map((s, i) => {
+                const inactive = s.status !== "ACTIVE";
 
-                  {!s.deletedAt && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteStudent(s.id);
-                      }}
-                      className="text-red-600 text-xs"
-                    >
-                      Excluir
-                    </button>
-                  )}
-                </li>
-              ))}
+                return (
+                  <li
+                    key={s.id}
+                    onClick={() => setSelectedStudent(s.id)}
+                    className={`cursor-pointer border-t px-4 py-3 text-sm ${getItemClasses(s)}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={inactive ? "line-through" : ""}>
+                        {i + 1}. {s.name}
+                        {getStatusBadge(s)}
+                      </span>
+
+                      {s.status === "ACTIVE" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStudent(s.id);
+                          }}
+                          className="text-xs text-red-600"
+                        >
+                          Solicitar exclusão
+                        </button>
+                      )}
+                    </div>
+
+                    {s.status === "PENDING_DELETE" && s.deletedReason ? (
+                      <p className="mt-1 text-xs text-amber-800">
+                        Motivo informado: {s.deletedReason}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>

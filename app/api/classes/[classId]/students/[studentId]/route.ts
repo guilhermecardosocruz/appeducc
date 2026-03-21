@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function isManagerRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return ["ADMIN", "GESTOR", "MANAGER", "OWNER"].includes(normalized);
+}
+
 async function ensureClassAccess(userId: string, classId: string) {
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
-    include: { school: true },
+    include: {
+      school: true,
+    },
   });
 
   if (!foundClass) return null;
@@ -24,17 +31,61 @@ async function ensureClassAccess(userId: string, classId: string) {
   return foundClass;
 }
 
+async function getApprovalContext(userId: string, classId: string) {
+  const foundClass = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      school: true,
+    },
+  });
+
+  if (!foundClass) return null;
+
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId,
+          schoolId: foundClass.schoolId,
+        },
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const hasAccess = Boolean(schoolMembership);
+  const canApprove =
+    isManagerRole(schoolMembership?.role) || isManagerRole(groupMembership?.role);
+
+  return {
+    foundClass,
+    hasAccess,
+    canApprove,
+  };
+}
+
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ classId: string; studentId: string }> }
 ) {
   const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { classId, studentId } = await params;
+  const access = await getApprovalContext(user.id, classId);
 
-  const foundClass = await ensureClassAccess(user.id, classId);
-  if (!foundClass) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!access?.hasAccess) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const student = await prisma.student.findUnique({
     where: { id: studentId },
@@ -48,15 +99,17 @@ export async function GET(
   }
 
   const total = student.presences.length;
-  const presents = student.presences.filter(p => p.present).length;
+  const presents = student.presences.filter((p) => p.present).length;
   const absents = total - presents;
   const percentage = total ? Math.round((presents / total) * 100) : 0;
 
   return NextResponse.json({
     id: student.id,
     name: student.name,
+    status: student.status,
     deletedAt: student.deletedAt,
     deletedReason: student.deletedReason,
+    canApproveDelete: access.canApprove,
     stats: {
       total,
       presents,
@@ -71,17 +124,91 @@ export async function PATCH(
   { params }: { params: Promise<{ classId: string; studentId: string }> }
 ) {
   const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { classId, studentId } = await params;
   const { name } = await req.json();
 
   const foundClass = await ensureClassAccess(user.id, classId);
-  if (!foundClass) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!foundClass) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const normalizedName = String(name ?? "").trim();
+
+  if (!normalizedName) {
+    return NextResponse.json({ error: "Missing student name" }, { status: 400 });
+  }
+
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: {
+      id: true,
+      classId: true,
+    },
+  });
+
+  if (!student || student.classId !== classId) {
+    return NextResponse.json({ error: "Student not found" }, { status: 404 });
+  }
 
   await prisma.student.update({
     where: { id: studentId },
-    data: { name },
+    data: { name: normalizedName },
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ classId: string; studentId: string }> }
+) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { classId, studentId } = await params;
+  const foundClass = await ensureClassAccess(user.id, classId);
+
+  if (!foundClass) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const reason = String(body?.reason ?? "").trim();
+
+  if (!reason) {
+    return NextResponse.json(
+      { error: "Motivo da exclusão é obrigatório" },
+      { status: 400 }
+    );
+  }
+
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: {
+      id: true,
+      classId: true,
+      status: true,
+    },
+  });
+
+  if (!student || student.classId !== classId) {
+    return NextResponse.json({ error: "Student not found" }, { status: 404 });
+  }
+
+  await prisma.student.update({
+    where: { id: studentId },
+    data: {
+      status: "PENDING_DELETE",
+      deletedReason: reason,
+      deletedById: user.id,
+      deletedAt: null,
+    },
   });
 
   return NextResponse.json({ success: true });

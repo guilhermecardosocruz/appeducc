@@ -46,6 +46,7 @@ export default async function ClassStudentsPage({ params }: PageProps) {
   const students = foundClass.students.map((student) => ({
     id: student.id,
     name: student.name,
+    status: student.status as "ACTIVE" | "PENDING_DELETE" | "DELETED",
     createdAt: student.createdAt.toISOString(),
     deletedAt: student.deletedAt?.toISOString() ?? null,
     deletedReason: student.deletedReason ?? null,

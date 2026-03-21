@@ -32,7 +32,7 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
           school: true,
           students: {
             where: {
-              deletedAt: null,
+              status: "ACTIVE",
             },
             select: {
               id: true,
@@ -101,7 +101,7 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
       presences: {
         where: {
           student: {
-            deletedAt: null,
+            status: "ACTIVE",
           },
         },
         include: {
