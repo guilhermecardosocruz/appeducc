@@ -99,6 +99,11 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
         },
       },
       presences: {
+        where: {
+          student: {
+            deletedAt: null,
+          },
+        },
         include: {
           student: {
             select: {
