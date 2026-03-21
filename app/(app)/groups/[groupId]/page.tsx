@@ -40,6 +40,24 @@ export default async function GroupPage({ params }: PageProps) {
         },
         orderBy: { createdAt: "desc" },
       },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              cpf: true,
+              isTeacher: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: [
+          { role: "asc" },
+          { createdAt: "asc" },
+        ],
+      },
     },
   });
 
@@ -56,11 +74,29 @@ export default async function GroupPage({ params }: PageProps) {
     },
   }));
 
+  const members = group.members.map((item) => ({
+    userId: item.user.id,
+    name: item.user.name,
+    email: item.user.email,
+    cpf: item.user.cpf,
+    isTeacher: item.user.isTeacher,
+    role: item.role,
+    canManageSchools: item.canManageSchools,
+    memberSince: item.createdAt.toISOString(),
+    createdAt: item.user.createdAt.toISOString(),
+  }));
+
+  const canManageMembers =
+    membership.role === "OWNER" || membership.role === "MANAGER";
+
   return (
     <GroupDetailClient
       groupId={group.id}
       groupName={group.name}
       initialSchools={schools}
+      initialMembers={members}
+      canManageMembers={canManageMembers}
+      currentUserId={user.id}
     />
   );
 }

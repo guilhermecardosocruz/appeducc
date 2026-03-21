@@ -8,24 +8,24 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  name           String
-  email          String         @unique
-  cpf            String?        @unique
-  passwordHash   String
-  isTeacher      Boolean        @default(false)
-  createdById    String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  name            String
+  email           String         @unique
+  cpf             String?        @unique
+  passwordHash    String
+  isTeacher       Boolean        @default(false)
+  createdById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  createdBy      User?          @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
-  createdUsers   User[]         @relation("CreatedUsers")
-  sessions       Session[]
-  groupMembers   GroupMember[]
-  schoolMembers  SchoolMember[]
-  classes        Class[]        @relation("ClassTeacher")
+  createdBy       User?          @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers    User[]         @relation("CreatedUsers")
+  sessions        Session[]
+  groupMembers    GroupMember[]
+  schoolMembers   SchoolMember[]
+  classes         Class[]        @relation("ClassTeacher")
 
-  deletedStudents Student[]     @relation("DeletedByUser")
+  deletedStudents Student[]      @relation("DeletedByUser")
 }
 
 model Session {
@@ -49,14 +49,15 @@ model Group {
 }
 
 model GroupMember {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  groupId   String
+  id               String   @id @default(cuid())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  group            Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId          String
 
-  role      String
-  createdAt DateTime @default(now())
+  role             String
+  canManageSchools Boolean  @default(false)
+  createdAt        DateTime @default(now())
 
   @@unique([userId, groupId])
 }
