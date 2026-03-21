@@ -8,6 +8,8 @@ type StudentItem = {
   id: string;
   name: string;
   createdAt: string;
+  deletedAt?: string | null;
+  deletedReason?: string | null;
 };
 
 type Props = {
@@ -58,6 +60,29 @@ export default function StudentsManagerClient({
       setImportMessage(null);
     } finally {
       setAddingStudent(false);
+    }
+  }
+
+  async function handleDeleteStudent(studentId: string) {
+    const confirmDelete = confirm("Deseja realmente excluir este aluno?");
+    if (!confirmDelete) return;
+
+    const reason = prompt("Motivo da exclusão:");
+    if (!reason) return;
+
+    const res = await fetch(
+      `/api/classes/${classId}/students/${studentId}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      }
+    );
+
+    if (res.ok) {
+      await refreshStudents();
+    } else {
+      alert("Erro ao excluir aluno.");
     }
   }
 
@@ -163,8 +188,30 @@ export default function StudentsManagerClient({
               </li>
 
               {students.map((s, i) => (
-                <li key={s.id} className="px-4 py-2 border-t text-sm">
-                  {i + 1}. {s.name}
+                <li
+                  key={s.id}
+                  className={`px-4 py-2 border-t text-sm flex justify-between items-center ${
+                    s.deletedAt ? "bg-red-50 text-red-700 line-through" : ""
+                  }`}
+                  title={s.deletedReason ?? ""}
+                >
+                  <span>
+                    {i + 1}. {s.name}
+                    {s.deletedAt && (
+                      <span className="ml-2 text-xs">
+                        (Excluído)
+                      </span>
+                    )}
+                  </span>
+
+                  {!s.deletedAt && (
+                    <button
+                      onClick={() => handleDeleteStudent(s.id)}
+                      className="text-red-600 text-xs"
+                    >
+                      Excluir
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
