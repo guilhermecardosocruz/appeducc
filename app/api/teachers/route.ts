@@ -90,21 +90,40 @@ export async function POST(req: NextRequest) {
     where: { email },
   });
 
+  // Se usuário já existe → não altera senha
   if (existingByEmail) {
-    return NextResponse.json(
-      { error: "Email already in use" },
-      { status: 409 }
-    );
-  }
+    const updated = await prisma.user.update({
+      where: { id: existingByEmail.id },
+      data: {
+        isTeacher: true,
+        createdById: user.id,
+        cpf: existingByEmail.cpf ?? cpf,
+      },
+      include: {
+        _count: {
+          select: {
+            classes: true,
+          },
+        },
+      },
+    });
 
-  const existingByCpf = await prisma.user.findFirst({
-    where: { cpf },
-  });
-
-  if (existingByCpf) {
     return NextResponse.json(
-      { error: "CPF already in use" },
-      { status: 409 }
+      {
+        teacher: {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          cpf: updated.cpf,
+          isTeacher: updated.isTeacher,
+          createdAt: updated.createdAt,
+          _count: {
+            classes: updated._count.classes,
+          },
+        },
+        message: "Usuário já existia. Senha não foi alterada.",
+      },
+      { status: 200 }
     );
   }
 

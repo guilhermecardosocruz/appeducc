@@ -1,25 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, hashPassword } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function normalizeCpf(cpf: string) {
   return cpf.replace(/\D/g, "");
-}
-
-function generateTeacherPassword(name: string, cpf: string) {
-  const cleanName = name.trim().replace(/\s+/g, "");
-  const cleanCpf = normalizeCpf(cpf);
-
-  if (cleanName.length < 3 || cleanCpf.length < 6) {
-    return null;
-  }
-
-  const first = cleanName[0].toUpperCase();
-  const second = cleanName[1].toLowerCase();
-  const third = cleanName[2].toUpperCase();
-  const cpfPart = cleanCpf.slice(0, 6);
-
-  return `${first}${second}${third}@${cpfPart}.`;
 }
 
 async function ensureTeacherAccess(userId: string, teacherId: string) {
@@ -140,24 +124,12 @@ export async function PATCH(
     );
   }
 
-  const regeneratedPassword = generateTeacherPassword(name, cpf);
-
-  if (!regeneratedPassword) {
-    return NextResponse.json(
-      { error: "Could not generate password from provided name and CPF" },
-      { status: 400 }
-    );
-  }
-
-  const passwordHash = await hashPassword(regeneratedPassword);
-
   const updatedTeacher = await prisma.user.update({
     where: { id: teacherId },
     data: {
       name,
       email,
       cpf,
-      passwordHash,
     },
     include: {
       _count: {
@@ -180,6 +152,5 @@ export async function PATCH(
         classes: updatedTeacher._count.classes,
       },
     },
-    regeneratedPassword,
   });
 }
