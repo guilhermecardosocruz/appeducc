@@ -96,6 +96,7 @@ export default async function TeacherPage({ params }: PageProps) {
       teacherId={teacher.id}
       teacherName={teacher.name}
       teacherEmail={teacher.email}
+      teacherCpf={teacher.cpf}
       linkedClasses={linkedClasses}
       availableClasses={availableClasses}
     />

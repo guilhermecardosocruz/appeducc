@@ -7,16 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//
-// ==========================
-// MODELO USER E SESSION (EXISTENTES)
-// ==========================
-//
-
 model User {
   id            String          @id @default(cuid())
   name          String
   email         String          @unique
+  cpf           String?         @unique
   passwordHash  String
   isTeacher     Boolean         @default(false)
   createdById   String?
@@ -43,12 +38,6 @@ model Session {
   @@index([userId])
 }
 
-//
-// ==========================
-// MODELOS DE GRUPOS DE ESCOLAS
-// ==========================
-//
-
 model Group {
   id        String        @id @default(cuid())
   name      String
@@ -66,17 +55,11 @@ model GroupMember {
   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupId   String
 
-  role      String   // OWNER, DIRECTOR, VIEWER
+  role      String
   createdAt DateTime @default(now())
 
   @@unique([userId, groupId])
 }
-
-//
-// ==========================
-// MODELOS DE ESCOLAS
-// ==========================
-//
 
 model School {
   id        String         @id @default(cuid())
@@ -98,17 +81,11 @@ model SchoolMember {
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolId  String
 
-  role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+  role      String
   createdAt DateTime @default(now())
 
   @@unique([userId, schoolId])
 }
-
-//
-// ==========================
-// MODELOS DE TURMAS, ALUNOS E CHAMADAS
-// ==========================
-//
 
 model Class {
   id          String              @id @default(cuid())

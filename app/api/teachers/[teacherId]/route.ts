@@ -22,16 +22,11 @@ function generateTeacherPassword(name: string, cpf: string) {
   return `${first}${second}${third}@${cpfPart}.`;
 }
 
-export async function GET() {
-  const user = await getSessionUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const teachers = await prisma.user.findMany({
+async function ensureTeacherAccess(userId: string, teacherId: string) {
+  const teacher = await prisma.user.findFirst({
     where: {
-      createdById: user.id,
+      id: teacherId,
+      createdById: userId,
       isTeacher: true,
     },
     include: {
@@ -41,29 +36,56 @@ export async function GET() {
         },
       },
     },
-    orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(
-    teachers.map((teacher) => ({
-      id: teacher.id,
-      name: teacher.name,
-      email: teacher.email,
-      cpf: teacher.cpf,
-      isTeacher: teacher.isTeacher,
-      createdAt: teacher.createdAt,
-      _count: {
-        classes: teacher._count.classes,
-      },
-    }))
-  );
+  return teacher;
 }
 
-export async function POST(req: NextRequest) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ teacherId: string }> }
+) {
   const user = await getSessionUser();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { teacherId } = await params;
+  const teacher = await ensureTeacherAccess(user.id, teacherId);
+
+  if (!teacher) {
+    return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    id: teacher.id,
+    name: teacher.name,
+    email: teacher.email,
+    cpf: teacher.cpf,
+    isTeacher: teacher.isTeacher,
+    createdAt: teacher.createdAt,
+    _count: {
+      classes: teacher._count.classes,
+    },
+  });
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ teacherId: string }> }
+) {
+  const user = await getSessionUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { teacherId } = await params;
+  const teacher = await ensureTeacherAccess(user.id, teacherId);
+
+  if (!teacher) {
+    return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
   }
 
   const data = await req.json();
@@ -74,7 +96,7 @@ export async function POST(req: NextRequest) {
 
   if (!name || !email || !cpf) {
     return NextResponse.json(
-      { error: "Missing teacher name, email or CPF" },
+      { error: "Name, email and CPF are required" },
       { status: 400 }
     );
   }
@@ -86,8 +108,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const existingByEmail = await prisma.user.findUnique({
-    where: { email },
+  const existingByEmail = await prisma.user.findFirst({
+    where: {
+      email,
+      NOT: {
+        id: teacherId,
+      },
+    },
   });
 
   if (existingByEmail) {
@@ -98,7 +125,12 @@ export async function POST(req: NextRequest) {
   }
 
   const existingByCpf = await prisma.user.findFirst({
-    where: { cpf },
+    where: {
+      cpf,
+      NOT: {
+        id: teacherId,
+      },
+    },
   });
 
   if (existingByCpf) {
@@ -108,25 +140,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const temporaryPassword = generateTeacherPassword(name, cpf);
+  const regeneratedPassword = generateTeacherPassword(name, cpf);
 
-  if (!temporaryPassword) {
+  if (!regeneratedPassword) {
     return NextResponse.json(
       { error: "Could not generate password from provided name and CPF" },
       { status: 400 }
     );
   }
 
-  const passwordHash = await hashPassword(temporaryPassword);
+  const passwordHash = await hashPassword(regeneratedPassword);
 
-  const teacher = await prisma.user.create({
+  const updatedTeacher = await prisma.user.update({
+    where: { id: teacherId },
     data: {
       name,
       email,
       cpf,
       passwordHash,
-      isTeacher: true,
-      createdById: user.id,
     },
     include: {
       _count: {
@@ -137,21 +168,18 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json(
-    {
-      teacher: {
-        id: teacher.id,
-        name: teacher.name,
-        email: teacher.email,
-        cpf: teacher.cpf,
-        isTeacher: teacher.isTeacher,
-        createdAt: teacher.createdAt,
-        _count: {
-          classes: teacher._count.classes,
-        },
+  return NextResponse.json({
+    teacher: {
+      id: updatedTeacher.id,
+      name: updatedTeacher.name,
+      email: updatedTeacher.email,
+      cpf: updatedTeacher.cpf,
+      isTeacher: updatedTeacher.isTeacher,
+      createdAt: updatedTeacher.createdAt,
+      _count: {
+        classes: updatedTeacher._count.classes,
       },
-      temporaryPassword,
     },
-    { status: 201 }
-  );
+    regeneratedPassword,
+  });
 }

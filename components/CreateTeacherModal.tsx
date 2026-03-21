@@ -7,6 +7,7 @@ type CreatedTeacherResult = {
     id: string;
     name: string;
     email: string;
+    cpf: string | null;
     isTeacher: boolean;
     createdAt: string;
     _count: {
@@ -16,11 +17,24 @@ type CreatedTeacherResult = {
   temporaryPassword: string;
 };
 
+type ErrorResponse = {
+  error?: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
 };
+
+function formatCpf(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  return digits
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
 
 export default function CreateTeacherModal({
   open,
@@ -29,26 +43,34 @@ export default function CreateTeacherModal({
 }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<CreatedTeacherResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+
+    if (!name.trim() || !email.trim() || !cpf.trim()) {
+      setErrorMessage("Preencha nome completo, e-mail e CPF.");
+      return;
+    }
 
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const res = await fetch("/api/teachers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, cpf }),
       });
 
       if (!res.ok) {
-        console.error("Erro ao criar professor");
+        const errorData = (await res.json()) as ErrorResponse;
+        setErrorMessage(errorData.error ?? "Erro ao criar professor.");
         return;
       }
 
@@ -56,9 +78,11 @@ export default function CreateTeacherModal({
       setCreated(data);
       setName("");
       setEmail("");
+      setCpf("");
       onCreated();
     } catch (error) {
       console.error("Erro ao criar professor", error);
+      setErrorMessage("Erro ao criar professor.");
     } finally {
       setLoading(false);
     }
@@ -68,6 +92,8 @@ export default function CreateTeacherModal({
     setCreated(null);
     setName("");
     setEmail("");
+    setCpf("");
+    setErrorMessage(null);
     onClose();
   }
 
@@ -80,8 +106,8 @@ export default function CreateTeacherModal({
               Adicionar professor
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              Cadastre um professor com nome completo e e-mail. A senha será
-              gerada automaticamente.
+              Cadastre o professor com nome completo, e-mail e CPF. A senha será
+              gerada automaticamente com base nesses dados.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -92,7 +118,7 @@ export default function CreateTeacherModal({
                 <input
                   type="text"
                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  placeholder="Ex: João da Silva"
+                  placeholder="Ex: Guilherme Cruz"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -105,11 +131,29 @@ export default function CreateTeacherModal({
                 <input
                   type="email"
                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  placeholder="Ex: joao@email.com"
+                  placeholder="Ex: professor@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  CPF
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Ex: 111.111.111-11"
+                  value={cpf}
+                  onChange={(e) => setCpf(formatCpf(e.target.value))}
+                />
+              </div>
+
+              {errorMessage && (
+                <p className="text-sm text-red-600">{errorMessage}</p>
+              )}
 
               <div className="flex justify-end gap-2">
                 <button
@@ -161,7 +205,16 @@ export default function CreateTeacherModal({
 
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Senha temporária
+                  CPF
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-900">
+                  {created.teacher.cpf}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Senha inicial
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-900">
                   {created.temporaryPassword}
