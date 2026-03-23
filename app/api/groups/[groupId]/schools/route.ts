@@ -58,10 +58,9 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const schoolIds =
-    access.groupMembership || access.canManage
-      ? undefined
-      : access.schoolMemberships.map((item) => item.schoolId);
+  const schoolIds = access.groupMembership
+    ? undefined
+    : access.schoolMemberships.map((item) => item.schoolId);
 
   const schools = await prisma.school.findMany({
     where: {

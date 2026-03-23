@@ -36,9 +36,16 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
         include: {
           school: true,
           students: {
-            where: { status: "ACTIVE" },
-            select: { id: true, name: true },
-            orderBy: { name: "asc" },
+            where: {
+              status: "ACTIVE",
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+            orderBy: {
+              name: "asc",
+            },
           },
         },
       },
@@ -75,26 +82,75 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess =
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManage =
     Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
   if (!hasAccess) {
     notFound();
   }
 
-  const initialPresences = attendanceBase.presences.map((item) => ({
+  const existingStudentIds = new Set(
+    attendanceBase.presences.map((item) => item.studentId)
+  );
+
+  const missingStudents = attendanceBase.class.students.filter(
+    (student) => !existingStudentIds.has(student.id)
+  );
+
+  if (missingStudents.length > 0 && canManage) {
+    await prisma.attendancePresence.createMany({
+      data: missingStudents.map((student) => ({
+        attendanceId,
+        studentId: student.id,
+        present: false,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const attendance = await prisma.attendance.findUnique({
+    where: { id: attendanceId },
+    include: {
+      class: {
+        include: {
+          school: true,
+        },
+      },
+      presences: {
+        where: {
+          student: {
+            status: "ACTIVE",
+          },
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          student: {
+            name: "asc",
+          },
+        },
+      },
+    },
+  });
+
+  if (!attendance || attendance.classId !== classId) {
+    notFound();
+  }
+
+  const initialPresences = attendance.presences.map((item) => ({
     id: item.id,
     present: item.present,
     student: {
-      id: item.studentId,
-      name:
-        attendanceBase.class.students.find((s) => s.id === item.studentId)
-          ?.name || "",
+      id: item.student.id,
+      name: item.student.name,
     },
   }));
 
@@ -110,11 +166,17 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
           </Link>
         </div>
 
+        {!canManage ? (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Você está com acesso somente de visualização nesta chamada.
+          </div>
+        ) : null}
+
         <AttendanceDetailClient
-          attendanceId={attendanceId}
+          attendanceId={attendance.id}
           classId={classId}
-          initialTitle={attendanceBase.title}
-          initialLessonDate={formatDateInput(attendanceBase.lessonDate)}
+          initialTitle={attendance.title}
+          initialLessonDate={formatDateInput(attendance.lessonDate)}
           initialPresences={initialPresences}
         />
       </div>

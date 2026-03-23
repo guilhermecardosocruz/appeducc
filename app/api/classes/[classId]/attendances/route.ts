@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 async function ensureClassAccess(userId: string, classId: string) {
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
@@ -15,18 +20,36 @@ async function ensureClassAccess(userId: string, classId: string) {
 
   if (!foundClass) return null;
 
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId,
-        schoolId: foundClass.schoolId,
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId,
+          schoolId: foundClass.schoolId,
+        },
       },
-    },
-  });
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
 
-  if (!membership) return null;
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManage =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
-  return foundClass;
+  if (!hasAccess) return null;
+
+  return {
+    foundClass,
+    canManage,
+  };
 }
 
 export async function GET(
@@ -39,9 +62,9 @@ export async function GET(
   }
 
   const { classId } = await params;
-  const foundClass = await ensureClassAccess(user.id, classId);
+  const access = await ensureClassAccess(user.id, classId);
 
-  if (!foundClass) {
+  if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -71,11 +94,17 @@ export async function POST(
   }
 
   const { classId } = await params;
-  const foundClass = await ensureClassAccess(user.id, classId);
+  const access = await ensureClassAccess(user.id, classId);
 
-  if (!foundClass) {
+  if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  if (!access.canManage) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { foundClass } = access;
 
   const data = await req.json();
   const title = String(data.title ?? "").trim();
@@ -113,7 +142,7 @@ export async function POST(
   }
 
   const activeStudents = foundClass.students.filter(
-    (student) => !student.deletedAt
+    (student) => student.status === "ACTIVE" && !student.deletedAt
   );
 
   const attendance = await prisma.attendance.create({

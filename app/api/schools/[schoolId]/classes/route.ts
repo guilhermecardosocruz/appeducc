@@ -39,21 +39,10 @@ async function getSchoolAccess(userId: string, schoolId: string) {
     }),
   ]);
 
-  const hasAccess =
-    Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
-
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
   const canManage =
     Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
   return {
     school,

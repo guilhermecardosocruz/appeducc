@@ -21,7 +21,6 @@ type GroupMemberItem = {
   cpf: string | null;
   isTeacher: boolean;
   role: string;
-  canManageSchools: boolean;
   memberSince: string;
   createdAt: string;
 };
@@ -133,7 +132,7 @@ export default function GroupDetailClient({
   function getRoleLabel(role: string) {
     if (role === "OWNER") return "Criador";
     if (role === "MANAGER") return "Gestor do grupo";
-    if (role === "VIEWER") return "Acompanhamento";
+    if (role === "VIEWER") return "Somente visualização";
     return role;
   }
 
@@ -167,7 +166,7 @@ export default function GroupDetailClient({
                   onClick={() => setOpenMembersModal(true)}
                   className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
                 >
-                  Gerenciar equipe
+                  Compartilhar gestão
                 </button>
               ) : null}
 
@@ -188,10 +187,10 @@ export default function GroupDetailClient({
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">
-                    Equipe do grupo
+                    Gestão do grupo
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Pessoas com acesso administrativo a este grupo.
+                    Pessoas com acesso administrativo ou visual a este grupo.
                   </p>
                 </div>
 
@@ -224,16 +223,6 @@ export default function GroupDetailClient({
                             <span className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
                               {getRoleLabel(member.role)}
                             </span>
-
-                            {member.canManageSchools ? (
-                              <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                                Gestão de escolas
-                              </span>
-                            ) : (
-                              <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                                Sem gestão de escolas
-                              </span>
-                            )}
                           </div>
                         </div>
 

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 async function ensureAttendanceAccess(userId: string, attendanceId: string) {
   const attendance = await prisma.attendance.findUnique({
     where: { id: attendanceId },
@@ -18,6 +23,7 @@ async function ensureAttendanceAccess(userId: string, attendanceId: string) {
               id: true,
               name: true,
               deletedAt: true,
+              status: true,
             },
           },
         },
@@ -32,18 +38,36 @@ async function ensureAttendanceAccess(userId: string, attendanceId: string) {
 
   if (!attendance) return null;
 
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId,
-        schoolId: attendance.class.schoolId,
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId,
+          schoolId: attendance.class.schoolId,
+        },
       },
-    },
-  });
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId: attendance.class.school.groupId,
+        },
+      },
+    }),
+  ]);
 
-  if (!membership) return null;
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManage =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
-  return attendance;
+  if (!hasAccess) return null;
+
+  return {
+    attendance,
+    canManage,
+  };
 }
 
 export async function GET(
@@ -56,17 +80,17 @@ export async function GET(
   }
 
   const { attendanceId } = await params;
-  const attendance = await ensureAttendanceAccess(user.id, attendanceId);
+  const access = await ensureAttendanceAccess(user.id, attendanceId);
 
-  if (!attendance) {
+  if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  attendance.presences = attendance.presences.filter(
-    (p) => !p.student.deletedAt
+  access.attendance.presences = access.attendance.presences.filter(
+    (p) => !p.student.deletedAt && p.student.status === "ACTIVE"
   );
 
-  return NextResponse.json(attendance);
+  return NextResponse.json(access.attendance);
 }
 
 export async function PATCH(
@@ -79,9 +103,13 @@ export async function PATCH(
   }
 
   const { attendanceId } = await params;
-  const attendance = await ensureAttendanceAccess(user.id, attendanceId);
+  const access = await ensureAttendanceAccess(user.id, attendanceId);
 
-  if (!attendance) {
+  if (!access) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!access.canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -144,6 +172,7 @@ export async function PATCH(
               id: true,
               name: true,
               deletedAt: true,
+              status: true,
             },
           },
         },
@@ -158,7 +187,7 @@ export async function PATCH(
 
   if (updated) {
     updated.presences = updated.presences.filter(
-      (p) => !p.student.deletedAt
+      (p) => !p.student.deletedAt && p.student.status === "ACTIVE"
     );
   }
 

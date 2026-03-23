@@ -62,13 +62,10 @@ export default async function ClassChamadasPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess =
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManage =
     Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
   if (!hasAccess) {
     notFound();
@@ -94,14 +91,21 @@ export default async function ClassChamadasPage({ params }: PageProps) {
             <p className="mt-2 text-sm text-slate-500">
               Gerencie as chamadas desta turma.
             </p>
+            {!canManage ? (
+              <p className="mt-2 text-sm text-amber-700">
+                Você está com acesso somente de visualização neste módulo.
+              </p>
+            ) : null}
           </div>
 
-          <Link
-            href={`/classes/${classId}/chamadas/new`}
-            className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
-          >
-            + Nova chamada
-          </Link>
+          {canManage ? (
+            <Link
+              href={`/classes/${classId}/chamadas/new`}
+              className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+            >
+              + Nova chamada
+            </Link>
+          ) : null}
         </div>
 
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -111,12 +115,14 @@ export default async function ClassChamadasPage({ params }: PageProps) {
                 Ainda não há chamadas nesta turma.
               </p>
 
-              <Link
-                href={`/classes/${classId}/chamadas/new`}
-                className="mt-4 inline-flex items-center rounded-md border border-sky-600 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50"
-              >
-                Criar primeira chamada
-              </Link>
+              {canManage ? (
+                <Link
+                  href={`/classes/${classId}/chamadas/new`}
+                  className="mt-4 inline-flex items-center rounded-md border border-sky-600 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50"
+                >
+                  Criar primeira chamada
+                </Link>
+              ) : null}
             </div>
           ) : (
             <ul className="space-y-3">

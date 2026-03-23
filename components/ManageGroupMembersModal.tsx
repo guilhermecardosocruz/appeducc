@@ -10,7 +10,6 @@ type CreatedMemberResponse = {
     cpf: string | null;
     isTeacher: boolean;
     role: string;
-    canManageSchools: boolean;
     memberSince: string;
     createdAt: string;
   };
@@ -48,17 +47,16 @@ export default function ManageGroupMembersModal({
   const [email, setEmail] = useState("");
   const [cpf, setCpf] = useState("");
   const [role, setRole] = useState<"MANAGER" | "VIEWER">("VIEWER");
-  const [canManageSchools, setCanManageSchools] = useState(false);
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<CreatedMemberResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const roleDescription = useMemo(() => {
     if (role === "MANAGER") {
-      return "Pode ajudar na administração do grupo.";
+      return "Terá os mesmos poderes de gestão do criador do grupo, exceto o papel de OWNER.";
     }
 
-    return "Acompanha informações do grupo sem alterar dados.";
+    return "Poderá visualizar o grupo, escolas, turmas e informações, sem editar.";
   }, [role]);
 
   if (!open) return null;
@@ -83,7 +81,6 @@ export default function ManageGroupMembersModal({
           email,
           cpf,
           role,
-          canManageSchools,
         }),
       });
 
@@ -99,7 +96,6 @@ export default function ManageGroupMembersModal({
       setEmail("");
       setCpf("");
       setRole("VIEWER");
-      setCanManageSchools(false);
       onCreated();
     } catch (error) {
       console.error("Erro ao adicionar membro do grupo", error);
@@ -114,7 +110,6 @@ export default function ManageGroupMembersModal({
     setEmail("");
     setCpf("");
     setRole("VIEWER");
-    setCanManageSchools(false);
     setCreated(null);
     setErrorMessage(null);
     onClose();
@@ -126,7 +121,7 @@ export default function ManageGroupMembersModal({
         {!created ? (
           <>
             <h2 className="text-lg font-semibold text-slate-900">
-              Gerenciar equipe do grupo
+              Compartilhar gestão do grupo
             </h2>
             <p className="mt-2 text-sm text-slate-500">
               Informe o e-mail. Se a pessoa já existir no sistema, ela será apenas
@@ -188,27 +183,11 @@ export default function ManageGroupMembersModal({
                   value={role}
                   onChange={(e) => setRole(e.target.value as "MANAGER" | "VIEWER")}
                 >
-                  <option value="VIEWER">Acompanhamento</option>
+                  <option value="VIEWER">Somente visualização</option>
                   <option value="MANAGER">Gestor do grupo</option>
                 </select>
                 <p className="mt-1 text-xs text-slate-500">{roleDescription}</p>
               </div>
-
-              <label className="flex items-start gap-3 rounded-md border border-slate-200 p-3">
-                <input
-                  type="checkbox"
-                  checked={canManageSchools}
-                  onChange={(e) => setCanManageSchools(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                />
-                <span className="text-sm text-slate-700">
-                  Dar acesso automático de gestão das escolas do grupo
-                  <span className="mt-1 block text-xs text-slate-500">
-                    Neste primeiro passo, vamos apenas salvar essa configuração no
-                    grupo para usar nas próximas regras de escola.
-                  </span>
-                </span>
-              </label>
 
               {errorMessage ? (
                 <p className="text-sm text-red-600">{errorMessage}</p>
@@ -229,7 +208,7 @@ export default function ManageGroupMembersModal({
                   className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
                   disabled={loading}
                 >
-                  {loading ? "Salvando..." : "Adicionar ao grupo"}
+                  {loading ? "Salvando..." : "Compartilhar"}
                 </button>
               </div>
             </form>
@@ -237,7 +216,7 @@ export default function ManageGroupMembersModal({
         ) : (
           <>
             <h2 className="text-lg font-semibold text-slate-900">
-              Membro adicionado ao grupo
+              Acesso compartilhado com sucesso
             </h2>
             <p className="mt-2 text-sm text-slate-500">
               {created.createdUser
@@ -266,19 +245,12 @@ export default function ManageGroupMembersModal({
 
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Papel no grupo
+                  Tipo de acesso
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-900">
-                  {created.member.role === "MANAGER" ? "Gestor do grupo" : "Acompanhamento"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Gestão das escolas
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-900">
-                  {created.member.canManageSchools ? "Sim" : "Não"}
+                  {created.member.role === "MANAGER"
+                    ? "Gestor do grupo"
+                    : "Somente visualização"}
                 </p>
               </div>
 

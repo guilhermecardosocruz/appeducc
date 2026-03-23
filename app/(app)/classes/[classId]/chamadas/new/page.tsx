@@ -35,7 +35,9 @@ export default async function NewAttendancePage({ params }: PageProps) {
     include: {
       school: true,
       students: {
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+        },
         orderBy: { name: "asc" },
       },
     },
@@ -64,15 +66,11 @@ export default async function NewAttendancePage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess =
+  const canManage =
     Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
-  if (!hasAccess) {
+  if (!canManage) {
     notFound();
   }
 

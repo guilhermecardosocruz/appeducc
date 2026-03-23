@@ -72,10 +72,7 @@ export async function GET(
         },
       },
     },
-    orderBy: [
-      { role: "asc" },
-      { createdAt: "asc" },
-    ],
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
   });
 
   return NextResponse.json(
@@ -86,7 +83,6 @@ export async function GET(
       cpf: item.user.cpf,
       isTeacher: item.user.isTeacher,
       role: item.role,
-      canManageSchools: item.canManageSchools,
       memberSince: item.createdAt,
       createdAt: item.user.createdAt,
     }))
@@ -123,7 +119,6 @@ export async function POST(
   const email = String(data.email ?? "").trim().toLowerCase();
   const cpf = normalizeCpf(String(data.cpf ?? "").trim());
   const roleRaw = String(data.role ?? "").trim().toUpperCase();
-  const canManageSchools = Boolean(data.canManageSchools);
 
   const allowedRoles = ["MANAGER", "VIEWER"];
 
@@ -241,7 +236,7 @@ export async function POST(
       userId,
       groupId,
       role: roleRaw,
-      canManageSchools,
+      canManageSchools: false,
     },
     include: {
       user: {
@@ -266,7 +261,6 @@ export async function POST(
         cpf: createdMembership.user.cpf,
         isTeacher: createdMembership.user.isTeacher,
         role: createdMembership.role,
-        canManageSchools: createdMembership.canManageSchools,
         memberSince: createdMembership.createdAt,
         createdAt: createdMembership.user.createdAt,
       },

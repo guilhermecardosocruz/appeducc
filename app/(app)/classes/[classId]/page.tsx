@@ -51,23 +51,22 @@ export default async function ClassPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess =
-    Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
 
   if (!hasAccess) {
     notFound();
   }
+
+  const canManageClass =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
   return (
     <ClassDetailClient
       classId={foundClass.id}
       className={foundClass.name}
       schoolId={foundClass.schoolId}
+      canManageClass={canManageClass}
     />
   );
 }

@@ -80,7 +80,7 @@ export default async function GroupPage({ params }: PageProps) {
   const canManageMembers =
     groupMembership?.role === "OWNER" || groupMembership?.role === "MANAGER";
 
-  const allowedSchoolIds = canManageMembers || groupMembership
+  const allowedSchoolIds = groupMembership
     ? null
     : new Set(schoolMembershipsInGroup.map((item) => item.schoolId));
 
@@ -105,7 +105,6 @@ export default async function GroupPage({ params }: PageProps) {
     cpf: item.user.cpf,
     isTeacher: item.user.isTeacher,
     role: item.role,
-    canManageSchools: item.canManageSchools,
     memberSince: item.createdAt.toISOString(),
     createdAt: item.user.createdAt.toISOString(),
   }));

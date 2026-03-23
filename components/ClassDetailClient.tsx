@@ -4,6 +4,7 @@ type Props = {
   classId: string;
   className: string;
   schoolId: string;
+  canManageClass: boolean;
 };
 
 const actions = [
@@ -43,6 +44,7 @@ export default function ClassDetailClient({
   classId,
   className,
   schoolId,
+  canManageClass,
 }: Props) {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
@@ -62,12 +64,17 @@ export default function ClassDetailClient({
             Gerencie a turma acessando alunos, chamadas, conteúdos, relatórios e
             ações de apoio.
           </p>
+          {!canManageClass ? (
+            <p className="mt-2 text-sm text-amber-700">
+              Você está com acesso somente de visualização nesta turma.
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Ações</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Use os atalhos abaixo para gerenciar a turma.
+            Use os atalhos abaixo para acessar a turma.
           </p>
 
           <div className="mt-6 space-y-3">

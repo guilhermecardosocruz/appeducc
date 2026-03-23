@@ -66,13 +66,7 @@ export default async function SchoolPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess =
-    Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
 
   if (!hasAccess) {
     notFound();
@@ -80,11 +74,7 @@ export default async function SchoolPage({ params }: PageProps) {
 
   const canManageSchool =
     Boolean(schoolMembership) ||
-    Boolean(
-      groupMembership &&
-        (canManageGroupRole(groupMembership.role) ||
-          groupMembership.canManageSchools)
-    );
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
   const teachersRaw = await prisma.user.findMany({
     where: {
