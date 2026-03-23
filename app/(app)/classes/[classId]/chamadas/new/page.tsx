@@ -16,6 +16,11 @@ function getTodayDateInputValue() {
   return `${year}-${month}-${day}`;
 }
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 export default async function NewAttendancePage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -30,9 +35,7 @@ export default async function NewAttendancePage({ params }: PageProps) {
     include: {
       school: true,
       students: {
-        where: {
-          deletedAt: null,
-        },
+        where: { deletedAt: null },
         orderBy: { name: "asc" },
       },
     },
@@ -42,16 +45,34 @@ export default async function NewAttendancePage({ params }: PageProps) {
     notFound();
   }
 
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId: user.id,
-        schoolId: foundClass.schoolId,
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId: foundClass.schoolId,
+        },
       },
-    },
-  });
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
 
-  if (!membership) {
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(
+      groupMembership &&
+        (canManageGroupRole(groupMembership.role) ||
+          groupMembership.canManageSchools)
+    );
+
+  if (!hasAccess) {
     notFound();
   }
 

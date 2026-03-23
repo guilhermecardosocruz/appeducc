@@ -15,6 +15,11 @@ function formatDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 export default async function AttendanceDetailPage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -31,16 +36,9 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
         include: {
           school: true,
           students: {
-            where: {
-              status: "ACTIVE",
-            },
-            select: {
-              id: true,
-              name: true,
-            },
-            orderBy: {
-              name: "asc",
-            },
+            where: { status: "ACTIVE" },
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
           },
         },
       },
@@ -58,79 +56,45 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId: user.id,
-        schoolId: attendanceBase.class.schoolId,
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId: attendanceBase.class.schoolId,
+        },
       },
-    },
-  });
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: attendanceBase.class.school.groupId,
+        },
+      },
+    }),
+  ]);
 
-  if (!membership) {
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(
+      groupMembership &&
+        (canManageGroupRole(groupMembership.role) ||
+          groupMembership.canManageSchools)
+    );
+
+  if (!hasAccess) {
     notFound();
   }
 
-  const existingStudentIds = new Set(
-    attendanceBase.presences.map((item) => item.studentId)
-  );
-
-  const missingStudents = attendanceBase.class.students.filter(
-    (student) => !existingStudentIds.has(student.id)
-  );
-
-  if (missingStudents.length > 0) {
-    await prisma.attendancePresence.createMany({
-      data: missingStudents.map((student) => ({
-        attendanceId,
-        studentId: student.id,
-        present: false,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  const attendance = await prisma.attendance.findUnique({
-    where: { id: attendanceId },
-    include: {
-      class: {
-        include: {
-          school: true,
-        },
-      },
-      presences: {
-        where: {
-          student: {
-            status: "ACTIVE",
-          },
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          student: {
-            name: "asc",
-          },
-        },
-      },
-    },
-  });
-
-  if (!attendance || attendance.classId !== classId) {
-    notFound();
-  }
-
-  const initialPresences = attendance.presences.map((item) => ({
+  const initialPresences = attendanceBase.presences.map((item) => ({
     id: item.id,
     present: item.present,
     student: {
-      id: item.student.id,
-      name: item.student.name,
+      id: item.studentId,
+      name:
+        attendanceBase.class.students.find((s) => s.id === item.studentId)
+          ?.name || "",
     },
   }));
 
@@ -147,10 +111,10 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
         </div>
 
         <AttendanceDetailClient
-          attendanceId={attendance.id}
+          attendanceId={attendanceId}
           classId={classId}
-          initialTitle={attendance.title}
-          initialLessonDate={formatDateInput(attendance.lessonDate)}
+          initialTitle={attendanceBase.title}
+          initialLessonDate={formatDateInput(attendanceBase.lessonDate)}
           initialPresences={initialPresences}
         />
       </div>
