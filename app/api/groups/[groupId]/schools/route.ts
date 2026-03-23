@@ -2,17 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-async function ensureGroupAccess(userId: string, groupId: string) {
-  const membership = await prisma.groupMember.findUnique({
-    where: {
-      userId_groupId: {
-        userId,
-        groupId,
-      },
-    },
-  });
+function isGroupManagerRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
 
-  return membership;
+async function getGroupAccess(userId: string, groupId: string) {
+  const [groupMembership, schoolMemberships] = await Promise.all([
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId,
+        },
+      },
+    }),
+    prisma.schoolMember.findMany({
+      where: {
+        userId,
+        school: {
+          groupId,
+        },
+      },
+      select: {
+        schoolId: true,
+        role: true,
+      },
+    }),
+  ]);
+
+  const hasAccess = Boolean(groupMembership) || schoolMemberships.length > 0;
+  const canManage = Boolean(groupMembership && isGroupManagerRole(groupMembership.role));
+
+  return {
+    groupMembership,
+    schoolMemberships,
+    hasAccess,
+    canManage,
+  };
 }
 
 export async function GET(
@@ -25,14 +52,22 @@ export async function GET(
   }
 
   const { groupId } = await params;
-  const membership = await ensureGroupAccess(user.id, groupId);
+  const access = await getGroupAccess(user.id, groupId);
 
-  if (!membership) {
+  if (!access.hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const schoolIds =
+    access.groupMembership || access.canManage
+      ? undefined
+      : access.schoolMemberships.map((item) => item.schoolId);
+
   const schools = await prisma.school.findMany({
-    where: { groupId },
+    where: {
+      groupId,
+      ...(schoolIds ? { id: { in: schoolIds } } : {}),
+    },
     include: {
       _count: {
         select: { classes: true },
@@ -54,9 +89,9 @@ export async function POST(
   }
 
   const { groupId } = await params;
-  const membership = await ensureGroupAccess(user.id, groupId);
+  const access = await getGroupAccess(user.id, groupId);
 
-  if (!membership) {
+  if (!access.canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

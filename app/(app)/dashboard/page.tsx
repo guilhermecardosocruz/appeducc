@@ -21,41 +21,88 @@ export default async function DashboardPage() {
     );
   }
 
-  const groupsRaw = await prisma.group.findMany({
-    where: {
-      members: {
-        some: {
-          userId: user.id,
+  const [groupMemberships, schoolMemberships, teachersRaw] = await Promise.all([
+    prisma.groupMember.findMany({
+      where: {
+        userId: user.id,
+      },
+      include: {
+        group: {
+          include: {
+            _count: { select: { schools: true } },
+          },
         },
       },
-    },
-    include: {
-      _count: { select: { schools: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const teachersRaw = await prisma.user.findMany({
-    where: {
-      createdById: user.id,
-      isTeacher: true,
-    },
-    include: {
-      _count: {
-        select: {
-          classes: true,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.schoolMember.findMany({
+      where: {
+        userId: user.id,
+      },
+      include: {
+        school: {
+          include: {
+            group: {
+              include: {
+                _count: { select: { schools: true } },
+              },
+            },
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.user.findMany({
+      where: {
+        createdById: user.id,
+        isTeacher: true,
+      },
+      include: {
+        _count: {
+          select: {
+            classes: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
-  const groups = groupsRaw.map((g) => ({
-    id: g.id,
-    name: g.name,
-    createdAt: g.createdAt.toISOString(),
-    _count: { schools: g._count.schools },
-  }));
+  const groupsMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      createdAt: string;
+      _count: { schools: number };
+    }
+  >();
+
+  for (const membership of groupMemberships) {
+    groupsMap.set(membership.group.id, {
+      id: membership.group.id,
+      name: membership.group.name,
+      createdAt: membership.group.createdAt.toISOString(),
+      _count: { schools: membership.group._count.schools },
+    });
+  }
+
+  for (const membership of schoolMemberships) {
+    const group = membership.school.group;
+
+    if (!groupsMap.has(group.id)) {
+      groupsMap.set(group.id, {
+        id: group.id,
+        name: group.name,
+        createdAt: group.createdAt.toISOString(),
+        _count: { schools: group._count.schools },
+      });
+    }
+  }
+
+  const groups = Array.from(groupsMap.values()).sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
 
   const teachers = teachersRaw.map((teacher) => ({
     id: teacher.id,

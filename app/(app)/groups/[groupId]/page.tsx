@@ -16,63 +16,87 @@ export default async function GroupPage({ params }: PageProps) {
 
   const { groupId } = await params;
 
-  const membership = await prisma.groupMember.findUnique({
-    where: {
-      userId_groupId: {
-        userId: user.id,
-        groupId,
-      },
-    },
-  });
-
-  if (!membership) {
-    notFound();
-  }
-
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-    include: {
-      schools: {
-        include: {
-          _count: {
-            select: { classes: true },
-          },
+  const [groupMembership, schoolMembershipsInGroup, group] = await Promise.all([
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId,
         },
-        orderBy: { createdAt: "desc" },
       },
-      members: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              cpf: true,
-              isTeacher: true,
-              createdAt: true,
+    }),
+    prisma.schoolMember.findMany({
+      where: {
+        userId: user.id,
+        school: {
+          groupId,
+        },
+      },
+      select: {
+        schoolId: true,
+        role: true,
+      },
+    }),
+    prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        schools: {
+          include: {
+            _count: {
+              select: { classes: true },
             },
           },
+          orderBy: { createdAt: "desc" },
         },
-        orderBy: [
-          { role: "asc" },
-          { createdAt: "asc" },
-        ],
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                cpf: true,
+                isTeacher: true,
+                createdAt: true,
+              },
+            },
+          },
+          orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+        },
       },
-    },
-  });
+    }),
+  ]);
 
   if (!group) {
     notFound();
   }
 
-  const schools = group.schools.map((school) => ({
-    id: school.id,
-    name: school.name,
-    createdAt: school.createdAt.toISOString(),
-    _count: {
-      classes: school._count.classes,
-    },
-  }));
+  const hasAccess = Boolean(groupMembership) || schoolMembershipsInGroup.length > 0;
+
+  if (!hasAccess) {
+    notFound();
+  }
+
+  const canManageMembers =
+    groupMembership?.role === "OWNER" || groupMembership?.role === "MANAGER";
+
+  const allowedSchoolIds = canManageMembers || groupMembership
+    ? null
+    : new Set(schoolMembershipsInGroup.map((item) => item.schoolId));
+
+  const schools = group.schools
+    .filter((school) => {
+      if (!allowedSchoolIds) return true;
+      return allowedSchoolIds.has(school.id);
+    })
+    .map((school) => ({
+      id: school.id,
+      name: school.name,
+      createdAt: school.createdAt.toISOString(),
+      _count: {
+        classes: school._count.classes,
+      },
+    }));
 
   const members = group.members.map((item) => ({
     userId: item.user.id,
@@ -85,9 +109,6 @@ export default async function GroupPage({ params }: PageProps) {
     memberSince: item.createdAt.toISOString(),
     createdAt: item.user.createdAt.toISOString(),
   }));
-
-  const canManageMembers =
-    membership.role === "OWNER" || membership.role === "MANAGER";
 
   return (
     <GroupDetailClient

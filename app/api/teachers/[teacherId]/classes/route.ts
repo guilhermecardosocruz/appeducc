@@ -150,23 +150,6 @@ export async function POST(
         role: "TEACHER",
       },
     });
-
-    await tx.groupMember.upsert({
-      where: {
-        userId_groupId: {
-          userId: teacher.id,
-          groupId: targetClass.school.groupId,
-        },
-      },
-      update: {
-        role: "VIEWER",
-      },
-      create: {
-        userId: teacher.id,
-        groupId: targetClass.school.groupId,
-        role: "VIEWER",
-      },
-    });
   });
 
   const payload = await getTeacherClassesPayload(user.id, teacher.id);
@@ -244,25 +227,6 @@ export async function DELETE(
           userId: teacher.id,
           schoolId: targetClass.schoolId,
           role: "TEACHER",
-        },
-      });
-    }
-
-    const remainingTeacherClassesInGroup = await tx.class.count({
-      where: {
-        teacherId: teacher.id,
-        school: {
-          groupId: targetClass.school.groupId,
-        },
-      },
-    });
-
-    if (remainingTeacherClassesInGroup === 0) {
-      await tx.groupMember.deleteMany({
-        where: {
-          userId: teacher.id,
-          groupId: targetClass.school.groupId,
-          role: "VIEWER",
         },
       });
     }
