@@ -31,6 +31,7 @@ type Props = {
   groupId: string;
   teachers: TeacherOption[];
   initialClasses: ClassItem[];
+  canManageSchool: boolean;
 };
 
 export default function SchoolDetailClient({
@@ -39,6 +40,7 @@ export default function SchoolDetailClient({
   groupId,
   teachers,
   initialClasses,
+  canManageSchool,
 }: Props) {
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
   const [openModal, setOpenModal] = useState(false);
@@ -105,13 +107,15 @@ export default function SchoolDetailClient({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setOpenModal(true)}
-            className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
-          >
-            + Criar turma
-          </button>
+          {canManageSchool ? (
+            <button
+              type="button"
+              onClick={() => setOpenModal(true)}
+              className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+            >
+              + Criar turma
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -121,8 +125,7 @@ export default function SchoolDetailClient({
 
           {classes.length === 0 ? (
             <p className="text-sm text-slate-500">
-              Nenhuma turma cadastrada ainda nesta escola. Clique em{" "}
-              <span className="font-semibold">“Criar turma”</span> para começar.
+              Nenhuma turma cadastrada ainda nesta escola.
             </p>
           ) : (
             <ul className="space-y-3">
@@ -161,13 +164,15 @@ export default function SchoolDetailClient({
           )}
         </div>
 
-        <CreateClassModal
-          schoolId={schoolId}
-          teachers={teachers}
-          open={openModal}
-          onClose={() => setOpenModal(false)}
-          onCreated={refreshClasses}
-        />
+        {canManageSchool ? (
+          <CreateClassModal
+            schoolId={schoolId}
+            teachers={teachers}
+            open={openModal}
+            onClose={() => setOpenModal(false)}
+            onCreated={refreshClasses}
+          />
+        ) : null}
       </div>
     </main>
   );

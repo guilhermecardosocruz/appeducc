@@ -2,20 +2,66 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-async function ensureSchoolAccess(userId: string, schoolId: string) {
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId,
-        schoolId,
-      },
-    },
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
+async function getSchoolAccess(userId: string, schoolId: string) {
+  const school = await prisma.school.findUnique({
+    where: { id: schoolId },
     include: {
-      school: true,
+      group: true,
     },
   });
 
-  return membership;
+  if (!school) return null;
+
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId,
+          schoolId,
+        },
+      },
+      include: {
+        school: true,
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId: school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(
+      groupMembership &&
+        (canManageGroupRole(groupMembership.role) ||
+          groupMembership.canManageSchools)
+    );
+
+  const canManage =
+    Boolean(schoolMembership) ||
+    Boolean(
+      groupMembership &&
+        (canManageGroupRole(groupMembership.role) ||
+          groupMembership.canManageSchools)
+    );
+
+  return {
+    school,
+    schoolMembership,
+    groupMembership,
+    hasAccess,
+    canManage,
+  };
 }
 
 export async function GET(
@@ -28,9 +74,9 @@ export async function GET(
   }
 
   const { schoolId } = await params;
-  const membership = await ensureSchoolAccess(user.id, schoolId);
+  const access = await getSchoolAccess(user.id, schoolId);
 
-  if (!membership) {
+  if (!access?.hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -64,9 +110,9 @@ export async function POST(
   }
 
   const { schoolId } = await params;
-  const membership = await ensureSchoolAccess(user.id, schoolId);
+  const access = await getSchoolAccess(user.id, schoolId);
 
-  if (!membership) {
+  if (!access?.canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -89,13 +135,12 @@ export async function POST(
       where: {
         id: teacherIdRaw,
         isTeacher: true,
-        createdById: user.id,
       },
     });
 
     if (!teacher) {
       return NextResponse.json(
-        { error: "Invalid teacher for this account" },
+        { error: "Invalid teacher for this school" },
         { status: 400 }
       );
     }

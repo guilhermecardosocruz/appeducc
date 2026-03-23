@@ -7,6 +7,11 @@ type PageProps = {
   params: Promise<{ schoolId: string }>;
 };
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 export default async function SchoolPage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -15,19 +20,6 @@ export default async function SchoolPage({ params }: PageProps) {
   }
 
   const { schoolId } = await params;
-
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId: user.id,
-        schoolId,
-      },
-    },
-  });
-
-  if (!membership) {
-    notFound();
-  }
 
   const school = await prisma.school.findUnique({
     where: { id: schoolId },
@@ -55,19 +47,77 @@ export default async function SchoolPage({ params }: PageProps) {
     notFound();
   }
 
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId,
+        },
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(
+      groupMembership &&
+        (canManageGroupRole(groupMembership.role) ||
+          groupMembership.canManageSchools)
+    );
+
+  if (!hasAccess) {
+    notFound();
+  }
+
+  const canManageSchool =
+    Boolean(schoolMembership) ||
+    Boolean(
+      groupMembership &&
+        (canManageGroupRole(groupMembership.role) ||
+          groupMembership.canManageSchools)
+    );
+
   const teachersRaw = await prisma.user.findMany({
     where: {
-      createdById: user.id,
-      isTeacher: true,
+      OR: [
+        {
+          createdById: user.id,
+          isTeacher: true,
+        },
+        {
+          schoolMembers: {
+            some: {
+              schoolId,
+              role: "TEACHER",
+            },
+          },
+        },
+      ],
     },
     orderBy: { name: "asc" },
   });
 
-  const teachers = teachersRaw.map((teacher) => ({
-    id: teacher.id,
-    name: teacher.name,
-    email: teacher.email,
-  }));
+  const teacherMap = new Map(
+    teachersRaw.map((teacher) => [
+      teacher.id,
+      {
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+      },
+    ])
+  );
+
+  const teachers = Array.from(teacherMap.values());
 
   const classes = school.classes.map((item) => ({
     id: item.id,
@@ -93,6 +143,7 @@ export default async function SchoolPage({ params }: PageProps) {
       groupId={school.groupId}
       teachers={teachers}
       initialClasses={classes}
+      canManageSchool={canManageSchool}
     />
   );
 }
