@@ -38,7 +38,7 @@ export default async function SchoolPage({ params }: PageProps) {
             select: { students: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { name: "asc" },
       },
     },
   });

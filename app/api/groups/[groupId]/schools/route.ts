@@ -32,7 +32,9 @@ async function getGroupAccess(userId: string, groupId: string) {
   ]);
 
   const hasAccess = Boolean(groupMembership) || schoolMemberships.length > 0;
-  const canManage = Boolean(groupMembership && isGroupManagerRole(groupMembership.role));
+  const canManage = Boolean(
+    groupMembership && isGroupManagerRole(groupMembership.role)
+  );
 
   return {
     groupMembership,
@@ -72,7 +74,7 @@ export async function GET(
         select: { classes: true },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { name: "asc" },
   });
 
   return NextResponse.json(schools);

@@ -46,7 +46,7 @@ export default async function GroupPage({ params }: PageProps) {
               select: { classes: true },
             },
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { name: "asc" },
         },
         members: {
           include: {
@@ -71,7 +71,8 @@ export default async function GroupPage({ params }: PageProps) {
     notFound();
   }
 
-  const hasAccess = Boolean(groupMembership) || schoolMembershipsInGroup.length > 0;
+  const hasAccess =
+    Boolean(groupMembership) || schoolMembershipsInGroup.length > 0;
 
   if (!hasAccess) {
     notFound();

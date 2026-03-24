@@ -83,7 +83,7 @@ export async function GET(
         select: { students: true },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { name: "asc" },
   });
 
   return NextResponse.json(classes);
