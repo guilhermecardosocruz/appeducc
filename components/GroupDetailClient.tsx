@@ -95,23 +95,27 @@ export default function GroupDetailClient({
         const data = (await res.json()) as GroupMemberItem[];
         setMembers(data);
       } else {
-        console.error("Erro ao carregar equipe do grupo");
+        console.error("Erro ao carregar gestão do grupo");
       }
     } catch (error) {
-      console.error("Erro ao buscar equipe do grupo", error);
+      console.error("Erro ao buscar gestão do grupo", error);
     } finally {
       setLoadingMembers(false);
     }
   }
 
-  async function handleRemoveMember(memberUserId: string, memberName: string, role: string) {
+  async function handleRemoveMember(
+    memberUserId: string,
+    memberName: string,
+    role: string
+  ) {
     if (role === "OWNER") {
       alert("O OWNER não pode ser removido nesta versão.");
       return;
     }
 
     const confirmed = window.confirm(
-      `Remover ${memberName} da equipe deste grupo?`
+      `Remover ${memberName} da gestão deste grupo?`
     );
 
     if (!confirmed) return;
@@ -127,13 +131,6 @@ export default function GroupDetailClient({
     }
 
     await refreshMembers();
-  }
-
-  function getRoleLabel(role: string) {
-    if (role === "OWNER") return "Criador";
-    if (role === "MANAGER") return "Gestor do grupo";
-    if (role === "VIEWER") return "Somente visualização";
-    return role;
   }
 
   return (
@@ -182,69 +179,6 @@ export default function GroupDetailClient({
             </div>
           </div>
 
-          {canManageMembers ? (
-            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">
-                    Gestão do grupo
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Pessoas com acesso administrativo ou visual a este grupo.
-                  </p>
-                </div>
-
-                {loadingMembers ? (
-                  <span className="text-xs text-slate-500">Atualizando equipe…</span>
-                ) : null}
-              </div>
-
-              {members.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  Ainda não há membros vinculados a este grupo.
-                </p>
-              ) : (
-                <ul className="space-y-3">
-                  {members.map((member) => (
-                    <li
-                      key={member.userId}
-                      className="rounded-md border border-slate-200 px-4 py-3"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">
-                            {member.name}
-                            {member.userId === currentUserId ? (
-                              <span className="ml-2 text-xs text-slate-500">(você)</span>
-                            ) : null}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">{member.email}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <span className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
-                              {getRoleLabel(member.role)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {member.role !== "OWNER" ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleRemoveMember(member.userId, member.name, member.role)
-                            }
-                            className="text-xs font-medium text-red-600 hover:text-red-700"
-                          >
-                            Remover
-                          </button>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : null}
-
           <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             {loadingList && (
               <p className="mb-3 text-sm text-slate-500">Atualizando escolas…</p>
@@ -284,16 +218,16 @@ export default function GroupDetailClient({
               </ul>
             )}
           </div>
-
-          {canManageMembers ? (
-            <CreateSchoolModal
-              groupId={groupId}
-              open={openSchoolModal}
-              onClose={() => setOpenSchoolModal(false)}
-              onCreated={refreshSchools}
-            />
-          ) : null}
         </div>
+
+        {canManageMembers ? (
+          <CreateSchoolModal
+            groupId={groupId}
+            open={openSchoolModal}
+            onClose={() => setOpenSchoolModal(false)}
+            onCreated={refreshSchools}
+          />
+        ) : null}
       </main>
 
       {canManageMembers ? (
@@ -302,6 +236,9 @@ export default function GroupDetailClient({
           open={openMembersModal}
           onClose={() => setOpenMembersModal(false)}
           onCreated={refreshMembers}
+          members={members}
+          currentUserId={currentUserId}
+          onRemoveMember={handleRemoveMember}
         />
       ) : null}
     </>
