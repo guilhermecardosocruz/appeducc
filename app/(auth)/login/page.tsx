@@ -35,6 +35,17 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-4 py-10">
+        
+        {/* LOGO / TÍTULO */}
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+            EDUCC
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Gestão educacional inteligente
+          </p>
+        </div>
+
         <div className="w-full max-w-lg">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
             <div className="mb-5">
@@ -99,6 +110,10 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
+
+          <p className="mt-4 text-center text-[11px] text-slate-400">
+            EDUCC • Plataforma educacional
+          </p>
         </div>
       </section>
     </main>
