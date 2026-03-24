@@ -3,127 +3,102 @@
 import { useState } from "react";
 import Link from "next/link";
 import PwaInstallButton from "@/components/PwaInstallButton";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError("E-mail ou senha incorretos");
+      return;
+    }
+
+    router.push(data.redirect);
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <div className="text-sm font-semibold tracking-[0.18em] text-sky-700">
-            EDUCC
-          </div>
-          <nav className="hidden gap-6 text-xs text-slate-500 sm:flex">
-            <span className="font-medium text-slate-700">Dashboard</span>
-            <span>Minhas escolas</span>
-            <span>Ajuda</span>
-          </nav>
-        </div>
-      </header>
-
-      <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-5xl flex-col items-center justify-center px-4 py-10">
-        <div className="mb-6 flex flex-col items-center gap-3">
-          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            PWA em desenvolvimento para escolas
-          </span>
-
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
-              Bem-vindo de volta
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Acesse sua conta para continuar organizando escolas, turmas e
-              equipes pedagógicas.
-            </p>
-          </div>
-        </div>
-
+      <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-4 py-10">
         <div className="w-full max-w-lg">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200 sm:p-7">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
             <div className="mb-5">
               <PwaInstallButton />
             </div>
 
-            <form
-              className="space-y-4"
-              method="POST"
-              action="/api/auth/login"
-            >
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-1.5">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-slate-800"
-                >
+                <label className="block text-sm font-medium text-slate-800">
                   E-mail
                 </label>
                 <input
-                  id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
                   required
-                  className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  placeholder="voce@exemplo.com"
+                  className="block w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-800"
-                >
+                <label className="block text-sm font-medium text-slate-800">
                   Senha
                 </label>
                 <input
-                  id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
                   required
-                  className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  placeholder="Digite sua senha"
+                  className="block w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
                 />
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center justify-between text-xs">
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="font-medium text-sky-600 hover:text-sky-500"
+                  className="text-sky-600"
                 >
                   {showPassword ? "Ocultar senha" : "Mostrar senha"}
                 </button>
 
                 <div className="flex gap-4">
-                  <Link
-                    href="/recover"
-                    className="font-medium text-sky-600 hover:text-sky-500"
-                  >
+                  <Link href="/recover" className="text-sky-600">
                     Esqueci minha senha
                   </Link>
-                  <Link
-                    href="/register"
-                    className="font-medium text-sky-600 hover:text-sky-500"
-                  >
+                  <Link href="/register" className="text-sky-600">
                     Criar conta
                   </Link>
                 </div>
               </div>
 
+              {error && (
+                <div className="text-sm text-red-600 font-medium">
+                  {error}
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50"
+                className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white"
               >
                 Entrar
               </button>
             </form>
           </div>
-
-          <p className="mt-4 text-center text-[11px] text-slate-400">
-            EDUCC • Primeira versão da plataforma educacional em desenvolvimento
-          </p>
         </div>
       </section>
     </main>

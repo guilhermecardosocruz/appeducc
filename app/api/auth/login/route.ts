@@ -8,8 +8,10 @@ export async function POST(req: NextRequest) {
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    const url = new URL("/login?error=missing_fields", req.url);
-    return NextResponse.redirect(url);
+    return NextResponse.json(
+      { error: "missing_fields" },
+      { status: 400 }
+    );
   }
 
   const user = await prisma.user.findUnique({
@@ -17,17 +19,25 @@ export async function POST(req: NextRequest) {
   });
 
   if (!user) {
-    const url = new URL("/login?error=invalid_credentials", req.url);
-    return NextResponse.redirect(url);
+    return NextResponse.json(
+      { error: "invalid_credentials" },
+      { status: 401 }
+    );
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
 
   if (!valid) {
-    const url = new URL("/login?error=invalid_credentials", req.url);
-    return NextResponse.redirect(url);
+    return NextResponse.json(
+      { error: "invalid_credentials" },
+      { status: 401 }
+    );
   }
 
   const redirectUrl = await createSession(user.id, req.url);
-  return NextResponse.redirect(redirectUrl);
+
+  return NextResponse.json({
+    success: true,
+    redirect: redirectUrl,
+  });
 }
