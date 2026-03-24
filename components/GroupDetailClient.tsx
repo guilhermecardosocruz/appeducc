@@ -47,7 +47,6 @@ export default function GroupDetailClient({
   const [openSchoolModal, setOpenSchoolModal] = useState(false);
   const [openMembersModal, setOpenMembersModal] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
-  const [loadingMembers, setLoadingMembers] = useState(false);
 
   async function refreshSchools() {
     setLoadingList(true);
@@ -60,21 +59,8 @@ export default function GroupDetailClient({
 
       if (res.ok) {
         const data = (await res.json()) as School[];
-        setSchools(
-          data.map((school) => ({
-            id: school.id,
-            name: school.name,
-            createdAt: school.createdAt,
-            _count: {
-              classes: school._count?.classes ?? 0,
-            },
-          }))
-        );
-      } else {
-        console.error("Erro ao carregar escolas");
+        setSchools(data);
       }
-    } catch (error) {
-      console.error("Erro ao buscar escolas", error);
     } finally {
       setLoadingList(false);
     }
@@ -83,24 +69,15 @@ export default function GroupDetailClient({
   async function refreshMembers() {
     if (!canManageMembers) return;
 
-    setLoadingMembers(true);
-    try {
-      const res = await fetch(`/api/groups/${groupId}/members`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      });
+    const res = await fetch(`/api/groups/${groupId}/members`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-      if (res.ok) {
-        const data = (await res.json()) as GroupMemberItem[];
-        setMembers(data);
-      } else {
-        console.error("Erro ao carregar gestão do grupo");
-      }
-    } catch (error) {
-      console.error("Erro ao buscar gestão do grupo", error);
-    } finally {
-      setLoadingMembers(false);
+    if (res.ok) {
+      const data = (await res.json()) as GroupMemberItem[];
+      setMembers(data);
     }
   }
 
@@ -157,6 +134,13 @@ export default function GroupDetailClient({
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/groups/${groupId}/teachers`}
+                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                Professores
+              </Link>
+
               {canManageMembers ? (
                 <button
                   type="button"
@@ -171,7 +155,7 @@ export default function GroupDetailClient({
                 <button
                   type="button"
                   onClick={() => setOpenSchoolModal(true)}
-                  className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                  className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
                 >
                   + Criar escola
                 </button>
@@ -194,18 +178,14 @@ export default function GroupDetailClient({
                   <li key={school.id}>
                     <Link
                       href={`/schools/${school.id}`}
-                      className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50"
                     >
                       <div>
                         <p className="text-sm font-medium text-slate-900">
                           {school.name}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {school._count.classes === 0
-                            ? "Nenhuma turma cadastrada ainda"
-                            : school._count.classes === 1
-                            ? "1 turma cadastrada"
-                            : `${school._count.classes} turmas cadastradas`}
+                          {school._count.classes} turmas cadastradas
                         </p>
                       </div>
 
