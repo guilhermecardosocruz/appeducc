@@ -36,13 +36,16 @@ async function getAccessContext(userId: string, classId: string) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership);
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManageClass =
+    Boolean(schoolMembership) || isManagerRole(groupMembership?.role);
   const canManageDelete =
     isManagerRole(schoolMembership?.role) || isManagerRole(groupMembership?.role);
 
   return {
     foundClass,
     hasAccess,
+    canManageClass,
     canManageDelete,
   };
 }
@@ -86,6 +89,7 @@ export async function GET(
     deletedAt: student.deletedAt,
     deletedReason: student.deletedReason,
     canApproveDelete: access.canManageDelete,
+    canManageClass: access.canManageClass,
     stats: {
       total,
       presents,
@@ -109,6 +113,10 @@ export async function PATCH(
 
   const access = await getAccessContext(user.id, classId);
   if (!access?.hasAccess) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!access.canManageClass) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -151,6 +159,10 @@ export async function DELETE(
   const access = await getAccessContext(user.id, classId);
 
   if (!access?.hasAccess) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!access.canManageClass) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

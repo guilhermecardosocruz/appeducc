@@ -18,6 +18,7 @@ type StudentData = {
   deletedAt: string | null;
   deletedReason: string | null;
   canApproveDelete: boolean;
+  canManageClass: boolean;
   stats: StudentStats;
 };
 
@@ -145,6 +146,7 @@ export default function StudentModal({
   const inactive = student.status !== "ACTIVE";
   const pendingDelete = student.status === "PENDING_DELETE";
   const deleted = student.status === "DELETED";
+  const canManage = student.canManageClass;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4">
@@ -154,11 +156,18 @@ export default function StudentModal({
         <div>
           <label className="text-sm">Nome</label>
           <input
-            className="mt-1 w-full rounded border px-3 py-2"
+            className="mt-1 w-full rounded border px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={!canManage || loading}
           />
         </div>
+
+        {!canManage ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Você está com acesso somente de visualização neste aluno.
+          </div>
+        ) : null}
 
         {inactive ? (
           <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -180,51 +189,61 @@ export default function StudentModal({
             <p>Faltas: {student.stats.absents}</p>
             <p>Frequência: {student.stats.percentage}%</p>
           </div>
+        ) : (
+          <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <p>Presenças: {student.stats.presents}</p>
+            <p>Faltas: {student.stats.absents}</p>
+            <p>Frequência: {student.stats.percentage}%</p>
+          </div>
+        )}
+
+        {canManage ? (
+          <div className="flex flex-wrap gap-2">
+            {pendingDelete && student.canApproveDelete ? (
+              <>
+                <button
+                  onClick={approveDelete}
+                  disabled={loading}
+                  className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                >
+                  Aprovar exclusão
+                </button>
+
+                <button
+                  onClick={rejectDelete}
+                  disabled={loading}
+                  className="rounded bg-amber-500 px-3 py-2 text-sm text-white disabled:opacity-50"
+                >
+                  Rejeitar exclusão
+                </button>
+              </>
+            ) : null}
+
+            {inactive ? (
+              <button
+                onClick={restoreStudent}
+                disabled={loading}
+                className="rounded bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              >
+                Reativar aluno
+              </button>
+            ) : null}
+          </div>
         ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          {pendingDelete && student.canApproveDelete ? (
-            <>
-              <button
-                onClick={approveDelete}
-                disabled={loading}
-                className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
-              >
-                Aprovar exclusão
-              </button>
-
-              <button
-                onClick={rejectDelete}
-                disabled={loading}
-                className="rounded bg-amber-500 px-3 py-2 text-sm text-white disabled:opacity-50"
-              >
-                Rejeitar exclusão
-              </button>
-            </>
-          ) : null}
-
-          {inactive ? (
-            <button
-              onClick={restoreStudent}
-              disabled={loading}
-              className="rounded bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
-            >
-              Reativar aluno
-            </button>
-          ) : null}
-        </div>
 
         <div className="flex justify-end gap-2">
           <button onClick={onClose} disabled={loading}>
             Fechar
           </button>
-          <button
-            onClick={saveName}
-            disabled={loading}
-            className="rounded bg-sky-600 px-3 py-1 text-white disabled:opacity-50"
-          >
-            {loading ? "Salvando..." : "Salvar"}
-          </button>
+          {canManage ? (
+            <button
+              onClick={saveName}
+              disabled={loading}
+              className="rounded bg-sky-600 px-3 py-1 text-white disabled:opacity-50"
+            >
+              {loading ? "Salvando..." : "Salvar"}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

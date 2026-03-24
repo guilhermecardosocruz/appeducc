@@ -54,7 +54,8 @@ export default async function ClassStudentsPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess =
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManageStudents =
     Boolean(schoolMembership) ||
     Boolean(groupMembership && isManagerRole(groupMembership.role));
 
@@ -75,7 +76,8 @@ export default async function ClassStudentsPage({ params }: PageProps) {
     <StudentsManagerClient
       classId={foundClass.id}
       className={foundClass.name}
-      canImportSpreadsheet={!user.isTeacher}
+      canImportSpreadsheet={!user.isTeacher && canManageStudents}
+      canManageStudents={canManageStudents}
       initialStudents={students}
     />
   );

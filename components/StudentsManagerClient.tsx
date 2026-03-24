@@ -20,6 +20,7 @@ type Props = {
   classId: string;
   className: string;
   canImportSpreadsheet: boolean;
+  canManageStudents: boolean;
   initialStudents: StudentItem[];
 };
 
@@ -27,6 +28,7 @@ export default function StudentsManagerClient({
   classId,
   className,
   initialStudents,
+  canManageStudents,
 }: Props) {
   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
   const [openAddModal, setOpenAddModal] = useState(false);
@@ -109,16 +111,25 @@ export default function StudentsManagerClient({
 
           <div className="rounded-lg border bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h1 className="text-xl font-semibold">
-                Alunos — {className}
-              </h1>
+              <div>
+                <h1 className="text-xl font-semibold">
+                  Alunos — {className}
+                </h1>
+                {!canManageStudents ? (
+                  <p className="mt-2 text-sm text-amber-700">
+                    Você está com acesso somente de visualização nesta aba.
+                  </p>
+                ) : null}
+              </div>
 
-              <button
-                onClick={() => setOpenAddModal(true)}
-                className="rounded-md bg-sky-600 px-4 py-2 text-white"
-              >
-                + Adicionar aluno
-              </button>
+              {canManageStudents ? (
+                <button
+                  onClick={() => setOpenAddModal(true)}
+                  className="rounded-md bg-sky-600 px-4 py-2 text-white"
+                >
+                  + Adicionar aluno
+                </button>
+              ) : null}
             </div>
 
             <ul className="mt-6 overflow-hidden rounded-md border">
@@ -141,7 +152,7 @@ export default function StudentsManagerClient({
                         {getStatusBadge(s)}
                       </span>
 
-                      {s.status === "ACTIVE" && (
+                      {canManageStudents && s.status === "ACTIVE" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -151,7 +162,7 @@ export default function StudentsManagerClient({
                         >
                           Excluir
                         </button>
-                      )}
+                      ) : null}
                     </div>
 
                     {s.status === "PENDING_DELETE" && s.deletedReason ? (
@@ -167,15 +178,17 @@ export default function StudentsManagerClient({
         </div>
       </main>
 
-      <AddStudentModal
-        open={openAddModal}
-        onClose={() => setOpenAddModal(false)}
-        onSubmit={async () => {
-          await refreshStudents();
-          setOpenAddModal(false);
-        }}
-        loading={false}
-      />
+      {canManageStudents ? (
+        <AddStudentModal
+          open={openAddModal}
+          onClose={() => setOpenAddModal(false)}
+          onSubmit={async () => {
+            await refreshStudents();
+            setOpenAddModal(false);
+          }}
+          loading={false}
+        />
+      ) : null}
 
       <StudentModal
         open={!!selectedStudent}
