@@ -1,7 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import PwaInstallButton from "@/components/PwaInstallButton";
 
 export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <main className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
@@ -65,24 +70,16 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium text-slate-800"
-                  >
-                    Senha
-                  </label>
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-sky-600 hover:text-sky-500"
-                  >
-                    Mostrar senha
-                  </button>
-                </div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-slate-800"
+                >
+                  Senha
+                </label>
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
                   className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -91,18 +88,28 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-500">
-                <Link
-                  href="/recover"
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
                   className="font-medium text-sky-600 hover:text-sky-500"
                 >
-                  Esqueci minha senha
-                </Link>
-                <Link
-                  href="/register"
-                  className="font-medium text-sky-600 hover:text-sky-500"
-                >
-                  Criar conta
-                </Link>
+                  {showPassword ? "Ocultar senha" : "Mostrar senha"}
+                </button>
+
+                <div className="flex gap-4">
+                  <Link
+                    href="/recover"
+                    className="font-medium text-sky-600 hover:text-sky-500"
+                  >
+                    Esqueci minha senha
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="font-medium text-sky-600 hover:text-sky-500"
+                  >
+                    Criar conta
+                  </Link>
+                </div>
               </div>
 
               <button
