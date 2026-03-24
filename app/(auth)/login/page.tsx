@@ -37,11 +37,11 @@ export default function LoginPage() {
       <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-4 py-10">
         
         {/* LOGO / TÍTULO */}
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+        <div className="mb-10 text-center">
+          <h1 className="text-5xl font-semibold tracking-[0.25em] text-sky-700">
             EDUCC
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-3 text-sm text-slate-500">
             Gestão educacional inteligente
           </p>
         </div>
