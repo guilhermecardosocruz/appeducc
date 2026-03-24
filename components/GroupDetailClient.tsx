@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import CreateSchoolModal from "./CreateSchoolModal";
 import ManageGroupMembersModal from "./ManageGroupMembersModal";
 
@@ -47,6 +47,7 @@ export default function GroupDetailClient({
   const [openSchoolModal, setOpenSchoolModal] = useState(false);
   const [openMembersModal, setOpenMembersModal] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshSchools() {
     setLoadingList(true);
@@ -110,6 +111,25 @@ export default function GroupDetailClient({
     await refreshMembers();
   }
 
+  async function handleImportSchools(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`/api/groups/${groupId}/schools/import`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      alert("Erro ao importar escolas");
+      return;
+    }
+
+    const data = await res.json();
+    alert(`Importadas: ${data.imported} | Ignoradas: ${data.skipped}`);
+    refreshSchools();
+  }
+
   return (
     <>
       <main className="min-h-screen bg-slate-50 px-4 py-10">
@@ -142,23 +162,49 @@ export default function GroupDetailClient({
               </Link>
 
               {canManageMembers ? (
-                <button
-                  type="button"
-                  onClick={() => setOpenMembersModal(true)}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  Compartilhar gestão
-                </button>
-              ) : null}
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setOpenMembersModal(true)}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Compartilhar gestão
+                  </button>
 
-              {canManageMembers ? (
-                <button
-                  type="button"
-                  onClick={() => setOpenSchoolModal(true)}
-                  className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
-                >
-                  + Criar escola
-                </button>
+                  <a
+                    href="/templates/schools-template.csv"
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Baixar template
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Importar planilha
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOpenSchoolModal(true)}
+                    className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+                  >
+                    + Criar escola
+                  </button>
+
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImportSchools(file);
+                    }}
+                  />
+                </>
               ) : null}
             </div>
           </div>
