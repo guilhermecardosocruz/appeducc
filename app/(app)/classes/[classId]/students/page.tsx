@@ -7,6 +7,11 @@ type PageProps = {
   params: Promise<{ classId: string }>;
 };
 
+function isManagerRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return ["OWNER", "MANAGER"].includes(normalized);
+}
+
 export default async function ClassStudentsPage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -30,16 +35,30 @@ export default async function ClassStudentsPage({ params }: PageProps) {
     notFound();
   }
 
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId: user.id,
-        schoolId: foundClass.schoolId,
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId: foundClass.schoolId,
+        },
       },
-    },
-  });
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
 
-  if (!membership) {
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && isManagerRole(groupMembership.role));
+
+  if (!hasAccess) {
     notFound();
   }
 
