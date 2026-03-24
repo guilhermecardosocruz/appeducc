@@ -205,7 +205,7 @@ export default function CreateAttendanceForm({
           ) : (
             <ul className="overflow-hidden rounded-md border border-slate-200">
               <li className="grid grid-cols-[48px_1fr_80px] items-center gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                <span>#</span>
+                <span>Nº</span>
                 <span>Aluno</span>
                 <span className="text-center">✓</span>
               </li>
