@@ -14,7 +14,8 @@ type CreatedTeacherResult = {
       classes: number;
     };
   };
-  temporaryPassword: string;
+  temporaryPassword?: string;
+  message?: string;
 };
 
 type ErrorResponse = {
@@ -25,6 +26,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  groupId?: string;
 };
 
 function formatCpf(value: string) {
@@ -40,6 +42,7 @@ export default function CreateTeacherModal({
   open,
   onClose,
   onCreated,
+  groupId,
 }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -65,7 +68,7 @@ export default function CreateTeacherModal({
       const res = await fetch("/api/teachers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, cpf }),
+        body: JSON.stringify({ name, email, cpf, groupId }),
       });
 
       if (!res.ok) {
@@ -212,14 +215,22 @@ export default function CreateTeacherModal({
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Senha inicial
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-900">
-                  {created.temporaryPassword}
-                </p>
-              </div>
+              {created.temporaryPassword ? (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Senha inicial
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {created.temporaryPassword}
+                  </p>
+                </div>
+              ) : null}
+
+              {created.message ? (
+                <div>
+                  <p className="text-sm text-amber-700">{created.message}</p>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-6 flex justify-end">

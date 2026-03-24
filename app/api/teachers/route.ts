@@ -22,11 +22,89 @@ function generateTeacherPassword(name: string, cpf: string) {
   return `${first}${second}${third}@${cpfPart}.`;
 }
 
-export async function GET() {
+async function getAccessibleGroupIds(userId: string) {
+  const memberships = await prisma.groupMember.findMany({
+    where: { userId },
+    select: { groupId: true },
+  });
+
+  return memberships.map((item) => item.groupId);
+}
+
+export async function GET(req: NextRequest) {
   const user = await getSessionUser();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const groupId = url.searchParams.get("groupId")?.trim() || "";
+
+  if (groupId) {
+    const membership = await prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId,
+        },
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const memberIds = await prisma.groupMember.findMany({
+      where: { groupId },
+      select: { userId: true },
+    });
+
+    const memberUserIds = memberIds.map((item) => item.userId);
+
+    const teachers = await prisma.user.findMany({
+      where: {
+        isTeacher: true,
+        OR: [
+          {
+            createdById: {
+              in: memberUserIds,
+            },
+          },
+          {
+            schoolMembers: {
+              some: {
+                school: {
+                  groupId,
+                },
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        _count: {
+          select: {
+            classes: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json(
+      teachers.map((teacher) => ({
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        cpf: teacher.cpf,
+        isTeacher: teacher.isTeacher,
+        createdAt: teacher.createdAt,
+        _count: {
+          classes: teacher._count.classes,
+        },
+      }))
+    );
   }
 
   const teachers = await prisma.user.findMany({
@@ -71,6 +149,7 @@ export async function POST(req: NextRequest) {
   const email = String(data.email ?? "").toLowerCase().trim();
   const cpfRaw = String(data.cpf ?? "").trim();
   const cpf = normalizeCpf(cpfRaw);
+  const groupId = String(data.groupId ?? "").trim();
 
   if (!name || !email || !cpf) {
     return NextResponse.json(
@@ -86,11 +165,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (groupId) {
+    const membership = await prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId,
+        },
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   const existingByEmail = await prisma.user.findUnique({
     where: { email },
   });
 
-  // Se usuário já existe → não altera senha
   if (existingByEmail) {
     const updated = await prisma.user.update({
       where: { id: existingByEmail.id },

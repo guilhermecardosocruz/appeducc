@@ -16,11 +16,48 @@ export default async function TeacherPage({ params }: PageProps) {
 
   const { teacherId } = await params;
 
+  const userGroupIds = await prisma.groupMember.findMany({
+    where: {
+      userId: user.id,
+    },
+    select: {
+      groupId: true,
+    },
+  });
+
+  const groupIds = userGroupIds.map((item) => item.groupId);
+
   const teacher = await prisma.user.findFirst({
     where: {
       id: teacherId,
-      createdById: user.id,
       isTeacher: true,
+      OR: [
+        {
+          createdById: user.id,
+        },
+        {
+          createdBy: {
+            groupMembers: {
+              some: {
+                groupId: {
+                  in: groupIds,
+                },
+              },
+            },
+          },
+        },
+        {
+          schoolMembers: {
+            some: {
+              school: {
+                groupId: {
+                  in: groupIds,
+                },
+              },
+            },
+          },
+        },
+      ],
     },
   });
 
@@ -46,10 +83,8 @@ export default async function TeacherPage({ params }: PageProps) {
     where: {
       teacherId: null,
       school: {
-        members: {
-          some: {
-            userId: user.id,
-          },
+        groupId: {
+          in: groupIds,
         },
       },
     },

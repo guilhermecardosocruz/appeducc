@@ -6,12 +6,49 @@ function normalizeCpf(cpf: string) {
   return cpf.replace(/\D/g, "");
 }
 
+async function getAccessibleGroupIds(userId: string) {
+  const memberships = await prisma.groupMember.findMany({
+    where: { userId },
+    select: { groupId: true },
+  });
+
+  return memberships.map((item) => item.groupId);
+}
+
 async function ensureTeacherAccess(userId: string, teacherId: string) {
+  const groupIds = await getAccessibleGroupIds(userId);
+
   const teacher = await prisma.user.findFirst({
     where: {
       id: teacherId,
-      createdById: userId,
       isTeacher: true,
+      OR: [
+        {
+          createdById: userId,
+        },
+        {
+          createdBy: {
+            groupMembers: {
+              some: {
+                groupId: {
+                  in: groupIds,
+                },
+              },
+            },
+          },
+        },
+        {
+          schoolMembers: {
+            some: {
+              school: {
+                groupId: {
+                  in: groupIds,
+                },
+              },
+            },
+          },
+        },
+      ],
     },
     include: {
       _count: {

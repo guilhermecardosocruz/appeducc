@@ -2,20 +2,64 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-async function getTeacherOwnedByUser(userId: string, teacherId: string) {
+async function getAccessibleGroupIds(userId: string) {
+  const memberships = await prisma.groupMember.findMany({
+    where: { userId },
+    select: { groupId: true },
+  });
+
+  return memberships.map((item) => item.groupId);
+}
+
+async function getTeacherAccessibleByUser(userId: string, teacherId: string) {
+  const groupIds = await getAccessibleGroupIds(userId);
+
   return prisma.user.findFirst({
     where: {
       id: teacherId,
-      createdById: userId,
       isTeacher: true,
+      OR: [
+        {
+          createdById: userId,
+        },
+        {
+          createdBy: {
+            groupMembers: {
+              some: {
+                groupId: {
+                  in: groupIds,
+                },
+              },
+            },
+          },
+        },
+        {
+          schoolMembers: {
+            some: {
+              school: {
+                groupId: {
+                  in: groupIds,
+                },
+              },
+            },
+          },
+        },
+      ],
     },
   });
 }
 
 async function getTeacherClassesPayload(userId: string, teacherId: string) {
+  const groupIds = await getAccessibleGroupIds(userId);
+
   const linkedClassesRaw = await prisma.class.findMany({
     where: {
       teacherId,
+      school: {
+        groupId: {
+          in: groupIds,
+        },
+      },
     },
     include: {
       school: {
@@ -31,10 +75,8 @@ async function getTeacherClassesPayload(userId: string, teacherId: string) {
     where: {
       teacherId: null,
       school: {
-        members: {
-          some: {
-            userId,
-          },
+        groupId: {
+          in: groupIds,
         },
       },
     },
@@ -89,12 +131,13 @@ export async function POST(
   }
 
   const { teacherId } = await params;
-  const teacher = await getTeacherOwnedByUser(user.id, teacherId);
+  const teacher = await getTeacherAccessibleByUser(user.id, teacherId);
 
   if (!teacher) {
     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
   }
 
+  const groupIds = await getAccessibleGroupIds(user.id);
   const data = await req.json();
   const classId = String(data.classId ?? "").trim();
 
@@ -106,10 +149,8 @@ export async function POST(
     where: {
       id: classId,
       school: {
-        members: {
-          some: {
-            userId: user.id,
-          },
+        groupId: {
+          in: groupIds,
         },
       },
     },
@@ -167,12 +208,13 @@ export async function DELETE(
   }
 
   const { teacherId } = await params;
-  const teacher = await getTeacherOwnedByUser(user.id, teacherId);
+  const teacher = await getTeacherAccessibleByUser(user.id, teacherId);
 
   if (!teacher) {
     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
   }
 
+  const groupIds = await getAccessibleGroupIds(user.id);
   const data = await req.json();
   const classId = String(data.classId ?? "").trim();
 
@@ -184,19 +226,16 @@ export async function DELETE(
     where: {
       id: classId,
       teacherId: teacher.id,
+      school: {
+        groupId: {
+          in: groupIds,
+        },
+      },
     },
     include: {
       school: {
         include: {
           group: true,
-          classes: {
-            where: {
-              teacherId: teacher.id,
-            },
-            select: {
-              id: true,
-            },
-          },
         },
       },
     },
