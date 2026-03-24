@@ -15,7 +15,6 @@ type Group = {
 
 type Props = {
   initialGroups: Group[];
-  initialTeachers: unknown[];
   userName?: string | null;
   userEmail?: string | null;
 };
@@ -63,7 +62,6 @@ export default function GroupsDashboardClient({
         </p>
       </div>
 
-      {/* GRUPOS */}
       <section className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -106,7 +104,11 @@ export default function GroupsDashboardClient({
                         {group.name}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {group._count.schools} escolas cadastradas
+                        {group._count.schools === 0
+                          ? "Nenhuma escola cadastrada ainda"
+                          : group._count.schools === 1
+                            ? "1 escola cadastrada"
+                            : `${group._count.schools} escolas cadastradas`}
                       </p>
                     </div>
 
@@ -118,29 +120,6 @@ export default function GroupsDashboardClient({
               ))}
             </ul>
           )}
-        </div>
-      </section>
-
-      {/* CARD PROFESSORES */}
-      <section className="space-y-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Professores
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Cadastre professores e gerencie vínculos com turmas.
-              </p>
-            </div>
-
-            <Link
-              href="/teachers"
-              className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-            >
-              Abrir
-            </Link>
-          </div>
         </div>
       </section>
 

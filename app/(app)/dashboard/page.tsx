@@ -21,7 +21,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const [groupMemberships, schoolMemberships, teachersRaw] = await Promise.all([
+  const [groupMemberships, schoolMemberships] = await Promise.all([
     prisma.groupMember.findMany({
       where: {
         userId: user.id,
@@ -47,20 +47,6 @@ export default async function DashboardPage() {
                 _count: { select: { schools: true } },
               },
             },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.user.findMany({
-      where: {
-        createdById: user.id,
-        isTeacher: true,
-      },
-      include: {
-        _count: {
-          select: {
-            classes: true,
           },
         },
       },
@@ -104,17 +90,6 @@ export default async function DashboardPage() {
     b.createdAt.localeCompare(a.createdAt)
   );
 
-  const teachers = teachersRaw.map((teacher) => ({
-    id: teacher.id,
-    name: teacher.name,
-    email: teacher.email,
-    isTeacher: teacher.isTeacher,
-    createdAt: teacher.createdAt.toISOString(),
-    _count: {
-      classes: teacher._count.classes,
-    },
-  }));
-
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-4xl">
@@ -131,7 +106,6 @@ export default async function DashboardPage() {
 
         <GroupsDashboardClient
           initialGroups={groups}
-          initialTeachers={teachers}
           userName={user.name}
           userEmail={user.email}
         />
