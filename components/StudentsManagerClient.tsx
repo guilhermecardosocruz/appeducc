@@ -58,12 +58,13 @@ export default function StudentsManagerClient({
       }
     );
 
+    const data = await res.json();
+
     if (!res.ok) {
-      alert("Erro ao importar planilha");
+      alert(data.error || "Erro ao importar planilha");
       return;
     }
 
-    const data = await res.json();
     alert(`Importados: ${data.imported} | Ignorados: ${data.skipped}`);
     await refreshStudents();
   }
