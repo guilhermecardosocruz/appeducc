@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type Props = {
   groupId: string;
@@ -17,10 +17,11 @@ export default function CreateSchoolModal({
 }: Props) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -38,23 +39,46 @@ export default function CreateSchoolModal({
         onCreated();
         onClose();
       } else {
-        console.error("Erro ao criar escola");
+        alert("Erro ao criar escola");
       }
-    } catch (error) {
-      console.error("Erro ao criar escola", error);
+    } catch {
+      alert("Erro ao criar escola");
     } finally {
       setLoading(false);
     }
   }
 
+  async function handleImport(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(
+      `/api/groups/${groupId}/schools/import`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    if (!res.ok) {
+      alert("Erro ao importar planilha");
+      return;
+    }
+
+    const data = await res.json();
+    alert(`Importadas: ${data.imported} | Ignoradas: ${data.skipped}`);
+    onCreated();
+    onClose();
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">
-          Criar nova Escola
+          Adicionar Escola
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleCreate} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-700">
               Nome da escola
@@ -68,25 +92,58 @@ export default function CreateSchoolModal({
             />
           </div>
 
-          <div className="flex justify-end gap-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+          >
+            {loading ? "Criando..." : "Criar manualmente"}
+          </button>
+        </form>
+
+        <div className="my-4 border-t pt-4">
+          <p className="mb-2 text-sm text-slate-600">
+            Ou importar por planilha
+          </p>
+
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
-              disabled={loading}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
             >
-              Cancelar
+              Importar planilha
             </button>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+            <a
+              href="/templates/schools-template.csv"
+              className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-center text-sm hover:bg-slate-50"
             >
-              {loading ? "Criando..." : "Criar escola"}
-            </button>
+              Baixar template
+            </a>
           </div>
-        </form>
+
+          <input
+            type="file"
+            accept=".csv,.xlsx"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImport(file);
+            }}
+          />
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
+          >
+            Fechar
+          </button>
+        </div>
       </div>
     </div>
   );
