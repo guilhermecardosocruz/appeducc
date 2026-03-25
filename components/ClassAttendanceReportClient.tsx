@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type StudentReport = {
   studentId: string;
@@ -88,6 +88,15 @@ export default function ClassAttendanceReportClient({
     await loadReport(startDate, endDate);
   }
 
+  const pdfHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+
+    const query = params.toString();
+    return `/classes/${classId}/relatorio-chamadas/pdf${query ? `?${query}` : ""}`;
+  }, [classId, startDate, endDate]);
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-6xl">
@@ -100,9 +109,18 @@ export default function ClassAttendanceReportClient({
           </Link>
         </div>
 
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Relatório de Chamadas
-        </h1>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Relatório de Chamadas
+          </h1>
+
+          <Link
+            href={pdfHref}
+            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+          >
+            Versão para PDF
+          </Link>
+        </div>
 
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">
