@@ -1,0 +1,511 @@
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 //
+11 // ==========================
+12 // MODELO USER E SESSION (EXISTENTES)
+13 // ==========================
+14 //
+15 
+16 model User {
+17   id            String          @id @default(cuid())
+18   name          String
+19   email         String          @unique
+20   passwordHash  String
+21   isTeacher     Boolean         @default(false)
+22   createdById   String?
+23   createdAt     DateTime        @default(now())
+24   updatedAt     DateTime        @updatedAt
+25 
+26   createdBy     User?           @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+27   createdUsers  User[]          @relation("CreatedUsers")
+28   sessions      Session[]
+29   groupMembers  GroupMember[]
+30   schoolMembers SchoolMember[]
+31   classes       Class[]         @relation("ClassTeacher")
+32 }
+33 
+34 model Session {
+35   id        String   @id @default(cuid())
+36   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+37   userId    String
+38   createdAt DateTime @default(now())
+39   expiresAt DateTime
+40 
+41   @@index([userId])
+42 }
+43 
+44 //
+45 // ==========================
+46 // MODELOS DE GRUPOS DE ESCOLAS
+47 // ==========================
+48 //
+49 
+50 model Group {
+51   id        String        @id @default(cuid())
+52   name      String
+53   createdAt DateTime      @default(now())
+54   updatedAt DateTime      @updatedAt
+55 
+56   members   GroupMember[]
+57   schools   School[]
+58 }
+59 
+60 model GroupMember {
+61   id        String   @id @default(cuid())
+62   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+63   userId    String
+64   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+65   groupId   String
+66 
+67   role      String   // OWNER, DIRECTOR, VIEWER
+68   createdAt DateTime @default(now())
+69 
+70   @@unique([userId, groupId])
+71 }
+72 
+73 //
+74 // ==========================
+75 // MODELOS DE ESCOLAS
+76 // ==========================
+77 //
+78 
+79 model School {
+80   id        String         @id @default(cuid())
+81   name      String
+82   createdAt DateTime       @default(now())
+83   updatedAt DateTime       @updatedAt
+84 
+85   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+86   groupId   String
+87 
+88   members   SchoolMember[]
+89   classes   Class[]
+90 }
+91 
+92 model SchoolMember {
+93   id        String   @id @default(cuid())
+94   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+95   userId    String
+96   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+97   schoolId  String
+98 
+99   role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+100   createdAt DateTime @default(now())
+101 
+102   @@unique([userId, schoolId])
+103 }
+104 
+105 //
+106 // ==========================
+107 // MODELOS DE TURMAS, ALUNOS E CHAMADAS
+108 // ==========================
+109 //
+110 
+111 model Class {
+112   id          String              @id @default(cuid())
+113   name        String
+114   year        Int?
+115   createdAt   DateTime            @default(now())
+116   updatedAt   DateTime            @updatedAt
+117 
+118   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+119   schoolId    String
+120 
+121   teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+122   teacherId   String?
+123 
+124   students    Student[]
+125   attendances Attendance[]
+126 }
+127 
+128 model Student {
+129   id         String               @id @default(cuid())
+130   name       String
+131   createdAt  DateTime             @default(now())
+132   updatedAt  DateTime             @updatedAt
+133 
+134   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+135   classId    String
+136 
+137   presences  AttendancePresence[]
+138 }
+139 
+140 model Attendance {
+141   id         String               @id @default(cuid())
+142   title      String
+143   lessonDate DateTime
+144   createdAt  DateTime             @default(now())
+145   updatedAt  DateTime             @updatedAt
+146 
+147   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+148   classId    String
+149 
+150   presences  AttendancePresence[]
+151 }
+152 
+153 model AttendancePresence {
+154   id           String      @id @default(cuid())
+155   present      Boolean     @default(false)
+156   createdAt    DateTime    @default(now())
+157   updatedAt    DateTime    @updatedAt
+158 
+159   attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+160   attendanceId String
+161 
+162   student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+163   studentId    String
+164 
+165   @@unique([attendanceId, studentId])
+166 }
+
+===== components/StudentsManagerClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useRef, useState } from "react";
+5 import AddStudentModal from "./AddStudentModal";
+6 
+7 type StudentItem = {
+8   id: string;
+9   name: string;
+10   createdAt: string;
+11 };
+12 
+13 type Props = {
+14   classId: string;
+15   className: string;
+16   canImportSpreadsheet: boolean;
+17   initialStudents: StudentItem[];
+18 };
+19 
+20 export default function StudentsManagerClient({
+21   classId,
+22   className,
+23   canImportSpreadsheet,
+24   initialStudents,
+25 }: Props) {
+26   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
+27   const [openAddModal, setOpenAddModal] = useState(false);
+28   const [addingStudent, setAddingStudent] = useState(false);
+29   const [importing, setImporting] = useState(false);
+30   const [importMessage, setImportMessage] = useState<string | null>(null);
+31   const fileInputRef = useRef<HTMLInputElement | null>(null);
+32 
+33   async function refreshStudents() {
+34     const res = await fetch(`/api/classes/${classId}/students`, {
+35       cache: "no-store",
+36     });
+37 
+38     if (!res.ok) return;
+39 
+40     const data = await res.json();
+41     setStudents(data);
+42   }
+43 
+44   async function handleAddStudent(name: string) {
+45     setAddingStudent(true);
+46 
+47     try {
+48       const res = await fetch(`/api/classes/${classId}/students`, {
+49         method: "POST",
+50         headers: { "Content-Type": "application/json" },
+51         body: JSON.stringify({ name }),
+52       });
+53 
+54       if (!res.ok) return;
+55 
+56       await refreshStudents();
+57       setOpenAddModal(false);
+58       setImportMessage(null);
+59     } finally {
+60       setAddingStudent(false);
+61     }
+62   }
+63 
+64   async function handleImportFile(file: File) {
+65     setImporting(true);
+66     setImportMessage(null);
+67 
+68     try {
+69       const formData = new FormData();
+70       formData.append("file", file);
+71 
+72       const res = await fetch(`/api/classes/${classId}/students/import`, {
+73         method: "POST",
+74         body: formData,
+75       });
+76 
+77       const data = await res.json();
+78 
+79       if (!res.ok) {
+80         setImportMessage(data.error ?? "Erro ao importar planilha.");
+81         return;
+82       }
+83 
+84       setStudents(data.students);
+85 
+86       setImportMessage(
+87         `Importado: ${data.imported} | Ignorados: ${data.skipped}`
+88       );
+89 
+90       if (fileInputRef.current) fileInputRef.current.value = "";
+91     } finally {
+92       setImporting(false);
+93     }
+94   }
+95 
+96   return (
+97     <>
+98       <main className="min-h-screen bg-slate-50 px-4 py-10">
+99         <div className="mx-auto w-full max-w-4xl">
+100           <div className="mb-6">
+101             <Link href={`/classes/${classId}`} className="text-sky-700">
+102               ← Voltar
+103             </Link>
+104           </div>
+105 
+106           <div className="bg-white p-6 rounded-lg border shadow-sm">
+107             <div className="flex justify-between items-start flex-wrap gap-3">
+108               <div>
+109                 <h1 className="text-xl font-semibold">
+110                   Alunos — {className}
+111                 </h1>
+112               </div>
+113 
+114               <button
+115                 onClick={() => setOpenAddModal(true)}
+116                 className="bg-sky-600 text-white px-4 py-2 rounded-md"
+117               >
+118                 + Adicionar aluno
+119               </button>
+120             </div>
+121 
+122             {canImportSpreadsheet && (
+123               <div className="mt-6 border rounded-lg p-4 bg-slate-50">
+124                 <h2 className="font-semibold text-sm">
+125                   Importar via planilha
+126                 </h2>
+127 
+128                 <div className="mt-3 flex flex-wrap gap-2">
+129                   <a
+130                     href="/templates/students-template.xlsx"
+131                     download
+132                     className="text-sm px-3 py-2 border rounded-md bg-white hover:bg-slate-100"
+133                   >
+134                     ⬇ Baixar modelo Excel (.xlsx)
+135                   </a>
+136 
+137                   <input
+138                     ref={fileInputRef}
+139                     type="file"
+140                     accept=".xlsx,.xls,.csv"
+141                     onChange={(e) => {
+142                       const file = e.target.files?.[0];
+143                       if (file) handleImportFile(file);
+144                     }}
+145                     disabled={importing}
+146                     className="text-sm"
+147                   />
+148                 </div>
+149 
+150                 <p className="text-xs text-slate-500 mt-2">
+151                   Use a coluna Nome na primeira coluna.
+152                 </p>
+153 
+154                 {importMessage && (
+155                   <p className="text-sm mt-2">{importMessage}</p>
+156                 )}
+157               </div>
+158             )}
+159 
+160             <ul className="mt-6 border rounded-md overflow-hidden">
+161               <li className="bg-slate-100 px-4 py-2 text-sm font-semibold">
+162                 Lista de alunos
+163               </li>
+164 
+165               {students.map((s, i) => (
+166                 <li key={s.id} className="px-4 py-2 border-t text-sm">
+167                   {i + 1}. {s.name}
+168                 </li>
+169               ))}
+170             </ul>
+171           </div>
+172         </div>
+173       </main>
+174 
+175       <AddStudentModal
+176         open={openAddModal}
+177         onClose={() => setOpenAddModal(false)}
+178         onSubmit={handleAddStudent}
+179         loading={addingStudent}
+180       />
+181     </>
+182   );
+183 }
+
+===== app/api/classes/[classId]/students/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureClassAccess(userId: string, classId: string) {
+6   const foundClass = await prisma.class.findUnique({
+7     where: { id: classId },
+8     include: {
+9       school: true,
+10     },
+11   });
+12 
+13   if (!foundClass) return null;
+14 
+15   const membership = await prisma.schoolMember.findUnique({
+16     where: {
+17       userId_schoolId: {
+18         userId,
+19         schoolId: foundClass.schoolId,
+20       },
+21     },
+22   });
+23 
+24   if (!membership) return null;
+25 
+26   return foundClass;
+27 }
+28 
+29 export async function GET(
+30   _req: NextRequest,
+31   { params }: { params: Promise<{ classId: string }> }
+32 ) {
+33   const user = await getSessionUser();
+34 
+35   if (!user) {
+36     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+37   }
+38 
+39   const { classId } = await params;
+40   const foundClass = await ensureClassAccess(user.id, classId);
+41 
+42   if (!foundClass) {
+43     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+44   }
+45 
+46   const students = await prisma.student.findMany({
+47     where: { classId },
+48     orderBy: { name: "asc" },
+49   });
+50 
+51   return NextResponse.json(students);
+52 }
+53 
+54 export async function POST(
+55   req: NextRequest,
+56   { params }: { params: Promise<{ classId: string }> }
+57 ) {
+58   const user = await getSessionUser();
+59 
+60   if (!user) {
+61     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+62   }
+63 
+64   const { classId } = await params;
+65   const foundClass = await ensureClassAccess(user.id, classId);
+66 
+67   if (!foundClass) {
+68     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+69   }
+70 
+71   const data = await req.json();
+72   const name = String(data.name ?? "").trim();
+73   const attendanceId = String(data.attendanceId ?? "").trim();
+74 
+75   if (!name) {
+76     return NextResponse.json({ error: "Missing student name" }, { status: 400 });
+77   }
+78 
+79   const existingStudent = await prisma.student.findFirst({
+80     where: {
+81       classId,
+82       name,
+83     },
+84   });
+85 
+86   if (existingStudent) {
+87     return NextResponse.json(
+88       { error: "Student already exists in this class" },
+89       { status: 409 }
+90     );
+91   }
+92 
+93   const createdStudent = await prisma.student.create({
+94     data: {
+95       name,
+96       classId,
+97     },
+98   });
+99 
+100   const classAttendances = await prisma.attendance.findMany({
+101     where: { classId },
+102     select: { id: true },
+103   });
+104 
+105   if (classAttendances.length > 0) {
+106     await prisma.attendancePresence.createMany({
+107       data: classAttendances.map((attendance) => ({
+108         attendanceId: attendance.id,
+109         studentId: createdStudent.id,
+110         present: false,
+111       })),
+112       skipDuplicates: true,
+113     });
+114   }
+115 
+116   let createdPresence = null;
+117 
+118   if (attendanceId) {
+119     const attendance = await prisma.attendance.findUnique({
+120       where: { id: attendanceId },
+121     });
+122 
+123     if (!attendance || attendance.classId !== classId) {
+124       return NextResponse.json(
+125         { error: "Attendance not found for this class" },
+126         { status: 400 }
+127       );
+128     }
+129 
+130     createdPresence = await prisma.attendancePresence.findFirst({
+131       where: {
+132         attendanceId,
+133         studentId: createdStudent.id,
+134       },
+135       include: {
+136         student: {
+137           select: {
+138             id: true,
+139             name: true,
+140           },
+141         },
+142       },
+143     });
+144   }
+145 
+146   return NextResponse.json(
+147     {
+148       student: createdStudent,
+149       presence: createdPresence,
+150     },
+151     { status: 201 }
+152   );
+153 }
+
+===== app/api/classes/[classId]/students/[studentId]/route.ts =====
+[MISSING] app/api/classes/[classId]/students/[studentId]/route.ts

@@ -1,0 +1,840 @@
+
+===== app/(app)/dashboard/page.tsx =====
+1 import { getSessionUser } from "@/lib/auth";
+2 import { prisma } from "@/lib/prisma";
+3 import GroupsDashboardClient from "@/components/GroupsDashboardClient";
+4 
+5 export default async function DashboardPage() {
+6   const user = await getSessionUser();
+7 
+8   if (!user) {
+9     return (
+10       <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+11         <div className="max-w-xl text-center">
+12           <h1 className="text-2xl font-semibold text-slate-900">
+13             Você precisa estar autenticado para acessar o painel.
+14           </h1>
+15           <p className="mt-3 text-sm text-slate-500">
+16             Faça login para organizar seus grupos de escolas, escolas, turmas e
+17             demais estruturas educativas.
+18           </p>
+19         </div>
+20       </main>
+21     );
+22   }
+23 
+24   const [groupMemberships, schoolMemberships, teachersRaw] = await Promise.all([
+25     prisma.groupMember.findMany({
+26       where: {
+27         userId: user.id,
+28       },
+29       include: {
+30         group: {
+31           include: {
+32             _count: { select: { schools: true } },
+33           },
+34         },
+35       },
+36       orderBy: { createdAt: "desc" },
+37     }),
+38     prisma.schoolMember.findMany({
+39       where: {
+40         userId: user.id,
+41       },
+42       include: {
+43         school: {
+44           include: {
+45             group: {
+46               include: {
+47                 _count: { select: { schools: true } },
+48               },
+49             },
+50           },
+51         },
+52       },
+53       orderBy: { createdAt: "desc" },
+54     }),
+55     prisma.user.findMany({
+56       where: {
+57         createdById: user.id,
+58         isTeacher: true,
+59       },
+60       include: {
+61         _count: {
+62           select: {
+63             classes: true,
+64           },
+65         },
+66       },
+67       orderBy: { createdAt: "desc" },
+68     }),
+69   ]);
+70 
+71   const groupsMap = new Map<
+72     string,
+73     {
+74       id: string;
+75       name: string;
+76       createdAt: string;
+77       _count: { schools: number };
+78     }
+79   >();
+80 
+81   for (const membership of groupMemberships) {
+82     groupsMap.set(membership.group.id, {
+83       id: membership.group.id,
+84       name: membership.group.name,
+85       createdAt: membership.group.createdAt.toISOString(),
+86       _count: { schools: membership.group._count.schools },
+87     });
+88   }
+89 
+90   for (const membership of schoolMemberships) {
+91     const group = membership.school.group;
+92 
+93     if (!groupsMap.has(group.id)) {
+94       groupsMap.set(group.id, {
+95         id: group.id,
+96         name: group.name,
+97         createdAt: group.createdAt.toISOString(),
+98         _count: { schools: group._count.schools },
+99       });
+100     }
+101   }
+102 
+103   const groups = Array.from(groupsMap.values()).sort((a, b) =>
+104     b.createdAt.localeCompare(a.createdAt)
+105   );
+106 
+107   const teachers = teachersRaw.map((teacher) => ({
+108     id: teacher.id,
+109     name: teacher.name,
+110     email: teacher.email,
+111     isTeacher: teacher.isTeacher,
+112     createdAt: teacher.createdAt.toISOString(),
+113     _count: {
+114       classes: teacher._count.classes,
+115     },
+116   }));
+117 
+118   return (
+119     <main className="min-h-screen bg-slate-50 px-4 py-10">
+120       <div className="mx-auto w-full max-w-4xl">
+121         <h1 className="text-2xl font-semibold text-slate-900">
+122           Organização das escolas
+123         </h1>
+124         <p className="mt-2 max-w-2xl text-sm text-slate-500">
+125           Aqui você gerencia sua estrutura educacional em níveis:{" "}
+126           <span className="font-medium">
+127             Grupos de escolas → Escolas → Turmas → Professores e Alunos
+128           </span>
+129           .
+130         </p>
+131 
+132         <GroupsDashboardClient
+133           initialGroups={groups}
+134           initialTeachers={teachers}
+135           userName={user.name}
+136           userEmail={user.email}
+137         />
+138       </div>
+139     </main>
+140   );
+141 }
+
+===== components/TeacherDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useMemo, useState } from "react";
+5 
+6 type LinkedClass = {
+7   id: string;
+8   name: string;
+9   year: number | null;
+10   school: {
+11     id: string;
+12     name: string;
+13     group: {
+14       id: string;
+15       name: string;
+16     };
+17   };
+18 };
+19 
+20 type AvailableClass = {
+21   id: string;
+22   name: string;
+23   year: number | null;
+24   school: {
+25     id: string;
+26     name: string;
+27     group: {
+28       id: string;
+29       name: string;
+30     };
+31   };
+32 };
+33 
+34 type Props = {
+35   teacherId: string;
+36   teacherName: string;
+37   teacherEmail: string;
+38   teacherCpf: string | null;
+39   linkedClasses: LinkedClass[];
+40   availableClasses: AvailableClass[];
+41 };
+42 
+43 function formatCpf(value: string) {
+44   const digits = value.replace(/\D/g, "").slice(0, 11);
+45 
+46   return digits
+47     .replace(/^(\d{3})(\d)/, "$1.$2")
+48     .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+49     .replace(/\.(\d{3})(\d)/, ".$1-$2");
+50 }
+51 
+52 export default function TeacherDetailClient({
+53   teacherId,
+54   teacherName,
+55   teacherEmail,
+56   teacherCpf,
+57   linkedClasses,
+58   availableClasses,
+59 }: Props) {
+60   const [currentLinked, setCurrentLinked] = useState(linkedClasses);
+61   const [currentAvailable, setCurrentAvailable] = useState(availableClasses);
+62   const [loadingAssignId, setLoadingAssignId] = useState<string | null>(null);
+63   const [loadingRemoveId, setLoadingRemoveId] = useState<string | null>(null);
+64 
+65   const [editOpen, setEditOpen] = useState(false);
+66   const [editName, setEditName] = useState(teacherName);
+67   const [editEmail, setEditEmail] = useState(teacherEmail);
+68   const [editCpf, setEditCpf] = useState(teacherCpf ?? "");
+69   const [savingTeacher, setSavingTeacher] = useState(false);
+70   const [teacherError, setTeacherError] = useState<string | null>(null);
+71   const [newPassword, setNewPassword] = useState<string | null>(null);
+72 
+73   const sortedAvailable = useMemo(
+74     () =>
+75       [...currentAvailable].sort((a, b) => {
+76         const groupCompare = a.school.group.name.localeCompare(
+77           b.school.group.name
+78         );
+79         if (groupCompare !== 0) return groupCompare;
+80 
+81         const schoolCompare = a.school.name.localeCompare(b.school.name);
+82         if (schoolCompare !== 0) return schoolCompare;
+83 
+84         return a.name.localeCompare(b.name);
+85       }),
+86     [currentAvailable]
+87   );
+88 
+89   async function assignClass(classId: string) {
+90     setLoadingAssignId(classId);
+91 
+92     try {
+93       const res = await fetch(`/api/teachers/${teacherId}/classes`, {
+94         method: "POST",
+95         headers: { "Content-Type": "application/json" },
+96         body: JSON.stringify({ classId }),
+97       });
+98 
+99       if (!res.ok) {
+100         console.error("Erro ao vincular turma");
+101         return;
+102       }
+103 
+104       const data = (await res.json()) as {
+105         linkedClasses: LinkedClass[];
+106         availableClasses: AvailableClass[];
+107       };
+108 
+109       setCurrentLinked(data.linkedClasses);
+110       setCurrentAvailable(data.availableClasses);
+111     } catch (error) {
+112       console.error("Erro ao vincular turma", error);
+113     } finally {
+114       setLoadingAssignId(null);
+115     }
+116   }
+117 
+118   async function removeClass(classId: string) {
+119     setLoadingRemoveId(classId);
+120 
+121     try {
+122       const res = await fetch(`/api/teachers/${teacherId}/classes`, {
+123         method: "DELETE",
+124         headers: { "Content-Type": "application/json" },
+125         body: JSON.stringify({ classId }),
+126       });
+127 
+128       if (!res.ok) {
+129         console.error("Erro ao remover vínculo da turma");
+130         return;
+131       }
+132 
+133       const data = (await res.json()) as {
+134         linkedClasses: LinkedClass[];
+135         availableClasses: AvailableClass[];
+136       };
+137 
+138       setCurrentLinked(data.linkedClasses);
+139       setCurrentAvailable(data.availableClasses);
+140     } catch (error) {
+141       console.error("Erro ao remover vínculo da turma", error);
+142     } finally {
+143       setLoadingRemoveId(null);
+144     }
+145   }
+146 
+147   async function saveTeacher() {
+148     if (!editName.trim() || !editEmail.trim() || !editCpf.trim()) {
+149       setTeacherError("Nome completo, e-mail e CPF são obrigatórios.");
+150       return;
+151     }
+152 
+153     setSavingTeacher(true);
+154     setTeacherError(null);
+155     setNewPassword(null);
+156 
+157     try {
+158       const res = await fetch(`/api/teachers/${teacherId}`, {
+159         method: "PATCH",
+160         headers: { "Content-Type": "application/json" },
+161         body: JSON.stringify({
+162           name: editName,
+163           email: editEmail,
+164           cpf: editCpf,
+165         }),
+166       });
+167 
+168       const data = (await res.json()) as {
+169         error?: string;
+170         regeneratedPassword?: string;
+171       };
+172 
+173       if (!res.ok) {
+174         setTeacherError(data.error ?? "Erro ao atualizar professor.");
+175         return;
+176       }
+177 
+178       setNewPassword(data.regeneratedPassword ?? null);
+179       setEditOpen(false);
+180       window.location.reload();
+181     } catch (error) {
+182       console.error("Erro ao atualizar professor", error);
+183       setTeacherError("Erro ao atualizar professor.");
+184     } finally {
+185       setSavingTeacher(false);
+186     }
+187   }
+188 
+189   return (
+190     <main className="min-h-screen bg-slate-50 px-4 py-10">
+191       <div className="mx-auto w-full max-w-5xl">
+192         <div className="mb-6">
+193           <Link
+194             href="/dashboard"
+195             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+196           >
+197             ← Voltar para dashboard
+198           </Link>
+199         </div>
+200 
+201         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+202           <div className="flex flex-wrap items-start justify-between gap-4">
+203             <div>
+204               <h1 className="text-2xl font-semibold text-slate-900">
+205                 {teacherName}
+206               </h1>
+207               <p className="mt-2 text-sm text-slate-500">{teacherEmail}</p>
+208               <p className="mt-1 text-sm text-slate-500">
+209                 CPF: {teacherCpf ?? "Não informado"}
+210               </p>
+211               <p className="mt-3 text-sm text-slate-500">
+212                 Vincule e remova turmas deste professor. As permissões de acesso
+213                 serão refletidas conforme as turmas atendidas.
+214               </p>
+215 
+216               {newPassword && (
+217                 <p className="mt-3 text-sm font-medium text-emerald-700">
+218                   Nova senha gerada: {newPassword}
+219                 </p>
+220               )}
+221             </div>
+222 
+223             <button
+224               type="button"
+225               onClick={() => setEditOpen(true)}
+226               className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+227             >
+228               Editar professor
+229             </button>
+230           </div>
+231         </div>
+232 
+233         <div className="mt-8 grid gap-6 lg:grid-cols-2">
+234           <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+235             <h2 className="text-lg font-semibold text-slate-900">
+236               Turmas vinculadas
+237             </h2>
+238             <p className="mt-2 text-sm text-slate-500">
+239               Estas turmas estão atualmente atribuídas a este professor.
+240             </p>
+241 
+242             {currentLinked.length === 0 ? (
+243               <p className="mt-6 text-sm text-slate-500">
+244                 Nenhuma turma vinculada ainda.
+245               </p>
+246             ) : (
+247               <ul className="mt-6 space-y-3">
+248                 {currentLinked.map((item) => (
+249                   <li
+250                     key={item.id}
+251                     className="rounded-md border border-slate-200 px-4 py-3"
+252                   >
+253                     <div className="flex items-start justify-between gap-4">
+254                       <div>
+255                         <p className="text-sm font-medium text-slate-900">
+256                           {item.name}
+257                         </p>
+258                         <p className="mt-1 text-xs text-slate-500">
+259                           {item.year ? `Ano letivo ${item.year} • ` : ""}
+260                           {item.school.group.name} • {item.school.name}
+261                         </p>
+262                       </div>
+263 
+264                       <button
+265                         type="button"
+266                         onClick={() => removeClass(item.id)}
+267                         disabled={loadingRemoveId === item.id}
+268                         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+269                       >
+270                         {loadingRemoveId === item.id
+271                           ? "Removendo..."
+272                           : "Remover"}
+273                       </button>
+274                     </div>
+275                   </li>
+276                 ))}
+277               </ul>
+278             )}
+279           </section>
+280 
+281           <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+282             <h2 className="text-lg font-semibold text-slate-900">
+283               Turmas disponíveis
+284             </h2>
+285             <p className="mt-2 text-sm text-slate-500">
+286               Selecione uma turma disponível para vincular a este professor.
+287             </p>
+288 
+289             {sortedAvailable.length === 0 ? (
+290               <p className="mt-6 text-sm text-slate-500">
+291                 Não há turmas disponíveis para vínculo no momento.
+292               </p>
+293             ) : (
+294               <ul className="mt-6 space-y-3">
+295                 {sortedAvailable.map((item) => (
+296                   <li
+297                     key={item.id}
+298                     className="rounded-md border border-slate-200 px-4 py-3"
+299                   >
+300                     <div className="flex items-start justify-between gap-4">
+301                       <div>
+302                         <p className="text-sm font-medium text-slate-900">
+303                           {item.name}
+304                         </p>
+305                         <p className="mt-1 text-xs text-slate-500">
+306                           {item.year ? `Ano letivo ${item.year} • ` : ""}
+307                           {item.school.group.name} • {item.school.name}
+308                         </p>
+309                       </div>
+310 
+311                       <button
+312                         type="button"
+313                         onClick={() => assignClass(item.id)}
+314                         disabled={loadingAssignId === item.id}
+315                         className="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+316                       >
+317                         {loadingAssignId === item.id
+318                           ? "Vinculando..."
+319                           : "Vincular"}
+320                       </button>
+321                     </div>
+322                   </li>
+323                 ))}
+324               </ul>
+325             )}
+326           </section>
+327         </div>
+328 
+329         {editOpen && (
+330           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+331             <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+332               <h2 className="text-lg font-semibold text-slate-900">
+333                 Editar professor
+334               </h2>
+335               <p className="mt-2 text-sm text-slate-500">
+336                 Nome completo, e-mail e CPF são obrigatórios. Ao salvar, a senha
+337                 será regenerada automaticamente.
+338               </p>
+339 
+340               <div className="mt-6 space-y-4">
+341                 <div>
+342                   <label className="text-sm font-medium text-slate-700">
+343                     Nome completo
+344                   </label>
+345                   <input
+346                     type="text"
+347                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+348                     value={editName}
+349                     onChange={(e) => setEditName(e.target.value)}
+350                   />
+351                 </div>
+352 
+353                 <div>
+354                   <label className="text-sm font-medium text-slate-700">
+355                     E-mail
+356                   </label>
+357                   <input
+358                     type="email"
+359                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+360                     value={editEmail}
+361                     onChange={(e) => setEditEmail(e.target.value)}
+362                   />
+363                 </div>
+364 
+365                 <div>
+366                   <label className="text-sm font-medium text-slate-700">
+367                     CPF
+368                   </label>
+369                   <input
+370                     type="text"
+371                     inputMode="numeric"
+372                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+373                     value={editCpf}
+374                     onChange={(e) => setEditCpf(formatCpf(e.target.value))}
+375                   />
+376                 </div>
+377 
+378                 {teacherError && (
+379                   <p className="text-sm text-red-600">{teacherError}</p>
+380                 )}
+381 
+382                 <div className="flex justify-end gap-2">
+383                   <button
+384                     type="button"
+385                     onClick={() => {
+386                       setEditOpen(false);
+387                       setTeacherError(null);
+388                     }}
+389                     className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300"
+390                     disabled={savingTeacher}
+391                   >
+392                     Cancelar
+393                   </button>
+394 
+395                   <button
+396                     type="button"
+397                     onClick={saveTeacher}
+398                     className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+399                     disabled={savingTeacher}
+400                   >
+401                     {savingTeacher ? "Salvando..." : "Salvar alterações"}
+402                   </button>
+403                 </div>
+404               </div>
+405             </div>
+406           </div>
+407         )}
+408       </div>
+409     </main>
+410   );
+411 }
+
+===== app/(app)/teachers/[teacherId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import TeacherDetailClient from "@/components/TeacherDetailClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ teacherId: string }>;
+8 };
+9 
+10 export default async function TeacherPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { teacherId } = await params;
+18 
+19   const teacher = await prisma.user.findFirst({
+20     where: {
+21       id: teacherId,
+22       createdById: user.id,
+23       isTeacher: true,
+24     },
+25   });
+26 
+27   if (!teacher) {
+28     notFound();
+29   }
+30 
+31   const linkedClassesRaw = await prisma.class.findMany({
+32     where: {
+33       teacherId: teacher.id,
+34     },
+35     include: {
+36       school: {
+37         include: {
+38           group: true,
+39         },
+40       },
+41     },
+42     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+43   });
+44 
+45   const availableClassesRaw = await prisma.class.findMany({
+46     where: {
+47       teacherId: null,
+48       school: {
+49         members: {
+50           some: {
+51             userId: user.id,
+52           },
+53         },
+54       },
+55     },
+56     include: {
+57       school: {
+58         include: {
+59           group: true,
+60         },
+61       },
+62     },
+63     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+64   });
+65 
+66   const linkedClasses = linkedClassesRaw.map((item) => ({
+67     id: item.id,
+68     name: item.name,
+69     year: item.year,
+70     school: {
+71       id: item.school.id,
+72       name: item.school.name,
+73       group: {
+74         id: item.school.group.id,
+75         name: item.school.group.name,
+76       },
+77     },
+78   }));
+79 
+80   const availableClasses = availableClassesRaw.map((item) => ({
+81     id: item.id,
+82     name: item.name,
+83     year: item.year,
+84     school: {
+85       id: item.school.id,
+86       name: item.school.name,
+87       group: {
+88         id: item.school.group.id,
+89         name: item.school.group.name,
+90       },
+91     },
+92   }));
+93 
+94   return (
+95     <TeacherDetailClient
+96       teacherId={teacher.id}
+97       teacherName={teacher.name}
+98       teacherEmail={teacher.email}
+99       teacherCpf={teacher.cpf}
+100       linkedClasses={linkedClasses}
+101       availableClasses={availableClasses}
+102     />
+103   );
+104 }
+
+===== app/api/teachers/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser, hashPassword } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 function generateTeacherPassword(name: string, cpf: string) {
+10   const cleanName = name.trim().replace(/\s+/g, "");
+11   const cleanCpf = normalizeCpf(cpf);
+12 
+13   if (cleanName.length < 3 || cleanCpf.length < 6) {
+14     return null;
+15   }
+16 
+17   const first = cleanName[0].toUpperCase();
+18   const second = cleanName[1].toLowerCase();
+19   const third = cleanName[2].toUpperCase();
+20   const cpfPart = cleanCpf.slice(0, 6);
+21 
+22   return `${first}${second}${third}@${cpfPart}.`;
+23 }
+24 
+25 export async function GET() {
+26   const user = await getSessionUser();
+27 
+28   if (!user) {
+29     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+30   }
+31 
+32   const teachers = await prisma.user.findMany({
+33     where: {
+34       createdById: user.id,
+35       isTeacher: true,
+36     },
+37     include: {
+38       _count: {
+39         select: {
+40           classes: true,
+41         },
+42       },
+43     },
+44     orderBy: { createdAt: "desc" },
+45   });
+46 
+47   return NextResponse.json(
+48     teachers.map((teacher) => ({
+49       id: teacher.id,
+50       name: teacher.name,
+51       email: teacher.email,
+52       cpf: teacher.cpf,
+53       isTeacher: teacher.isTeacher,
+54       createdAt: teacher.createdAt,
+55       _count: {
+56         classes: teacher._count.classes,
+57       },
+58     }))
+59   );
+60 }
+61 
+62 export async function POST(req: NextRequest) {
+63   const user = await getSessionUser();
+64 
+65   if (!user) {
+66     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+67   }
+68 
+69   const data = await req.json();
+70   const name = String(data.name ?? "").trim();
+71   const email = String(data.email ?? "").toLowerCase().trim();
+72   const cpfRaw = String(data.cpf ?? "").trim();
+73   const cpf = normalizeCpf(cpfRaw);
+74 
+75   if (!name || !email || !cpf) {
+76     return NextResponse.json(
+77       { error: "Missing teacher name, email or CPF" },
+78       { status: 400 }
+79     );
+80   }
+81 
+82   if (cpf.length !== 11) {
+83     return NextResponse.json(
+84       { error: "CPF must contain 11 digits" },
+85       { status: 400 }
+86     );
+87   }
+88 
+89   const existingByEmail = await prisma.user.findUnique({
+90     where: { email },
+91   });
+92 
+93   // Se usuário já existe → não altera senha
+94   if (existingByEmail) {
+95     const updated = await prisma.user.update({
+96       where: { id: existingByEmail.id },
+97       data: {
+98         isTeacher: true,
+99         createdById: user.id,
+100         cpf: existingByEmail.cpf ?? cpf,
+101       },
+102       include: {
+103         _count: {
+104           select: {
+105             classes: true,
+106           },
+107         },
+108       },
+109     });
+110 
+111     return NextResponse.json(
+112       {
+113         teacher: {
+114           id: updated.id,
+115           name: updated.name,
+116           email: updated.email,
+117           cpf: updated.cpf,
+118           isTeacher: updated.isTeacher,
+119           createdAt: updated.createdAt,
+120           _count: {
+121             classes: updated._count.classes,
+122           },
+123         },
+124         message: "Usuário já existia. Senha não foi alterada.",
+125       },
+126       { status: 200 }
+127     );
+128   }
+129 
+130   const temporaryPassword = generateTeacherPassword(name, cpf);
+131 
+132   if (!temporaryPassword) {
+133     return NextResponse.json(
+134       { error: "Could not generate password from provided name and CPF" },
+135       { status: 400 }
+136     );
+137   }
+138 
+139   const passwordHash = await hashPassword(temporaryPassword);
+140 
+141   const teacher = await prisma.user.create({
+142     data: {
+143       name,
+144       email,
+145       cpf,
+146       passwordHash,
+147       isTeacher: true,
+148       createdById: user.id,
+149     },
+150     include: {
+151       _count: {
+152         select: {
+153           classes: true,
+154         },
+155       },
+156     },
+157   });
+158 
+159   return NextResponse.json(
+160     {
+161       teacher: {
+162         id: teacher.id,
+163         name: teacher.name,
+164         email: teacher.email,
+165         cpf: teacher.cpf,
+166         isTeacher: teacher.isTeacher,
+167         createdAt: teacher.createdAt,
+168         _count: {
+169           classes: teacher._count.classes,
+170         },
+171       },
+172       temporaryPassword,
+173     },
+174     { status: 201 }
+175   );
+176 }

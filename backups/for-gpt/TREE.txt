@@ -1,0 +1,233 @@
+./
+├── app/
+│   ├── api/
+│   │   ├── account/
+│   │   │   └── route.ts
+│   │   ├── attendances/
+│   │   │   └── [attendanceId]/
+│   │   │       └── route.ts
+│   │   ├── auth/
+│   │   │   ├── login/
+│   │   │   │   └── route.ts
+│   │   │   ├── logout/
+│   │   │   │   └── route.ts
+│   │   │   ├── recover/
+│   │   │   │   └── route.ts
+│   │   │   └── register/
+│   │   │       └── route.ts
+│   │   ├── classes/
+│   │   │   └── [classId]/
+│   │   │       ├── attendances/
+│   │   │       │   └── route.ts
+│   │   │       └── students/
+│   │   │           ├── import/
+│   │   │           │   └── route.ts
+│   │   │           ├── route.ts
+│   │   │           └── [studentId]/
+│   │   │               ├── approve/
+│   │   │               │   └── route.ts
+│   │   │               ├── reject/
+│   │   │               │   └── route.ts
+│   │   │               ├── restore/
+│   │   │               │   └── route.ts
+│   │   │               └── route.ts
+│   │   ├── groups/
+│   │   │   ├── [groupId]/
+│   │   │   │   ├── members/
+│   │   │   │   │   ├── route.ts
+│   │   │   │   │   └── [userId]/
+│   │   │   │   │       └── route.ts
+│   │   │   │   └── schools/
+│   │   │   │       └── route.ts
+│   │   │   └── route.ts
+│   │   ├── schools/
+│   │   │   └── [schoolId]/
+│   │   │       └── classes/
+│   │   │           └── route.ts
+│   │   └── teachers/
+│   │       ├── route.ts
+│   │       └── [teacherId]/
+│   │           ├── classes/
+│   │           │   └── route.ts
+│   │           └── route.ts
+│   ├── (app)/
+│   │   ├── classes/
+│   │   │   └── [classId]/
+│   │   │       ├── ai-help/
+│   │   │       │   └── page.tsx
+│   │   │       ├── chamadas/
+│   │   │       │   ├── [attendanceId]/
+│   │   │       │   │   └── page.tsx
+│   │   │       │   ├── new/
+│   │   │       │   │   └── page.tsx
+│   │   │       │   └── page.tsx
+│   │   │       ├── conteudos/
+│   │   │       │   └── page.tsx
+│   │   │       ├── conteudos-pdf/
+│   │   │       │   └── page.tsx
+│   │   │       ├── page.tsx
+│   │   │       ├── relatorio-chamadas/
+│   │   │       │   └── page.tsx
+│   │   │       └── students/
+│   │   │           └── page.tsx
+│   │   ├── dashboard/
+│   │   │   └── page.tsx
+│   │   ├── groups/
+│   │   │   └── [groupId]/
+│   │   │       ├── page.tsx
+│   │   │       └── teachers/
+│   │   │           └── page.tsx
+│   │   ├── layout.tsx
+│   │   ├── perfil/
+│   │   │   └── page.tsx
+│   │   ├── schools/
+│   │   │   └── [schoolId]/
+│   │   │       └── page.tsx
+│   │   └── teachers/
+│   │       ├── page.tsx
+│   │       └── [teacherId]/
+│   │           └── page.tsx
+│   ├── (auth)/
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   ├── recover/
+│   │   │   └── page.tsx
+│   │   └── register/
+│   │       └── page.tsx
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── manifest.ts
+│   ├── offline/
+│   ├── page.module.css
+│   └── page.tsx
+├── backups/
+│   └── for-gpt/
+│       ├── ACCOUNT_PROFILE_AND_REGISTER_CPF_DEBUG.txt
+│       ├── ADD_STUDENT_IN_ATTENDANCE_DEBUG.txt
+│       ├── ATTENDANCE_CREATE_WITH_STUDENTS_DEBUG.txt
+│       ├── ATTENDANCE_HIDE_DELETED_STUDENTS_DEBUG.txt
+│       ├── ATTENDANCE_MODULE_START_DEBUG.txt
+│       ├── CLASS_ACTIONS_MVP_DEBUG.txt
+│       ├── CLASS_VISUAL_ADJUST_DEBUG.txt
+│       ├── EDUCC_BASE_DEBUG.txt
+│       ├── EDUCC_STEP1_DEBUG.txt
+│       ├── EDUCC_TAILWIND_DEBUG.txt
+│       ├── GROUP_AND_MANAGER_SHARING_DEBUG.txt
+│       ├── GROUP_MANAGER_ATTENDANCE_ACCESS_DEBUG.txt
+│       ├── GROUP_MANAGER_STUDENTS_ACCESS_DEBUG.txt
+│       ├── GROUPS_AND_SCHOOLS_STEP_DEBUG.txt
+│       ├── GROUP_TEACHERS_MOVE_DEBUG.txt
+│       ├── GROUP_TEACHERS_NEXT_STEP_DEBUG.txt
+│       ├── LOGIN_API_DEBUG.txt
+│       ├── LOGIN_SHOW_PASSWORD_DEBUG.txt
+│       ├── NUMERO_LABEL_UX_DEBUG.txt
+│       ├── ORDER_AND_COUNTS_DEBUG.txt
+│       ├── PWA_INSTALL_BUTTON_LOGIN_DEBUG.txt
+│       ├── REQUEST_DASHBOARD_LAYOUT_DEBUG.txt
+│       ├── REQUEST_DEBUG.txt
+│       ├── REQUEST_GROUPS_DEBUG.txt
+│       ├── REQUEST_GROUPS_STEP2_DEBUG.txt
+│       ├── REQUEST_GROUPS_STRUCTURE_DEBUG.txt
+│       ├── SCHOOLS_CLASSES_STEP_DEBUG.txt
+│       ├── STUDENT_BACKFILL_ATTENDANCES_DEBUG.txt
+│       ├── STUDENT_DELETE_APPROVAL_DEBUG.txt
+│       ├── STUDENT_DELETE_APPROVAL_STEP2_DEBUG.txt
+│       ├── STUDENT_DELETE_ROUTE_DEBUG.txt
+│       ├── STUDENT_EXCLUDED_MODAL_AND_ATTENDANCE_FIX_DEBUG.txt
+│       ├── STUDENTS_IMPORT_BY_ROLE_DEBUG.txt
+│       ├── STUDENT_SOFT_DELETE_IMPLEMENTATION_DEBUG.txt
+│       ├── TEACHER_CLASS_ASSIGNMENT_DEBUG.txt
+│       ├── TEACHER_DETAIL_AND_CLASS_LINK_DEBUG.txt
+│       ├── TEACHER_EXISTING_EMAIL_ACCOUNT_RULE_DEBUG.txt
+│       ├── TEACHER_REQUIRED_FIELDS_AND_PASSWORD_RULE_DEBUG.txt
+│       ├── TEACHER_SCOPE_AND_DASHBOARD_DEBUG.txt
+│       ├── TEACHERS_DASHBOARD_MOVE_DEBUG.txt
+│       ├── TEACHERS_ONBOARDING_DEBUG.txt
+│       ├── TEACHERS_PAGE_REFACTOR_DEBUG.txt
+│       ├── TEAM_MANAGEMENT_SCHEMA_DEBUG.txt
+│       ├── TOPBAR_INSTALL_AND_LOGOUT_DEBUG.txt
+│       ├── TREE.txt
+│       └── VERCEL_RUNTIME_AND_MIGRATIONS_DEBUG.txt
+├── components/
+│   ├── AccountProfileClient.tsx
+│   ├── AddStudentModal.tsx
+│   ├── AppTopbar.tsx
+│   ├── AttendanceDetailClient.tsx
+│   ├── ClassDetailClient.tsx
+│   ├── CreateAttendanceForm.tsx
+│   ├── CreateClassModal.tsx
+│   ├── CreateGroupModal.tsx
+│   ├── CreateSchoolModal.tsx
+│   ├── CreateTeacherModal.tsx
+│   ├── GroupDetailClient.tsx
+│   ├── GroupsDashboardClient.tsx
+│   ├── ManageGroupMembersModal.tsx
+│   ├── PwaInstallButton.tsx
+│   ├── SchoolDetailClient.tsx
+│   ├── StudentModal.tsx
+│   ├── StudentsManagerClient.tsx
+│   ├── TeacherDetailClient.tsx
+│   └── TeachersListClient.tsx
+├── .env
+├── .env.example
+├── eslint.config.mjs
+├── .github/
+│   └── workflows/
+├── .gitignore
+├── lib/
+│   ├── auth.ts
+│   ├── permissions.ts
+│   └── prisma.ts
+├── next.config.mjs
+├── next.config.ts
+├── next-env.d.ts
+├── package.json
+├── pnpm-lock.yaml
+├── postcss.config.js
+├── postcss.config.mjs
+├── prisma/
+│   ├── migrations/
+│   │   ├── 20260301223441_init_auth/
+│   │   │   └── migration.sql
+│   │   ├── 20260302141337_init_groups_schools_structure/
+│   │   │   └── migration.sql
+│   │   ├── 20260313130023_add_attendance_module/
+│   │   │   └── migration.sql
+│   │   ├── 20260313133308_add_attendance_lesson_date/
+│   │   │   └── migration.sql
+│   │   ├── 20260319110038_add_teacher_users_created_by/
+│   │   │   └── migration.sql
+│   │   ├── 20260321013701_add_student_soft_delete/
+│   │   │   └── migration.sql
+│   │   ├── 20260321082840_add_user_cpf/
+│   │   │   └── migration.sql
+│   │   ├── 20260321172741_add_student_delete_approval_status/
+│   │   │   └── migration.sql
+│   │   ├── 20260321182511_add_group_team_management/
+│   │   │   └── migration.sql
+│   │   └── migration_lock.toml
+│   └── schema.prisma
+├── public/
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── icons/
+│   ├── next.svg
+│   ├── sw.js
+│   ├── templates/
+│   │   ├── students-template.csv
+│   │   └── students-template.xlsx
+│   ├── vercel.svg
+│   └── window.svg
+├── README.md
+├── scripts/
+│   ├── check-password.mjs
+│   └── reset-password.mjs
+├── tailwind.config.js
+├── tailwind.config.ts
+├── tsconfig.json
+├── types/
+│   └── bcryptjs.d.ts
+└── ui/
+
+78 directories, 152 files

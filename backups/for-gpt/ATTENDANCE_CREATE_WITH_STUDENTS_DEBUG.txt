@@ -1,0 +1,1144 @@
+
+===== app/(app)/classes/[classId]/chamadas/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassChamadasPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23       attendances: {
+24         include: {
+25           presences: {
+26             select: {
+27               id: true,
+28               present: true,
+29             },
+30           },
+31         },
+32         orderBy: { createdAt: "desc" },
+33       },
+34     },
+35   });
+36 
+37   if (!foundClass) {
+38     notFound();
+39   }
+40 
+41   const membership = await prisma.schoolMember.findUnique({
+42     where: {
+43       userId_schoolId: {
+44         userId: user.id,
+45         schoolId: foundClass.schoolId,
+46       },
+47     },
+48   });
+49 
+50   if (!membership) {
+51     notFound();
+52   }
+53 
+54   return (
+55     <main className="min-h-screen bg-slate-50 px-4 py-10">
+56       <div className="mx-auto w-full max-w-4xl">
+57         <div className="mb-6">
+58           <Link
+59             href={`/classes/${classId}`}
+60             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+61           >
+62             ← Voltar para turma
+63           </Link>
+64         </div>
+65 
+66         <div className="flex items-start justify-between gap-4">
+67           <div>
+68             <h1 className="text-2xl font-semibold text-slate-900">
+69               Chamadas — {foundClass.name}
+70             </h1>
+71             <p className="mt-2 text-sm text-slate-500">
+72               Gerencie as chamadas desta turma.
+73             </p>
+74           </div>
+75 
+76           <Link
+77             href={`/classes/${classId}/chamadas/new`}
+78             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+79           >
+80             + Nova chamada
+81           </Link>
+82         </div>
+83 
+84         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+85           {foundClass.attendances.length === 0 ? (
+86             <div className="text-center">
+87               <p className="text-sm text-slate-500">
+88                 Ainda não há chamadas nesta turma.
+89               </p>
+90 
+91               <Link
+92                 href={`/classes/${classId}/chamadas/new`}
+93                 className="mt-4 inline-flex items-center rounded-md border border-sky-600 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50"
+94               >
+95                 Criar primeira chamada
+96               </Link>
+97             </div>
+98           ) : (
+99             <ul className="space-y-3">
+100               {foundClass.attendances.map((attendance) => {
+101                 const total = attendance.presences.length;
+102                 const presents = attendance.presences.filter(
+103                   (item) => item.present
+104                 ).length;
+105 
+106                 return (
+107                   <li key={attendance.id}>
+108                     <Link
+109                       href={`/classes/${classId}/chamadas/${attendance.id}`}
+110                       className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50"
+111                     >
+112                       <div>
+113                         <p className="text-sm font-medium text-slate-900">
+114                           {attendance.title}
+115                         </p>
+116                         <p className="mt-1 text-xs text-slate-500">
+117                           {attendance.createdAt.toLocaleDateString("pt-BR")} •{" "}
+118                           {presents} presentes de {total}
+119                         </p>
+120                       </div>
+121 
+122                       <span className="text-sm font-medium text-sky-700">
+123                         Abrir
+124                       </span>
+125                     </Link>
+126                   </li>
+127                 );
+128               })}
+129             </ul>
+130           )}
+131         </div>
+132       </div>
+133     </main>
+134   );
+135 }
+
+===== app/(app)/classes/[classId]/chamadas/new/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import CreateAttendanceForm from "@/components/CreateAttendanceForm";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string }>;
+9 };
+10 
+11 export default async function NewAttendancePage({ params }: PageProps) {
+12   const user = await getSessionUser();
+13 
+14   if (!user) {
+15     notFound();
+16   }
+17 
+18   const { classId } = await params;
+19 
+20   const foundClass = await prisma.class.findUnique({
+21     where: { id: classId },
+22     include: {
+23       school: true,
+24     },
+25   });
+26 
+27   if (!foundClass) {
+28     notFound();
+29   }
+30 
+31   const membership = await prisma.schoolMember.findUnique({
+32     where: {
+33       userId_schoolId: {
+34         userId: user.id,
+35         schoolId: foundClass.schoolId,
+36       },
+37     },
+38   });
+39 
+40   if (!membership) {
+41     notFound();
+42   }
+43 
+44   return (
+45     <main className="min-h-screen bg-slate-50 px-4 py-10">
+46       <div className="mx-auto w-full max-w-4xl">
+47         <div className="mb-6">
+48           <Link
+49             href={`/classes/${classId}/chamadas`}
+50             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+51           >
+52             ← Voltar para chamadas
+53           </Link>
+54         </div>
+55 
+56         <CreateAttendanceForm classId={classId} />
+57       </div>
+58     </main>
+59   );
+60 }
+
+===== app/(app)/classes/[classId]/chamadas/[attendanceId]/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import AttendanceDetailClient from "@/components/AttendanceDetailClient";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string; attendanceId: string }>;
+9 };
+10 
+11 export default async function AttendanceDetailPage({ params }: PageProps) {
+12   const user = await getSessionUser();
+13 
+14   if (!user) {
+15     notFound();
+16   }
+17 
+18   const { classId, attendanceId } = await params;
+19 
+20   const attendance = await prisma.attendance.findUnique({
+21     where: { id: attendanceId },
+22     include: {
+23       class: {
+24         include: {
+25           school: true,
+26         },
+27       },
+28       presences: {
+29         include: {
+30           student: {
+31             select: {
+32               id: true,
+33               name: true,
+34             },
+35           },
+36         },
+37         orderBy: {
+38           student: {
+39             name: "asc",
+40           },
+41         },
+42       },
+43     },
+44   });
+45 
+46   if (!attendance || attendance.classId !== classId) {
+47     notFound();
+48   }
+49 
+50   const membership = await prisma.schoolMember.findUnique({
+51     where: {
+52       userId_schoolId: {
+53         userId: user.id,
+54         schoolId: attendance.class.schoolId,
+55       },
+56     },
+57   });
+58 
+59   if (!membership) {
+60     notFound();
+61   }
+62 
+63   const initialPresences = attendance.presences.map((item) => ({
+64     id: item.id,
+65     present: item.present,
+66     student: {
+67       id: item.student.id,
+68       name: item.student.name,
+69     },
+70   }));
+71 
+72   return (
+73     <main className="min-h-screen bg-slate-50 px-4 py-10">
+74       <div className="mx-auto w-full max-w-4xl">
+75         <div className="mb-6">
+76           <Link
+77             href={`/classes/${classId}/chamadas`}
+78             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+79           >
+80             ← Voltar para chamadas
+81           </Link>
+82         </div>
+83 
+84         <AttendanceDetailClient
+85           attendanceId={attendance.id}
+86           classId={classId}
+87           initialTitle={attendance.title}
+88           initialPresences={initialPresences}
+89         />
+90       </div>
+91     </main>
+92   );
+93 }
+
+===== components/CreateAttendanceForm.tsx =====
+1 "use client";
+2 
+3 import { useRouter } from "next/navigation";
+4 import { useState } from "react";
+5 
+6 type Props = {
+7   classId: string;
+8 };
+9 
+10 export default function CreateAttendanceForm({ classId }: Props) {
+11   const router = useRouter();
+12   const [title, setTitle] = useState("");
+13   const [loading, setLoading] = useState(false);
+14 
+15   async function handleSubmit(e: React.FormEvent) {
+16     e.preventDefault();
+17     if (!title.trim()) return;
+18 
+19     setLoading(true);
+20 
+21     try {
+22       const res = await fetch(`/api/classes/${classId}/attendances`, {
+23         method: "POST",
+24         headers: { "Content-Type": "application/json" },
+25         body: JSON.stringify({ title }),
+26       });
+27 
+28       if (!res.ok) {
+29         console.error("Erro ao criar chamada");
+30         return;
+31       }
+32 
+33       const created = await res.json();
+34       router.push(`/classes/${classId}/chamadas/${created.id}`);
+35       router.refresh();
+36     } catch (error) {
+37       console.error("Erro ao criar chamada", error);
+38     } finally {
+39       setLoading(false);
+40     }
+41   }
+42 
+43   return (
+44     <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+45       <h1 className="text-2xl font-semibold text-slate-900">Nova chamada</h1>
+46       <p className="mt-2 text-sm text-slate-500">
+47         Crie uma chamada para registrar a presença dos alunos desta turma.
+48       </p>
+49 
+50       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+51         <div>
+52           <label className="text-sm font-medium text-slate-700">
+53             Título da chamada
+54           </label>
+55           <input
+56             type="text"
+57             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+58             placeholder="Ex: Chamada 01"
+59             value={title}
+60             onChange={(e) => setTitle(e.target.value)}
+61           />
+62         </div>
+63 
+64         <div className="flex justify-end">
+65           <button
+66             type="submit"
+67             disabled={loading}
+68             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+69           >
+70             {loading ? "Criando..." : "Criar chamada"}
+71           </button>
+72         </div>
+73       </form>
+74     </div>
+75   );
+76 }
+
+===== components/AttendanceDetailClient.tsx =====
+1 "use client";
+2 
+3 import { useRouter } from "next/navigation";
+4 import { useMemo, useState } from "react";
+5 
+6 type PresenceItem = {
+7   id: string;
+8   present: boolean;
+9   student: {
+10     id: string;
+11     name: string;
+12   };
+13 };
+14 
+15 type Props = {
+16   attendanceId: string;
+17   classId: string;
+18   initialTitle: string;
+19   initialPresences: PresenceItem[];
+20 };
+21 
+22 export default function AttendanceDetailClient({
+23   attendanceId,
+24   classId,
+25   initialTitle,
+26   initialPresences,
+27 }: Props) {
+28   const router = useRouter();
+29   const [title, setTitle] = useState(initialTitle);
+30   const [presences, setPresences] = useState<PresenceItem[]>(initialPresences);
+31   const [loading, setLoading] = useState(false);
+32 
+33   const summary = useMemo(() => {
+34     const total = presences.length;
+35     const presents = presences.filter((item) => item.present).length;
+36     return { total, presents, absents: total - presents };
+37   }, [presences]);
+38 
+39   function togglePresence(id: string) {
+40     setPresences((current) =>
+41       current.map((item) =>
+42         item.id === id ? { ...item, present: !item.present } : item
+43       )
+44     );
+45   }
+46 
+47   async function handleSave() {
+48     setLoading(true);
+49 
+50     try {
+51       const res = await fetch(`/api/attendances/${attendanceId}`, {
+52         method: "PATCH",
+53         headers: { "Content-Type": "application/json" },
+54         body: JSON.stringify({
+55           title,
+56           presences: presences.map((item) => ({
+57             id: item.id,
+58             present: item.present,
+59           })),
+60         }),
+61       });
+62 
+63       if (!res.ok) {
+64         console.error("Erro ao salvar chamada");
+65         return;
+66       }
+67 
+68       router.refresh();
+69     } catch (error) {
+70       console.error("Erro ao salvar chamada", error);
+71     } finally {
+72       setLoading(false);
+73     }
+74   }
+75 
+76   return (
+77     <div className="mt-6 space-y-6">
+78       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+79         <div className="space-y-4">
+80           <div>
+81             <label className="text-sm font-medium text-slate-700">
+82               Título da chamada
+83             </label>
+84             <input
+85               type="text"
+86               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+87               value={title}
+88               onChange={(e) => setTitle(e.target.value)}
+89             />
+90           </div>
+91 
+92           <div className="grid gap-3 sm:grid-cols-3">
+93             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+94               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+95                 Total
+96               </p>
+97               <p className="mt-1 text-lg font-semibold text-slate-900">
+98                 {summary.total}
+99               </p>
+100             </div>
+101 
+102             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+103               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+104                 Presentes
+105               </p>
+106               <p className="mt-1 text-lg font-semibold text-slate-900">
+107                 {summary.presents}
+108               </p>
+109             </div>
+110 
+111             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+112               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+113                 Faltas
+114               </p>
+115               <p className="mt-1 text-lg font-semibold text-slate-900">
+116                 {summary.absents}
+117               </p>
+118             </div>
+119           </div>
+120         </div>
+121       </div>
+122 
+123       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+124         <h2 className="text-lg font-semibold text-slate-900">Presenças</h2>
+125         <p className="mt-2 text-sm text-slate-500">
+126           Marque quem está presente nesta chamada.
+127         </p>
+128 
+129         {presences.length === 0 ? (
+130           <p className="mt-6 text-sm text-slate-500">
+131             Ainda não há alunos cadastrados nesta turma.
+132           </p>
+133         ) : (
+134           <ul className="mt-6 space-y-3">
+135             {presences.map((item) => (
+136               <li
+137                 key={item.id}
+138                 className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3"
+139               >
+140                 <div>
+141                   <p className="text-sm font-medium text-slate-900">
+142                     {item.student.name}
+143                   </p>
+144                   <p className="mt-1 text-xs text-slate-500">
+145                     {item.present ? "Presente" : "Faltou"}
+146                   </p>
+147                 </div>
+148 
+149                 <button
+150                   type="button"
+151                   onClick={() => togglePresence(item.id)}
+152                   className={[
+153                     "rounded-md px-4 py-2 text-sm font-medium transition",
+154                     item.present
+155                       ? "bg-sky-600 text-white hover:bg-sky-700"
+156                       : "bg-slate-200 text-slate-800 hover:bg-slate-300",
+157                   ].join(" ")}
+158                 >
+159                   {item.present ? "Presente" : "Marcar presença"}
+160                 </button>
+161               </li>
+162             ))}
+163           </ul>
+164         )}
+165 
+166         <div className="mt-6 flex justify-between gap-3">
+167           <a
+168             href={`/classes/${classId}/chamadas`}
+169             className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+170           >
+171             Voltar
+172           </a>
+173 
+174           <button
+175             type="button"
+176             onClick={handleSave}
+177             disabled={loading}
+178             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+179           >
+180             {loading ? "Salvando..." : "Salvar chamada"}
+181           </button>
+182         </div>
+183       </div>
+184     </div>
+185   );
+186 }
+
+===== app/api/classes/[classId]/attendances/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureClassAccess(userId: string, classId: string) {
+6   const foundClass = await prisma.class.findUnique({
+7     where: { id: classId },
+8     include: {
+9       school: true,
+10       students: {
+11         orderBy: { name: "asc" },
+12       },
+13     },
+14   });
+15 
+16   if (!foundClass) return null;
+17 
+18   const membership = await prisma.schoolMember.findUnique({
+19     where: {
+20       userId_schoolId: {
+21         userId,
+22         schoolId: foundClass.schoolId,
+23       },
+24     },
+25   });
+26 
+27   if (!membership) return null;
+28 
+29   return foundClass;
+30 }
+31 
+32 export async function GET(
+33   _req: NextRequest,
+34   { params }: { params: Promise<{ classId: string }> }
+35 ) {
+36   const user = await getSessionUser();
+37   if (!user) {
+38     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+39   }
+40 
+41   const { classId } = await params;
+42   const foundClass = await ensureClassAccess(user.id, classId);
+43 
+44   if (!foundClass) {
+45     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+46   }
+47 
+48   const attendances = await prisma.attendance.findMany({
+49     where: { classId },
+50     include: {
+51       presences: {
+52         select: {
+53           id: true,
+54           present: true,
+55         },
+56       },
+57     },
+58     orderBy: { createdAt: "desc" },
+59   });
+60 
+61   return NextResponse.json(attendances);
+62 }
+63 
+64 export async function POST(
+65   req: NextRequest,
+66   { params }: { params: Promise<{ classId: string }> }
+67 ) {
+68   const user = await getSessionUser();
+69   if (!user) {
+70     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+71   }
+72 
+73   const { classId } = await params;
+74   const foundClass = await ensureClassAccess(user.id, classId);
+75 
+76   if (!foundClass) {
+77     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+78   }
+79 
+80   const data = await req.json();
+81   const title = String(data.title ?? "").trim();
+82 
+83   if (!title) {
+84     return NextResponse.json(
+85       { error: "Missing attendance title" },
+86       { status: 400 }
+87     );
+88   }
+89 
+90   const attendance = await prisma.attendance.create({
+91     data: {
+92       title,
+93       classId,
+94       presences: {
+95         create: foundClass.students.map((student) => ({
+96           studentId: student.id,
+97           present: false,
+98         })),
+99       },
+100     },
+101     include: {
+102       presences: {
+103         include: {
+104           student: {
+105             select: {
+106               id: true,
+107               name: true,
+108             },
+109           },
+110         },
+111         orderBy: {
+112           student: {
+113             name: "asc",
+114           },
+115         },
+116       },
+117     },
+118   });
+119 
+120   return NextResponse.json(attendance, { status: 201 });
+121 }
+
+===== app/api/attendances/[attendanceId]/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureAttendanceAccess(userId: string, attendanceId: string) {
+6   const attendance = await prisma.attendance.findUnique({
+7     where: { id: attendanceId },
+8     include: {
+9       class: {
+10         include: {
+11           school: true,
+12         },
+13       },
+14       presences: {
+15         include: {
+16           student: {
+17             select: {
+18               id: true,
+19               name: true,
+20             },
+21           },
+22         },
+23         orderBy: {
+24           student: {
+25             name: "asc",
+26           },
+27         },
+28       },
+29     },
+30   });
+31 
+32   if (!attendance) return null;
+33 
+34   const membership = await prisma.schoolMember.findUnique({
+35     where: {
+36       userId_schoolId: {
+37         userId,
+38         schoolId: attendance.class.schoolId,
+39       },
+40     },
+41   });
+42 
+43   if (!membership) return null;
+44 
+45   return attendance;
+46 }
+47 
+48 export async function GET(
+49   _req: NextRequest,
+50   { params }: { params: Promise<{ attendanceId: string }> }
+51 ) {
+52   const user = await getSessionUser();
+53   if (!user) {
+54     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+55   }
+56 
+57   const { attendanceId } = await params;
+58   const attendance = await ensureAttendanceAccess(user.id, attendanceId);
+59 
+60   if (!attendance) {
+61     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+62   }
+63 
+64   return NextResponse.json(attendance);
+65 }
+66 
+67 export async function PATCH(
+68   req: NextRequest,
+69   { params }: { params: Promise<{ attendanceId: string }> }
+70 ) {
+71   const user = await getSessionUser();
+72   if (!user) {
+73     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+74   }
+75 
+76   const { attendanceId } = await params;
+77   const attendance = await ensureAttendanceAccess(user.id, attendanceId);
+78 
+79   if (!attendance) {
+80     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+81   }
+82 
+83   const data = await req.json();
+84   const title = String(data.title ?? "").trim();
+85   const presences = Array.isArray(data.presences) ? data.presences : [];
+86 
+87   if (!title) {
+88     return NextResponse.json(
+89       { error: "Missing attendance title" },
+90       { status: 400 }
+91     );
+92   }
+93 
+94   await prisma.$transaction([
+95     prisma.attendance.update({
+96       where: { id: attendanceId },
+97       data: { title },
+98     }),
+99     ...presences.map((presence: { id: string; present: boolean }) =>
+100       prisma.attendancePresence.update({
+101         where: { id: presence.id },
+102         data: { present: Boolean(presence.present) },
+103       })
+104     ),
+105   ]);
+106 
+107   const updated = await prisma.attendance.findUnique({
+108     where: { id: attendanceId },
+109     include: {
+110       class: {
+111         include: {
+112           school: true,
+113         },
+114       },
+115       presences: {
+116         include: {
+117           student: {
+118             select: {
+119               id: true,
+120               name: true,
+121             },
+122           },
+123         },
+124         orderBy: {
+125           student: {
+126             name: "asc",
+127           },
+128         },
+129       },
+130     },
+131   });
+132 
+133   return NextResponse.json(updated);
+134 }
+
+===== app/(app)/classes/[classId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 import ClassDetailClient from "@/components/ClassDetailClient";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23     },
+24   });
+25 
+26   if (!foundClass) {
+27     notFound();
+28   }
+29 
+30   const membership = await prisma.schoolMember.findUnique({
+31     where: {
+32       userId_schoolId: {
+33         userId: user.id,
+34         schoolId: foundClass.schoolId,
+35       },
+36     },
+37   });
+38 
+39   if (!membership) {
+40     notFound();
+41   }
+42 
+43   return (
+44     <ClassDetailClient
+45       classId={foundClass.id}
+46       className={foundClass.name}
+47       schoolId={foundClass.schoolId}
+48     />
+49   );
+50 }
+
+===== components/ClassDetailClient.tsx =====
+1 import Link from "next/link";
+2 
+3 type Props = {
+4   classId: string;
+5   className: string;
+6   schoolId: string;
+7 };
+8 
+9 const actions = [
+10   {
+11     title: "Ir para Chamadas",
+12     href: (classId: string) => `/classes/${classId}/chamadas`,
+13     primary: true,
+14   },
+15   {
+16     title: "Ir para Conteúdos",
+17     href: (classId: string) => `/classes/${classId}/conteudos`,
+18     primary: false,
+19   },
+20   {
+21     title: "Relatório Chamadas",
+22     href: (classId: string) => `/classes/${classId}/relatorio-chamadas`,
+23     primary: false,
+24   },
+25   {
+26     title: "Conteúdos em PDF",
+27     href: (classId: string) => `/classes/${classId}/conteudos-pdf`,
+28     primary: false,
+29   },
+30   {
+31     title: "Ajuda com IA",
+32     href: (classId: string) => `/classes/${classId}/ai-help`,
+33     primary: false,
+34   },
+35 ];
+36 
+37 export default function ClassDetailClient({
+38   classId,
+39   className,
+40   schoolId,
+41 }: Props) {
+42   return (
+43     <main className="min-h-screen bg-slate-50 px-4 py-10">
+44       <div className="mx-auto w-full max-w-4xl">
+45         <div className="mb-6">
+46           <Link
+47             href={`/schools/${schoolId}`}
+48             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+49           >
+50             ← Voltar para turmas
+51           </Link>
+52         </div>
+53 
+54         <div>
+55           <h1 className="text-2xl font-semibold text-slate-900">{className}</h1>
+56           <p className="mt-2 text-sm text-slate-500">
+57             Gerencie a turma acessando chamadas, conteúdos, relatórios e ações
+58             de apoio.
+59           </p>
+60         </div>
+61 
+62         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+63           <h2 className="text-lg font-semibold text-slate-900">Ações</h2>
+64           <p className="mt-2 text-sm text-slate-500">
+65             Use os atalhos abaixo para gerenciar a turma.
+66           </p>
+67 
+68           <div className="mt-6 space-y-3">
+69             {actions.map((action) => (
+70               <Link
+71                 key={action.title}
+72                 href={action.href(classId)}
+73                 className={[
+74                   "block rounded-md border px-4 py-4 text-center text-base font-medium transition focus:outline-none focus:ring-2 focus:ring-sky-500",
+75                   action.primary
+76                     ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700"
+77                     : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
+78                 ].join(" ")}
+79               >
+80                 {action.title}
+81               </Link>
+82             ))}
+83           </div>
+84         </div>
+85       </div>
+86     </main>
+87   );
+88 }
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 //
+11 // ==========================
+12 // MODELO USER E SESSION (EXISTENTES)
+13 // ==========================
+14 //
+15 
+16 model User {
+17   id            String          @id @default(cuid())
+18   name          String
+19   email         String          @unique
+20   passwordHash  String
+21   createdAt     DateTime        @default(now())
+22   updatedAt     DateTime        @updatedAt
+23 
+24   sessions      Session[]
+25   groupMembers  GroupMember[]
+26   schoolMembers SchoolMember[]
+27   classes       Class[]         @relation("ClassTeacher")
+28 }
+29 
+30 model Session {
+31   id        String   @id @default(cuid())
+32   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+33   userId    String
+34   createdAt DateTime @default(now())
+35   expiresAt DateTime
+36 
+37   @@index([userId])
+38 }
+39 
+40 //
+41 // ==========================
+42 // MODELOS DE GRUPOS DE ESCOLAS
+43 // ==========================
+44 //
+45 
+46 model Group {
+47   id        String        @id @default(cuid())
+48   name      String
+49   createdAt DateTime      @default(now())
+50   updatedAt DateTime      @updatedAt
+51 
+52   members   GroupMember[]
+53   schools   School[]
+54 }
+55 
+56 model GroupMember {
+57   id        String   @id @default(cuid())
+58   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+59   userId    String
+60   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+61   groupId   String
+62 
+63   role      String   // OWNER, DIRECTOR, VIEWER
+64   createdAt DateTime @default(now())
+65 
+66   @@unique([userId, groupId])
+67 }
+68 
+69 //
+70 // ==========================
+71 // MODELOS DE ESCOLAS
+72 // ==========================
+73 //
+74 
+75 model School {
+76   id        String         @id @default(cuid())
+77   name      String
+78   createdAt DateTime       @default(now())
+79   updatedAt DateTime       @updatedAt
+80 
+81   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+82   groupId   String
+83 
+84   members   SchoolMember[]
+85   classes   Class[]
+86 }
+87 
+88 model SchoolMember {
+89   id        String   @id @default(cuid())
+90   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+91   userId    String
+92   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+93   schoolId  String
+94 
+95   role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+96   createdAt DateTime @default(now())
+97 
+98   @@unique([userId, schoolId])
+99 }
+100 
+101 //
+102 // ==========================
+103 // MODELOS DE TURMAS, ALUNOS E CHAMADAS
+104 // ==========================
+105 //
+106 
+107 model Class {
+108   id          String              @id @default(cuid())
+109   name        String
+110   year        Int?
+111   createdAt   DateTime            @default(now())
+112   updatedAt   DateTime            @updatedAt
+113 
+114   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+115   schoolId    String
+116 
+117   teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+118   teacherId   String?
+119 
+120   students    Student[]
+121   attendances Attendance[]
+122 }
+123 
+124 model Student {
+125   id         String               @id @default(cuid())
+126   name       String
+127   createdAt  DateTime             @default(now())
+128   updatedAt  DateTime             @updatedAt
+129 
+130   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+131   classId    String
+132 
+133   presences  AttendancePresence[]
+134 }
+135 
+136 model Attendance {
+137   id         String               @id @default(cuid())
+138   title      String
+139   createdAt  DateTime             @default(now())
+140   updatedAt  DateTime             @updatedAt
+141 
+142   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+143   classId    String
+144 
+145   presences  AttendancePresence[]
+146 }
+147 
+148 model AttendancePresence {
+149   id           String      @id @default(cuid())
+150   present      Boolean     @default(false)
+151   createdAt    DateTime    @default(now())
+152   updatedAt    DateTime    @updatedAt
+153 
+154   attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+155   attendanceId String
+156 
+157   student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+158   studentId    String
+159 
+160   @@unique([attendanceId, studentId])
+161 }
+
+===== lib/prisma.ts =====
+1 import { PrismaClient } from "@prisma/client";
+2 
+3 const globalForPrisma = globalThis as unknown as {
+4   prisma?: PrismaClient;
+5 };
+6 
+7 export const prisma =
+8   globalForPrisma.prisma ??
+9   new PrismaClient({
+10     log:
+11       process.env.NODE_ENV === "development"
+12         ? ["query", "error", "warn"]
+13         : ["error"],
+14   });
+15 
+16 if (process.env.NODE_ENV !== "production") {
+17   globalForPrisma.prisma = prisma;
+18 }

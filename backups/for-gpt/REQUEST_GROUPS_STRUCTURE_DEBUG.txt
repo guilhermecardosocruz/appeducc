@@ -1,0 +1,12 @@
+
+===== app/api/groups =====
+[MISSING] app/api/groups
+
+===== components =====
+[DIR] components
+components
+
+===== app/(app)/dashboard =====
+[DIR] app/(app)/dashboard
+app/(app)/dashboard
+└── page.tsx

@@ -1,0 +1,682 @@
+
+===== lib/auth.ts =====
+1 import { cookies } from "next/headers";
+2 import { prisma } from "./prisma";
+3 import { compare, hash } from "bcryptjs";
+4 
+5 const SESSION_COOKIE_NAME = "educc_session";
+6 const SESSION_DAYS = 30;
+7 
+8 export async function hashPassword(password: string) {
+9   return hash(password, 10);
+10 }
+11 
+12 export async function verifyPassword(password: string, passwordHash: string) {
+13   return compare(password, passwordHash);
+14 }
+15 
+16 export async function createSession(userId: string, baseUrl: string) {
+17   const expiresAt = new Date();
+18   expiresAt.setDate(expiresAt.getDate() + SESSION_DAYS);
+19 
+20   const session = await prisma.session.create({
+21     data: {
+22       userId,
+23       expiresAt,
+24     },
+25   });
+26 
+27   const cookieStore = await cookies();
+28 
+29   cookieStore.set(SESSION_COOKIE_NAME, session.id, {
+30     httpOnly: true,
+31     secure: true,
+32     sameSite: "lax",
+33     path: "/",
+34     expires: expiresAt,
+35   });
+36 
+37   return new URL("/dashboard", baseUrl);
+38 }
+39 
+40 export async function destroySession() {
+41   const cookieStore = await cookies();
+42   const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+43 
+44   if (sessionId) {
+45     await prisma.session.deleteMany({
+46       where: { id: sessionId },
+47     });
+48 
+49     cookieStore.set(SESSION_COOKIE_NAME, "", {
+50       httpOnly: true,
+51       secure: true,
+52       sameSite: "lax",
+53       path: "/",
+54       maxAge: 0,
+55     });
+56   }
+57 }
+58 
+59 export async function getSessionUser() {
+60   const cookieStore = await cookies();
+61   const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+62 
+63   if (!sessionId) return null;
+64 
+65   const session = await prisma.session.findUnique({
+66     where: { id: sessionId },
+67     include: { user: true },
+68   });
+69 
+70   if (!session) return null;
+71   if (session.expiresAt < new Date()) {
+72     return null;
+73   }
+74 
+75   return session.user;
+76 }
+
+===== components/AttendanceDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useMemo, useState } from "react";
+5 import AddStudentModal from "./AddStudentModal";
+6 
+7 type PresenceItem = {
+8   id: string;
+9   present: boolean;
+10   student: {
+11     id: string;
+12     name: string;
+13   };
+14 };
+15 
+16 type Props = {
+17   attendanceId: string;
+18   classId: string;
+19   initialTitle: string;
+20   initialLessonDate: string;
+21   initialPresences: PresenceItem[];
+22 };
+23 
+24 export default function AttendanceDetailClient({
+25   attendanceId,
+26   classId,
+27   initialTitle,
+28   initialLessonDate,
+29   initialPresences,
+30 }: Props) {
+31   const [title, setTitle] = useState(initialTitle);
+32   const [lessonDate, setLessonDate] = useState(initialLessonDate);
+33   const [presences, setPresences] = useState<PresenceItem[]>(initialPresences);
+34   const [loading, setLoading] = useState(false);
+35   const [addingStudent, setAddingStudent] = useState(false);
+36   const [openStudentModal, setOpenStudentModal] = useState(false);
+37 
+38   const summary = useMemo(() => {
+39     const total = presences.length;
+40     const presents = presences.filter((item) => item.present).length;
+41     return { total, presents };
+42   }, [presences]);
+43 
+44   function togglePresence(id: string) {
+45     setPresences((current) =>
+46       current.map((item) =>
+47         item.id === id ? { ...item, present: !item.present } : item
+48       )
+49     );
+50   }
+51 
+52   function markAll(value: boolean) {
+53     setPresences((current) =>
+54       current.map((item) => ({
+55         ...item,
+56         present: value,
+57       }))
+58     );
+59   }
+60 
+61   async function handleAddStudent(name: string) {
+62     setAddingStudent(true);
+63 
+64     try {
+65       const res = await fetch(`/api/classes/${classId}/students`, {
+66         method: "POST",
+67         headers: { "Content-Type": "application/json" },
+68         body: JSON.stringify({
+69           name,
+70           attendanceId,
+71         }),
+72       });
+73 
+74       if (!res.ok) {
+75         console.error("Erro ao adicionar aluno");
+76         return;
+77       }
+78 
+79       const data = await res.json();
+80 
+81       if (data.presence) {
+82         setPresences((current) => [...current, data.presence]);
+83       }
+84 
+85       setOpenStudentModal(false);
+86     } catch (error) {
+87       console.error("Erro ao adicionar aluno", error);
+88     } finally {
+89       setAddingStudent(false);
+90     }
+91   }
+92 
+93   async function handleSave() {
+94     setLoading(true);
+95 
+96     try {
+97       const res = await fetch(`/api/attendances/${attendanceId}`, {
+98         method: "PATCH",
+99         headers: { "Content-Type": "application/json" },
+100         body: JSON.stringify({
+101           title,
+102           lessonDate,
+103           presences: presences.map((item) => ({
+104             id: item.id,
+105             present: item.present,
+106           })),
+107         }),
+108       });
+109 
+110       if (!res.ok) {
+111         console.error("Erro ao salvar chamada");
+112         return;
+113       }
+114 
+115       window.location.reload();
+116     } catch (error) {
+117       console.error("Erro ao salvar chamada", error);
+118     } finally {
+119       setLoading(false);
+120     }
+121   }
+122 
+123   return (
+124     <>
+125       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+126         <div className="space-y-6">
+127           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+128             <div className="grid flex-1 gap-4 md:grid-cols-[1fr_220px]">
+129               <div>
+130                 <label className="text-sm font-medium text-slate-700">
+131                   Nome da aula
+132                 </label>
+133                 <input
+134                   type="text"
+135                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+136                   value={title}
+137                   onChange={(e) => setTitle(e.target.value)}
+138                 />
+139               </div>
+140 
+141               <div>
+142                 <label className="text-sm font-medium text-slate-700">Data</label>
+143                 <input
+144                   type="date"
+145                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+146                   value={lessonDate}
+147                   onChange={(e) => setLessonDate(e.target.value)}
+148                 />
+149               </div>
+150             </div>
+151 
+152             <button
+153               type="button"
+154               onClick={() => setOpenStudentModal(true)}
+155               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+156             >
+157               Adicionar aluno
+158             </button>
+159           </div>
+160 
+161           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-sky-600 px-4 py-4 text-white">
+162             <h1 className="text-lg font-semibold">Lista de chamada</h1>
+163             <p className="text-sm font-medium">
+164               Presentes: {summary.presents} / {summary.total}
+165             </p>
+166           </div>
+167 
+168           <div className="flex flex-wrap gap-2">
+169             <button
+170               type="button"
+171               onClick={() => markAll(true)}
+172               className="rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
+173             >
+174               Marcar todos
+175             </button>
+176 
+177             <button
+178               type="button"
+179               onClick={() => markAll(false)}
+180               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+181             >
+182               Desmarcar todos
+183             </button>
+184           </div>
+185 
+186           {presences.length === 0 ? (
+187             <p className="text-sm text-slate-500">
+188               Ainda não há alunos cadastrados nesta turma.
+189             </p>
+190           ) : (
+191             <ul className="overflow-hidden rounded-md border border-slate-200">
+192               <li className="grid grid-cols-[48px_1fr_80px] items-center gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+193                 <span>#</span>
+194                 <span>Aluno</span>
+195                 <span className="text-center">✓</span>
+196               </li>
+197 
+198               {presences.map((item, index) => (
+199                 <li
+200                   key={item.id}
+201                   className="grid grid-cols-[48px_1fr_80px] items-center gap-3 border-t border-slate-200 px-4 py-3"
+202                 >
+203                   <span className="text-sm text-slate-500">{index + 1}</span>
+204 
+205                   <span className="text-sm font-medium text-slate-900">
+206                     {item.student.name}
+207                   </span>
+208 
+209                   <div className="flex justify-center">
+210                     <input
+211                       type="checkbox"
+212                       checked={item.present}
+213                       onChange={() => togglePresence(item.id)}
+214                       className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+215                     />
+216                   </div>
+217                 </li>
+218               ))}
+219             </ul>
+220           )}
+221 
+222           <div className="flex justify-between gap-3">
+223             <Link
+224               href={`/classes/${classId}/chamadas`}
+225               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+226             >
+227               Voltar
+228             </Link>
+229 
+230             <button
+231               type="button"
+232               onClick={handleSave}
+233               disabled={loading}
+234               className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+235             >
+236               {loading ? "Salvando..." : "Salvar chamada"}
+237             </button>
+238           </div>
+239         </div>
+240       </div>
+241 
+242       <AddStudentModal
+243         open={openStudentModal}
+244         onClose={() => setOpenStudentModal(false)}
+245         onSubmit={handleAddStudent}
+246         loading={addingStudent}
+247       />
+248     </>
+249   );
+250 }
+
+===== components/StudentModal.tsx =====
+1 "use client";
+2 
+3 import { useEffect, useState } from "react";
+4 
+5 type StudentStats = {
+6   total: number;
+7   presents: number;
+8   absents: number;
+9   percentage: number;
+10 };
+11 
+12 type StudentData = {
+13   id: string;
+14   name: string;
+15   deletedAt: string | null;
+16   deletedReason: string | null;
+17   stats: StudentStats;
+18 };
+19 
+20 type Props = {
+21   open: boolean;
+22   onClose: () => void;
+23   classId: string;
+24   studentId: string | null;
+25   onUpdated: () => void;
+26 };
+27 
+28 export default function StudentModal({
+29   open,
+30   onClose,
+31   classId,
+32   studentId,
+33   onUpdated,
+34 }: Props) {
+35   const [student, setStudent] = useState<StudentData | null>(null);
+36   const [name, setName] = useState("");
+37 
+38   useEffect(() => {
+39     if (!open || !studentId) return;
+40 
+41     async function load() {
+42       const res = await fetch(
+43         `/api/classes/${classId}/students/${studentId}`
+44       );
+45 
+46       if (!res.ok) return;
+47 
+48       const data: StudentData = await res.json();
+49       setStudent(data);
+50       setName(data.name);
+51     }
+52 
+53     load();
+54   }, [open, studentId, classId]);
+55 
+56   async function saveName() {
+57     if (!studentId) return;
+58 
+59     await fetch(`/api/classes/${classId}/students/${studentId}`, {
+60       method: "PATCH",
+61       headers: { "Content-Type": "application/json" },
+62       body: JSON.stringify({ name }),
+63     });
+64 
+65     onUpdated();
+66     onClose();
+67   }
+68 
+69   async function restoreStudent() {
+70     if (!studentId) return;
+71 
+72     await fetch(
+73       `/api/classes/${classId}/students/${studentId}/restore`,
+74       { method: "POST" }
+75     );
+76 
+77     onUpdated();
+78     onClose();
+79   }
+80 
+81   if (!open || !student) return null;
+82 
+83   return (
+84     <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+85       <div className="bg-white p-6 rounded-lg w-full max-w-md space-y-4">
+86         <h2 className="text-lg font-semibold">Aluno</h2>
+87 
+88         <div>
+89           <label className="text-sm">Nome</label>
+90           <input
+91             className="w-full border rounded px-3 py-2 mt-1"
+92             value={name}
+93             onChange={(e) => setName(e.target.value)}
+94           />
+95         </div>
+96 
+97         {student.deletedAt && (
+98           <div className="text-sm text-red-600 space-y-1">
+99             <p><strong>Motivo:</strong> {student.deletedReason}</p>
+100             <p>Presenças: {student.stats.presents}</p>
+101             <p>Faltas: {student.stats.absents}</p>
+102             <p>Frequência: {student.stats.percentage}%</p>
+103 
+104             <button
+105               onClick={restoreStudent}
+106               className="mt-2 px-3 py-1 bg-green-600 text-white rounded"
+107             >
+108               Reativar aluno
+109             </button>
+110           </div>
+111         )}
+112 
+113         <div className="flex justify-end gap-2">
+114           <button onClick={onClose}>Fechar</button>
+115           <button
+116             onClick={saveName}
+117             className="bg-sky-600 text-white px-3 py-1 rounded"
+118           >
+119             Salvar
+120           </button>
+121         </div>
+122       </div>
+123     </div>
+124   );
+125 }
+
+===== app/(app)/classes/[classId]/students/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import StudentsManagerClient from "@/components/StudentsManagerClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassStudentsPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23       students: {
+24         orderBy: { name: "asc" },
+25       },
+26     },
+27   });
+28 
+29   if (!foundClass) {
+30     notFound();
+31   }
+32 
+33   const membership = await prisma.schoolMember.findUnique({
+34     where: {
+35       userId_schoolId: {
+36         userId: user.id,
+37         schoolId: foundClass.schoolId,
+38       },
+39     },
+40   });
+41 
+42   if (!membership) {
+43     notFound();
+44   }
+45 
+46   const students = foundClass.students.map((student) => ({
+47     id: student.id,
+48     name: student.name,
+49     createdAt: student.createdAt.toISOString(),
+50     deletedAt: student.deletedAt?.toISOString() ?? null,
+51     deletedReason: student.deletedReason ?? null,
+52   }));
+53 
+54   return (
+55     <StudentsManagerClient
+56       classId={foundClass.id}
+57       className={foundClass.name}
+58       canImportSpreadsheet={!user.isTeacher}
+59       initialStudents={students}
+60     />
+61   );
+62 }
+
+===== app/(app)/classes/[classId]/chamadas/[attendanceId]/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import AttendanceDetailClient from "@/components/AttendanceDetailClient";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string; attendanceId: string }>;
+9 };
+10 
+11 function formatDateInput(date: Date) {
+12   const year = date.getFullYear();
+13   const month = `${date.getMonth() + 1}`.padStart(2, "0");
+14   const day = `${date.getDate()}`.padStart(2, "0");
+15   return `${year}-${month}-${day}`;
+16 }
+17 
+18 export default async function AttendanceDetailPage({ params }: PageProps) {
+19   const user = await getSessionUser();
+20 
+21   if (!user) {
+22     notFound();
+23   }
+24 
+25   const { classId, attendanceId } = await params;
+26 
+27   const attendanceBase = await prisma.attendance.findUnique({
+28     where: { id: attendanceId },
+29     include: {
+30       class: {
+31         include: {
+32           school: true,
+33           students: {
+34             where: {
+35               deletedAt: null,
+36             },
+37             select: {
+38               id: true,
+39               name: true,
+40             },
+41             orderBy: {
+42               name: "asc",
+43             },
+44           },
+45         },
+46       },
+47       presences: {
+48         select: {
+49           id: true,
+50           studentId: true,
+51           present: true,
+52         },
+53       },
+54     },
+55   });
+56 
+57   if (!attendanceBase || attendanceBase.classId !== classId) {
+58     notFound();
+59   }
+60 
+61   const membership = await prisma.schoolMember.findUnique({
+62     where: {
+63       userId_schoolId: {
+64         userId: user.id,
+65         schoolId: attendanceBase.class.schoolId,
+66       },
+67     },
+68   });
+69 
+70   if (!membership) {
+71     notFound();
+72   }
+73 
+74   const existingStudentIds = new Set(
+75     attendanceBase.presences.map((item) => item.studentId)
+76   );
+77 
+78   const missingStudents = attendanceBase.class.students.filter(
+79     (student) => !existingStudentIds.has(student.id)
+80   );
+81 
+82   if (missingStudents.length > 0) {
+83     await prisma.attendancePresence.createMany({
+84       data: missingStudents.map((student) => ({
+85         attendanceId,
+86         studentId: student.id,
+87         present: false,
+88       })),
+89       skipDuplicates: true,
+90     });
+91   }
+92 
+93   const attendance = await prisma.attendance.findUnique({
+94     where: { id: attendanceId },
+95     include: {
+96       class: {
+97         include: {
+98           school: true,
+99         },
+100       },
+101       presences: {
+102         where: {
+103           student: {
+104             deletedAt: null,
+105           },
+106         },
+107         include: {
+108           student: {
+109             select: {
+110               id: true,
+111               name: true,
+112             },
+113           },
+114         },
+115         orderBy: {
+116           student: {
+117             name: "asc",
+118           },
+119         },
+120       },
+121     },
+122   });
+123 
+124   if (!attendance || attendance.classId !== classId) {
+125     notFound();
+126   }
+127 
+128   const initialPresences = attendance.presences.map((item) => ({
+129     id: item.id,
+130     present: item.present,
+131     student: {
+132       id: item.student.id,
+133       name: item.student.name,
+134     },
+135   }));
+136 
+137   return (
+138     <main className="min-h-screen bg-slate-50 px-4 py-10">
+139       <div className="mx-auto w-full max-w-4xl">
+140         <div className="mb-6">
+141           <Link
+142             href={`/classes/${classId}/chamadas`}
+143             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+144           >
+145             ← Voltar para chamadas
+146           </Link>
+147         </div>
+148 
+149         <AttendanceDetailClient
+150           attendanceId={attendance.id}
+151           classId={classId}
+152           initialTitle={attendance.title}
+153           initialLessonDate={formatDateInput(attendance.lessonDate)}
+154           initialPresences={initialPresences}
+155         />
+156       </div>
+157     </main>
+158   );
+159 }

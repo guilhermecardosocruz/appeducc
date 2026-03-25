@@ -1,0 +1,267 @@
+
+===== components/PwaInstallButton.tsx =====
+1 "use client";
+2 
+3 import { useEffect, useMemo, useState } from "react";
+4 
+5 type BeforeInstallPromptEvent = Event & {
+6   prompt: () => Promise<void>;
+7   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+8 };
+9 
+10 function isIos() {
+11   if (typeof window === "undefined") return false;
+12   return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+13 }
+14 
+15 function isMobileOrTablet() {
+16   if (typeof window === "undefined") return false;
+17   return /android|iphone|ipad|ipod|mobile|tablet/i.test(
+18     window.navigator.userAgent
+19   );
+20 }
+21 
+22 function isInStandaloneMode() {
+23   if (typeof window === "undefined") return false;
+24 
+25   const navigatorWithStandalone = window.navigator as Navigator & {
+26     standalone?: boolean;
+27   };
+28 
+29   return (
+30     window.matchMedia("(display-mode: standalone)").matches ||
+31     Boolean(navigatorWithStandalone.standalone)
+32   );
+33 }
+34 
+35 export default function PwaInstallButton() {
+36   const [deferredPrompt, setDeferredPrompt] =
+37     useState<BeforeInstallPromptEvent | null>(null);
+38   const [installed, setInstalled] = useState<boolean>(() =>
+39     isInStandaloneMode()
+40   );
+41   const [showIosHelp, setShowIosHelp] = useState(false);
+42   const [isMobileDevice] = useState<boolean>(() => isMobileOrTablet());
+43 
+44   useEffect(() => {
+45     if (!isMobileDevice) return;
+46 
+47     if ("serviceWorker" in navigator) {
+48       void navigator.serviceWorker.register("/sw.js").catch((error) => {
+49         console.error("Erro ao registrar service worker", error);
+50       });
+51     }
+52 
+53     function handleBeforeInstallPrompt(event: Event) {
+54       event.preventDefault();
+55       setDeferredPrompt(event as BeforeInstallPromptEvent);
+56     }
+57 
+58     function handleAppInstalled() {
+59       setInstalled(true);
+60       setDeferredPrompt(null);
+61       setShowIosHelp(false);
+62     }
+63 
+64     window.addEventListener(
+65       "beforeinstallprompt",
+66       handleBeforeInstallPrompt as EventListener
+67     );
+68     window.addEventListener("appinstalled", handleAppInstalled);
+69 
+70     return () => {
+71       window.removeEventListener(
+72         "beforeinstallprompt",
+73         handleBeforeInstallPrompt as EventListener
+74       );
+75       window.removeEventListener("appinstalled", handleAppInstalled);
+76     };
+77   }, [isMobileDevice]);
+78 
+79   const canUsePrompt = useMemo(
+80     () => !installed && Boolean(deferredPrompt),
+81     [installed, deferredPrompt]
+82   );
+83 
+84   async function handleInstall() {
+85     if (installed || !isMobileDevice) return;
+86 
+87     if (deferredPrompt) {
+88       await deferredPrompt.prompt();
+89       await deferredPrompt.userChoice;
+90       setDeferredPrompt(null);
+91       return;
+92     }
+93 
+94     if (isIos()) {
+95       setShowIosHelp((current) => !current);
+96       return;
+97     }
+98 
+99     alert(
+100       "A instalação automática ainda não está disponível neste navegador. No menu do navegador, procure por 'Instalar app' ou 'Adicionar à tela inicial'."
+101     );
+102   }
+103 
+104   if (!isMobileDevice) {
+105     return null;
+106   }
+107 
+108   if (installed) {
+109     return (
+110       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+111         App já instalado neste dispositivo.
+112       </div>
+113     );
+114   }
+115 
+116   return (
+117     <div className="space-y-3">
+118       <button
+119         type="button"
+120         onClick={() => void handleInstall()}
+121         className="inline-flex w-full items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
+122       >
+123         {canUsePrompt ? "Instalar no dispositivo" : "Instalar no dispositivo"}
+124       </button>
+125 
+126       {showIosHelp && (
+127         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+128           No iPhone/iPad, toque em <span className="font-semibold">Compartilhar</span> no Safari e depois em{" "}
+129           <span className="font-semibold">Adicionar à Tela de Início</span>.
+130         </div>
+131       )}
+132     </div>
+133   );
+134 }
+
+===== components/AppTopbar.tsx =====
+1 import Link from "next/link";
+2 import PwaInstallButton from "./PwaInstallButton";
+3 
+4 type Props = {
+5   userName?: string | null;
+6   userEmail?: string | null;
+7 };
+8 
+9 export default function AppTopbar({ userName, userEmail }: Props) {
+10   return (
+11     <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
+12       <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 py-3">
+13         <div className="min-w-0">
+14           <Link
+15             href="/dashboard"
+16             className="text-sm font-semibold tracking-[0.18em] text-sky-700"
+17           >
+18             EDUCC
+19           </Link>
+20 
+21           {(userName || userEmail) && (
+22             <p className="mt-1 truncate text-xs text-slate-500">
+23               {userName ? userName : "Usuário"}
+24               {userEmail ? ` • ${userEmail}` : ""}
+25             </p>
+26           )}
+27         </div>
+28 
+29         <div className="flex items-center gap-2">
+30           <Link
+31             href="/perfil"
+32             className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+33           >
+34             Minha conta
+35           </Link>
+36 
+37           <div className="hidden sm:block">
+38             <div className="w-[190px]">
+39               <PwaInstallButton />
+40             </div>
+41           </div>
+42 
+43           <form method="POST" action="/api/auth/logout">
+44             <button
+45               type="submit"
+46               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+47             >
+48               Sair
+49             </button>
+50           </form>
+51         </div>
+52       </div>
+53 
+54       <div className="border-t border-slate-100 px-4 py-3 sm:hidden">
+55         <div className="mx-auto max-w-6xl">
+56           <PwaInstallButton />
+57         </div>
+58       </div>
+59     </header>
+60   );
+61 }
+
+===== app/(app)/layout.tsx =====
+1 import type { ReactNode } from "react";
+2 import { redirect } from "next/navigation";
+3 import AppTopbar from "@/components/AppTopbar";
+4 import { getSessionUser } from "@/lib/auth";
+5 
+6 export default async function AppLayout({
+7   children,
+8 }: {
+9   children: ReactNode;
+10 }) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     redirect("/login");
+15   }
+16 
+17   return (
+18     <div className="min-h-screen bg-slate-50">
+19       <AppTopbar userName={user.name} userEmail={user.email} />
+20       {children}
+21     </div>
+22   );
+23 }
+
+===== app/layout.tsx =====
+1 import type { Metadata } from "next";
+2 import { Geist, Geist_Mono } from "next/font/google";
+3 import type { ReactNode } from "react";
+4 import "./globals.css";
+5 
+6 const geistSans = Geist({
+7   variable: "--font-geist-sans",
+8   subsets: ["latin"],
+9 });
+10 
+11 const geistMono = Geist_Mono({
+12   variable: "--font-geist-mono",
+13   subsets: ["latin"],
+14 });
+15 
+16 export const metadata: Metadata = {
+17   title: "EDUCC",
+18   description: "Plataforma de gestão educacional",
+19   manifest: "/manifest.webmanifest",
+20   appleWebApp: {
+21     capable: true,
+22     statusBarStyle: "default",
+23     title: "EDUCC",
+24   },
+25 };
+26 
+27 export default function RootLayout({ children }: { children: ReactNode }) {
+28   return (
+29     <html lang="pt-BR">
+30       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+31         {children}
+32       </body>
+33     </html>
+34   );
+35 }
+
+===== public/manifest.json =====
+[MISSING] public/manifest.json
+
+===== components/DevSwKiller.tsx =====
+[MISSING] components/DevSwKiller.tsx

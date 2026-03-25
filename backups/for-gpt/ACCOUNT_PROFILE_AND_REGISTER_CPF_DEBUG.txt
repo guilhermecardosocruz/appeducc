@@ -1,0 +1,583 @@
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 model User {
+11   id            String          @id @default(cuid())
+12   name          String
+13   email         String          @unique
+14   cpf           String?         @unique
+15   passwordHash  String
+16   isTeacher     Boolean         @default(false)
+17   createdById   String?
+18   createdAt     DateTime        @default(now())
+19   updatedAt     DateTime        @updatedAt
+20 
+21   createdBy     User?           @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+22   createdUsers  User[]          @relation("CreatedUsers")
+23   sessions      Session[]
+24   groupMembers  GroupMember[]
+25   schoolMembers SchoolMember[]
+26   classes       Class[]         @relation("ClassTeacher")
+27 
+28   deletedStudents Student[]     @relation("DeletedByUser")
+29 }
+30 
+31 model Session {
+32   id        String   @id @default(cuid())
+33   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+34   userId    String
+35   createdAt DateTime @default(now())
+36   expiresAt DateTime
+37 
+38   @@index([userId])
+39 }
+40 
+41 model Group {
+42   id        String        @id @default(cuid())
+43   name      String
+44   createdAt DateTime      @default(now())
+45   updatedAt DateTime      @updatedAt
+46 
+47   members   GroupMember[]
+48   schools   School[]
+49 }
+50 
+51 model GroupMember {
+52   id        String   @id @default(cuid())
+53   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+54   userId    String
+55   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+56   groupId   String
+57 
+58   role      String
+59   createdAt DateTime @default(now())
+60 
+61   @@unique([userId, groupId])
+62 }
+63 
+64 model School {
+65   id        String         @id @default(cuid())
+66   name      String
+67   createdAt DateTime       @default(now())
+68   updatedAt DateTime       @updatedAt
+69 
+70   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+71   groupId   String
+72 
+73   members   SchoolMember[]
+74   classes   Class[]
+75 }
+76 
+77 model SchoolMember {
+78   id        String   @id @default(cuid())
+79   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+80   userId    String
+81   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+82   schoolId  String
+83 
+84   role      String
+85   createdAt DateTime @default(now())
+86 
+87   @@unique([userId, schoolId])
+88 }
+89 
+90 model Class {
+91   id          String              @id @default(cuid())
+92   name        String
+93   year        Int?
+94   createdAt   DateTime            @default(now())
+95   updatedAt   DateTime            @updatedAt
+96 
+97   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+98   schoolId    String
+99 
+100   teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+101   teacherId   String?
+102 
+103   students    Student[]
+104   attendances Attendance[]
+105 }
+106 
+107 model Student {
+108   id            String               @id @default(cuid())
+109   name          String
+110   createdAt     DateTime             @default(now())
+111   updatedAt     DateTime             @updatedAt
+112 
+113   class         Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+114   classId       String
+115 
+116   presences     AttendancePresence[]
+117 
+118   deletedAt     DateTime?
+119   deletedReason String?
+120   deletedById   String?
+121   deletedBy     User? @relation("DeletedByUser", fields: [deletedById], references: [id])
+122 }
+123 
+124 model Attendance {
+125   id         String               @id @default(cuid())
+126   title      String
+127   lessonDate DateTime
+128   createdAt  DateTime             @default(now())
+129   updatedAt  DateTime             @updatedAt
+130 
+131   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+132   classId    String
+133 
+134   presences  AttendancePresence[]
+135 }
+136 
+137 model AttendancePresence {
+138   id           String      @id @default(cuid())
+139   present      Boolean     @default(false)
+140   createdAt    DateTime    @default(now())
+141   updatedAt    DateTime    @updatedAt
+142 
+143   attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+144   attendanceId String
+145 
+146   student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+147   studentId    String
+148 
+149   @@unique([attendanceId, studentId])
+150 }
+
+===== app/api/auth/register/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { hashPassword, createSession } from "@/lib/auth";
+4 
+5 export async function POST(req: NextRequest) {
+6   const formData = await req.formData();
+7   const name = String(formData.get("name") ?? "").trim();
+8   const email = String(formData.get("email") ?? "").toLowerCase().trim();
+9   const password = String(formData.get("password") ?? "");
+10 
+11   if (!name || !email || !password) {
+12     const url = new URL("/register?error=missing_fields", req.url);
+13     return NextResponse.redirect(url);
+14   }
+15 
+16   const existing = await prisma.user.findUnique({
+17     where: { email },
+18   });
+19 
+20   if (existing) {
+21     const url = new URL("/register?error=email_in_use", req.url);
+22     return NextResponse.redirect(url);
+23   }
+24 
+25   const passwordHash = await hashPassword(password);
+26 
+27   const user = await prisma.user.create({
+28     data: {
+29       name,
+30       email,
+31       passwordHash,
+32     },
+33   });
+34 
+35   const redirectUrl = await createSession(user.id, req.url);
+36   return NextResponse.redirect(redirectUrl);
+37 }
+
+===== app/(auth)/register/page.tsx =====
+1 import Link from "next/link";
+2 
+3 export default function RegisterPage() {
+4   return (
+5     <main className="min-h-screen bg-slate-50">
+6       <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-4 py-10">
+7         <div className="mb-6 text-center">
+8           <h1 className="text-sm font-semibold tracking-[0.18em] text-sky-700">
+9             EDUCC
+10           </h1>
+11           <p className="mt-2 text-2xl font-semibold text-slate-900">
+12             Criar conta
+13           </p>
+14           <p className="mt-1 text-sm text-slate-500">
+15             Configure seu acesso como gestor, coordenador ou professor.
+16           </p>
+17         </div>
+18 
+19         <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200 sm:p-7">
+20           <form
+21             className="space-y-4"
+22             method="POST"
+23             action="/api/auth/register"
+24           >
+25             <div className="space-y-1.5">
+26               <label
+27                 htmlFor="name"
+28                 className="block text-sm font-medium text-slate-800"
+29               >
+30                 Nome completo
+31               </label>
+32               <input
+33                 id="name"
+34                 name="name"
+35                 type="text"
+36                 autoComplete="name"
+37                 required
+38                 className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+39                 placeholder="Seu nome"
+40               />
+41             </div>
+42 
+43             <div className="space-y-1.5">
+44               <label
+45                 htmlFor="email"
+46                 className="block text-sm font-medium text-slate-800"
+47               >
+48                 E-mail
+49               </label>
+50               <input
+51                 id="email"
+52                 name="email"
+53                 type="email"
+54                 autoComplete="email"
+55                 required
+56                 className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+57                 placeholder="nome@escola.com.br"
+58               />
+59             </div>
+60 
+61             <div className="space-y-1.5">
+62               <label
+63                 htmlFor="password"
+64                 className="block text-sm font-medium text-slate-800"
+65               >
+66                 Senha
+67               </label>
+68               <input
+69                 id="password"
+70                 name="password"
+71                 type="password"
+72                 autoComplete="new-password"
+73                 required
+74                 className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+75                 placeholder="Defina uma senha segura"
+76               />
+77             </div>
+78 
+79             <button
+80               type="submit"
+81               className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50"
+82             >
+83               Criar conta
+84             </button>
+85           </form>
+86 
+87           <p className="mt-4 text-center text-xs text-slate-500">
+88             Já tem conta?{" "}
+89             <Link
+90               href="/login"
+91               className="font-medium text-sky-600 hover:text-sky-500"
+92             >
+93               Voltar para o login
+94             </Link>
+95           </p>
+96         </div>
+97       </section>
+98     </main>
+99   );
+100 }
+
+===== app/(app)/layout.tsx =====
+1 import type { ReactNode } from "react";
+2 import { redirect } from "next/navigation";
+3 import AppTopbar from "@/components/AppTopbar";
+4 import { getSessionUser } from "@/lib/auth";
+5 
+6 export default async function AppLayout({
+7   children,
+8 }: {
+9   children: ReactNode;
+10 }) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     redirect("/login");
+15   }
+16 
+17   return (
+18     <div className="min-h-screen bg-slate-50">
+19       <AppTopbar userName={user.name} userEmail={user.email} />
+20       {children}
+21     </div>
+22   );
+23 }
+
+===== app/(app)/dashboard/page.tsx =====
+1 import { getSessionUser } from "@/lib/auth";
+2 import { prisma } from "@/lib/prisma";
+3 import GroupsDashboardClient from "@/components/GroupsDashboardClient";
+4 
+5 export default async function DashboardPage() {
+6   const user = await getSessionUser();
+7 
+8   if (!user) {
+9     return (
+10       <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+11         <div className="max-w-xl text-center">
+12           <h1 className="text-2xl font-semibold text-slate-900">
+13             Você precisa estar autenticado para acessar o painel.
+14           </h1>
+15           <p className="mt-3 text-sm text-slate-500">
+16             Faça login para organizar seus grupos de escolas, escolas, turmas e
+17             demais estruturas educativas.
+18           </p>
+19         </div>
+20       </main>
+21     );
+22   }
+23 
+24   const groupsRaw = await prisma.group.findMany({
+25     where: {
+26       members: {
+27         some: {
+28           userId: user.id,
+29         },
+30       },
+31     },
+32     include: {
+33       _count: { select: { schools: true } },
+34     },
+35     orderBy: { createdAt: "desc" },
+36   });
+37 
+38   const teachersRaw = await prisma.user.findMany({
+39     where: {
+40       createdById: user.id,
+41       isTeacher: true,
+42     },
+43     include: {
+44       _count: {
+45         select: {
+46           classes: true,
+47         },
+48       },
+49     },
+50     orderBy: { createdAt: "desc" },
+51   });
+52 
+53   const groups = groupsRaw.map((g) => ({
+54     id: g.id,
+55     name: g.name,
+56     createdAt: g.createdAt.toISOString(),
+57     _count: { schools: g._count.schools },
+58   }));
+59 
+60   const teachers = teachersRaw.map((teacher) => ({
+61     id: teacher.id,
+62     name: teacher.name,
+63     email: teacher.email,
+64     isTeacher: teacher.isTeacher,
+65     createdAt: teacher.createdAt.toISOString(),
+66     _count: {
+67       classes: teacher._count.classes,
+68     },
+69   }));
+70 
+71   return (
+72     <main className="min-h-screen bg-slate-50 px-4 py-10">
+73       <div className="mx-auto w-full max-w-4xl">
+74         <h1 className="text-2xl font-semibold text-slate-900">
+75           Organização das escolas
+76         </h1>
+77         <p className="mt-2 max-w-2xl text-sm text-slate-500">
+78           Aqui você gerencia sua estrutura educacional em níveis:{" "}
+79           <span className="font-medium">
+80             Grupos de escolas → Escolas → Turmas → Professores e Alunos
+81           </span>
+82           .
+83         </p>
+84 
+85         <GroupsDashboardClient
+86           initialGroups={groups}
+87           initialTeachers={teachers}
+88           userName={user.name}
+89           userEmail={user.email}
+90         />
+91       </div>
+92     </main>
+93   );
+94 }
+
+===== components/AppTopbar.tsx =====
+1 import Link from "next/link";
+2 import PwaInstallButton from "./PwaInstallButton";
+3 
+4 type Props = {
+5   userName?: string | null;
+6   userEmail?: string | null;
+7 };
+8 
+9 export default function AppTopbar({ userName, userEmail }: Props) {
+10   return (
+11     <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
+12       <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 py-3">
+13         <div className="min-w-0">
+14           <Link
+15             href="/dashboard"
+16             className="text-sm font-semibold tracking-[0.18em] text-sky-700"
+17           >
+18             EDUCC
+19           </Link>
+20 
+21           {(userName || userEmail) && (
+22             <p className="mt-1 truncate text-xs text-slate-500">
+23               {userName ? userName : "Usuário"}
+24               {userEmail ? ` • ${userEmail}` : ""}
+25             </p>
+26           )}
+27         </div>
+28 
+29         <div className="flex items-center gap-2">
+30           <div className="hidden sm:block">
+31             <div className="w-[190px]">
+32               <PwaInstallButton />
+33             </div>
+34           </div>
+35 
+36           <form method="POST" action="/api/auth/logout">
+37             <button
+38               type="submit"
+39               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+40             >
+41               Sair
+42             </button>
+43           </form>
+44         </div>
+45       </div>
+46 
+47       <div className="border-t border-slate-100 px-4 py-3 sm:hidden">
+48         <div className="mx-auto max-w-6xl">
+49           <PwaInstallButton />
+50         </div>
+51       </div>
+52     </header>
+53   );
+54 }
+
+===== lib/auth.ts =====
+1 import { cookies } from "next/headers";
+2 import { prisma } from "./prisma";
+3 import { compare, hash } from "bcryptjs";
+4 
+5 const SESSION_COOKIE_NAME = "educc_session";
+6 const SESSION_DAYS = 30;
+7 
+8 export async function hashPassword(password: string) {
+9   return hash(password, 10);
+10 }
+11 
+12 export async function verifyPassword(password: string, passwordHash: string) {
+13   return compare(password, passwordHash);
+14 }
+15 
+16 export async function createSession(userId: string, baseUrl: string) {
+17   const expiresAt = new Date();
+18   expiresAt.setDate(expiresAt.getDate() + SESSION_DAYS);
+19 
+20   const session = await prisma.session.create({
+21     data: {
+22       userId,
+23       expiresAt,
+24     },
+25   });
+26 
+27   const cookieStore = await cookies();
+28 
+29   cookieStore.set(SESSION_COOKIE_NAME, session.id, {
+30     httpOnly: true,
+31     secure: true,
+32     sameSite: "lax",
+33     path: "/",
+34     expires: expiresAt,
+35   });
+36 
+37   return new URL("/dashboard", baseUrl);
+38 }
+39 
+40 export async function destroySession() {
+41   const cookieStore = await cookies();
+42   const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+43 
+44   if (sessionId) {
+45     await prisma.session.deleteMany({
+46       where: { id: sessionId },
+47     });
+48 
+49     cookieStore.set(SESSION_COOKIE_NAME, "", {
+50       httpOnly: true,
+51       secure: true,
+52       sameSite: "lax",
+53       path: "/",
+54       maxAge: 0,
+55     });
+56   }
+57 }
+58 
+59 export async function getSessionUser() {
+60   const cookieStore = await cookies();
+61   const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+62 
+63   if (!sessionId) return null;
+64 
+65   const session = await prisma.session.findUnique({
+66     where: { id: sessionId },
+67     include: { user: true },
+68   });
+69 
+70   if (!session) return null;
+71   if (session.expiresAt < new Date()) {
+72     return null;
+73   }
+74 
+75   return session.user;
+76 }
+
+===== app/api/auth/login/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { verifyPassword, createSession } from "@/lib/auth";
+4 
+5 export async function POST(req: NextRequest) {
+6   const formData = await req.formData();
+7   const email = String(formData.get("email") ?? "").toLowerCase().trim();
+8   const password = String(formData.get("password") ?? "");
+9 
+10   if (!email || !password) {
+11     const url = new URL("/login?error=missing_fields", req.url);
+12     return NextResponse.redirect(url);
+13   }
+14 
+15   const user = await prisma.user.findUnique({
+16     where: { email },
+17   });
+18 
+19   if (!user) {
+20     const url = new URL("/login?error=invalid_credentials", req.url);
+21     return NextResponse.redirect(url);
+22   }
+23 
+24   const valid = await verifyPassword(password, user.passwordHash);
+25 
+26   if (!valid) {
+27     const url = new URL("/login?error=invalid_credentials", req.url);
+28     return NextResponse.redirect(url);
+29   }
+30 
+31   const redirectUrl = await createSession(user.id, req.url);
+32   return NextResponse.redirect(redirectUrl);
+33 }

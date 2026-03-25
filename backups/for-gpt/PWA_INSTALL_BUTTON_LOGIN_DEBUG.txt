@@ -1,0 +1,274 @@
+
+===== app/(auth)/login/page.tsx =====
+1 import Link from "next/link";
+2 
+3 export default function LoginPage() {
+4   return (
+5     <main className="min-h-screen bg-slate-50">
+6       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+7         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+8           <div className="text-sm font-semibold tracking-[0.18em] text-sky-700">
+9             EDUCC
+10           </div>
+11           <nav className="hidden gap-6 text-xs text-slate-500 sm:flex">
+12             <span className="font-medium text-slate-700">Dashboard</span>
+13             <span>Minhas escolas</span>
+14             <span>Ajuda</span>
+15           </nav>
+16         </div>
+17       </header>
+18 
+19       <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-5xl flex-col items-center justify-center px-4 py-10">
+20         <div className="mb-6 flex flex-col items-center gap-3">
+21           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+22             <span className="h-2 w-2 rounded-full bg-emerald-500" />
+23             PWA em desenvolvimento para escolas
+24           </span>
+25 
+26           <div className="text-center">
+27             <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
+28               Bem-vindo de volta
+29             </h1>
+30             <p className="mt-1 text-sm text-slate-500">
+31               Acesse sua conta para continuar organizando escolas, turmas e
+32               equipes pedagógicas.
+33             </p>
+34           </div>
+35         </div>
+36 
+37         <div className="w-full max-w-lg">
+38           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200 sm:p-7">
+39             <button
+40               type="button"
+41               className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+42             >
+43               <span className="text-lg">G</span>
+44               <span>Entrar com Google</span>
+45             </button>
+46 
+47             <div className="mt-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+48               <span className="h-px flex-1 bg-slate-200" />
+49               <span>ou entre com e-mail</span>
+50               <span className="h-px flex-1 bg-slate-200" />
+51             </div>
+52 
+53             <form
+54               className="mt-5 space-y-4"
+55               method="POST"
+56               action="/api/auth/login"
+57             >
+58               <div className="space-y-1.5">
+59                 <label
+60                   htmlFor="email"
+61                   className="block text-sm font-medium text-slate-800"
+62                 >
+63                   E-mail
+64                 </label>
+65                 <input
+66                   id="email"
+67                   name="email"
+68                   type="email"
+69                   autoComplete="email"
+70                   required
+71                   className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+72                   placeholder="voce@exemplo.com"
+73                 />
+74               </div>
+75 
+76               <div className="space-y-1.5">
+77                 <div className="flex items-center justify-between">
+78                   <label
+79                     htmlFor="password"
+80                     className="block text-sm font-medium text-slate-800"
+81                   >
+82                     Senha
+83                   </label>
+84                   <button
+85                     type="button"
+86                     className="text-xs font-medium text-sky-600 hover:text-sky-500"
+87                   >
+88                     Mostrar senha
+89                   </button>
+90                 </div>
+91                 <input
+92                   id="password"
+93                   name="password"
+94                   type="password"
+95                   autoComplete="current-password"
+96                   required
+97                   className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+98                   placeholder="Digite sua senha"
+99                 />
+100               </div>
+101 
+102               <div className="flex items-center justify-between text-xs text-slate-500">
+103                 <Link
+104                   href="/recover"
+105                   className="font-medium text-sky-600 hover:text-sky-500"
+106                 >
+107                   Esqueci minha senha
+108                 </Link>
+109                 <Link
+110                   href="/register"
+111                   className="font-medium text-sky-600 hover:text-sky-500"
+112                 >
+113                   Criar conta
+114                 </Link>
+115               </div>
+116 
+117               <button
+118                 type="submit"
+119                 className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50"
+120               >
+121                 Entrar
+122               </button>
+123             </form>
+124           </div>
+125 
+126           <p className="mt-4 text-center text-[11px] text-slate-400">
+127             EDUCC • Primeira versão da plataforma educacional em desenvolvimento
+128           </p>
+129         </div>
+130       </section>
+131     </main>
+132   );
+133 }
+
+===== app/layout.tsx =====
+1 import type { Metadata } from "next";
+2 import { Geist, Geist_Mono } from "next/font/google";
+3 import type { ReactNode } from "react";
+4 import "./globals.css";
+5 
+6 const geistSans = Geist({
+7   variable: "--font-geist-sans",
+8   subsets: ["latin"],
+9 });
+10 
+11 const geistMono = Geist_Mono({
+12   variable: "--font-geist-mono",
+13   subsets: ["latin"],
+14 });
+15 
+16 export const metadata: Metadata = {
+17   title: "EDUCC",
+18   description: "Plataforma de gestão educacional",
+19 };
+20 
+21 export default function RootLayout({ children }: { children: ReactNode }) {
+22   return (
+23     <html lang="pt-BR">
+24       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+25         {children}
+26       </body>
+27     </html>
+28   );
+29 }
+
+===== app/manifest.webmanifest/route.ts =====
+[MISSING] app/manifest.webmanifest/route.ts
+
+===== app/manifest.json =====
+[MISSING] app/manifest.json
+
+===== public/manifest.json =====
+[MISSING] public/manifest.json
+
+===== public/sw.js =====
+[MISSING] public/sw.js
+
+===== next.config.mjs =====
+1 /** @type {import("next").NextConfig} */
+2 const nextConfig = {
+3   // React Compiler habilitado globalmente
+4   reactCompiler: true,
+5 
+6   // Colocamos mais configs aqui depois (PWA, headers, redirects, etc.)
+7 };
+8 
+9 export default nextConfig;
+
+===== next.config.ts =====
+1 import type { NextConfig } from "next";
+2 
+3 const nextConfig: NextConfig = {
+4   /* config options here */
+5   reactCompiler: true,
+6 };
+7 
+8 export default nextConfig;
+
+===== package.json =====
+1 {
+2   "name": "educc",
+3   "version": "0.1.0",
+4   "private": true,
+5   "scripts": {
+6     "dev": "next dev",
+7     "build": "prisma generate && prisma migrate deploy && next build",
+8     "start": "next start",
+9     "lint": "eslint",
+10     "prisma:migrate": "prisma migrate dev",
+11     "prisma:generate": "prisma generate"
+12   },
+13   "dependencies": {
+14     "@prisma/client": "6.19.0",
+15     "bcryptjs": "2.4.3",
+16     "lucide-react": "0.453.0",
+17     "next": "15.5.12",
+18     "next-pwa": "5.6.0",
+19     "react": "19.2.3",
+20     "react-dom": "19.2.3",
+21     "xlsx": "^0.18.5",
+22     "zod": "3.23.8"
+23   },
+24   "devDependencies": {
+25     "@types/bcryptjs": "^3.0.0",
+26     "@types/node": "^22.7.4",
+27     "@types/react": "^19.0.0",
+28     "@types/react-dom": "^19",
+29     "autoprefixer": "10.4.20",
+30     "babel-plugin-react-compiler": "1.0.0",
+31     "eslint": "^9",
+32     "eslint-config-next": "16.1.6",
+33     "postcss": "8.4.47",
+34     "prisma": "6.19.0",
+35     "tailwindcss": "3.4.10",
+36     "typescript": "^5.6.3"
+37   }
+38 }
+
+===== app/globals.css =====
+1 @tailwind base;
+2 @tailwind components;
+3 @tailwind utilities;
+4 
+5 :root {
+6   color-scheme: light;
+7 }
+8 
+9 html,
+10 body {
+11   min-height: 100%;
+12 }
+13 
+14 body {
+15   @apply bg-slate-50 text-slate-900 antialiased;
+16 }
+
+===== components =====
+[DIR] components
+components
+├── AddStudentModal.tsx
+├── AttendanceDetailClient.tsx
+├── ClassDetailClient.tsx
+├── CreateAttendanceForm.tsx
+├── CreateClassModal.tsx
+├── CreateGroupModal.tsx
+├── CreateSchoolModal.tsx
+├── CreateTeacherModal.tsx
+├── GroupDetailClient.tsx
+├── GroupsDashboardClient.tsx
+├── SchoolDetailClient.tsx
+├── StudentsManagerClient.tsx
+└── TeacherDetailClient.tsx

@@ -1,0 +1,74 @@
+
+===== app/api/auth/login/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { verifyPassword, createSession } from "@/lib/auth";
+4 
+5 export async function POST(req: NextRequest) {
+6   const formData = await req.formData();
+7   const email = String(formData.get("email") ?? "").toLowerCase().trim();
+8   const password = String(formData.get("password") ?? "");
+9 
+10   if (!email || !password) {
+11     const url = new URL("/login?error=missing_fields", req.url);
+12     return NextResponse.redirect(url);
+13   }
+14 
+15   const user = await prisma.user.findUnique({
+16     where: { email },
+17   });
+18 
+19   if (!user) {
+20     const url = new URL("/login?error=invalid_credentials", req.url);
+21     return NextResponse.redirect(url);
+22   }
+23 
+24   const valid = await verifyPassword(password, user.passwordHash);
+25 
+26   if (!valid) {
+27     const url = new URL("/login?error=invalid_credentials", req.url);
+28     return NextResponse.redirect(url);
+29   }
+30 
+31   const redirectUrl = await createSession(user.id, req.url);
+32   return NextResponse.redirect(redirectUrl);
+33 }
+
+===== app/api/auth/register/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { hashPassword, createSession } from "@/lib/auth";
+4 
+5 export async function POST(req: NextRequest) {
+6   const formData = await req.formData();
+7   const name = String(formData.get("name") ?? "").trim();
+8   const email = String(formData.get("email") ?? "").toLowerCase().trim();
+9   const password = String(formData.get("password") ?? "");
+10 
+11   if (!name || !email || !password) {
+12     const url = new URL("/register?error=missing_fields", req.url);
+13     return NextResponse.redirect(url);
+14   }
+15 
+16   const existing = await prisma.user.findUnique({
+17     where: { email },
+18   });
+19 
+20   if (existing) {
+21     const url = new URL("/register?error=email_in_use", req.url);
+22     return NextResponse.redirect(url);
+23   }
+24 
+25   const passwordHash = await hashPassword(password);
+26 
+27   const user = await prisma.user.create({
+28     data: {
+29       name,
+30       email,
+31       passwordHash,
+32     },
+33   });
+34 
+35   const redirectUrl = await createSession(user.id, req.url);
+36   return NextResponse.redirect(redirectUrl);
+37 }

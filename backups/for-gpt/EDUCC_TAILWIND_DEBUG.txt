@@ -1,0 +1,212 @@
+
+===== postcss.config.mjs =====
+1 /** @type {import('postcss-load-config').Config} */
+2 const config = {
+3   plugins: {
+4     tailwindcss: {},
+5     autoprefixer: {},
+6   },
+7 };
+8 
+9 export default config;
+
+===== tailwind.config.ts =====
+1 import type { Config } from "tailwindcss";
+2 
+3 const config: Config = {
+4   content: [
+5     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+6     "./components/**/*.{js,ts,jsx,tsx,mdx}",
+7   ],
+8   theme: {
+9     extend: {},
+10   },
+11   plugins: [],
+12 };
+13 
+14 export default config;
+
+===== app/globals.css =====
+1 @tailwind base;
+2 @tailwind components;
+3 @tailwind utilities;
+4 
+5 :root {
+6   color-scheme: light;
+7 }
+8 
+9 html,
+10 body {
+11   min-height: 100%;
+12 }
+13 
+14 body {
+15   @apply bg-slate-50 text-slate-900 antialiased;
+16 }
+
+===== app/layout.tsx =====
+1 import type { Metadata } from "next";
+2 import { Geist, Geist_Mono } from "next/font/google";
+3 import type { ReactNode } from "react";
+4 import "./globals.css";
+5 
+6 const geistSans = Geist({
+7   variable: "--font-geist-sans",
+8   subsets: ["latin"],
+9 });
+10 
+11 const geistMono = Geist_Mono({
+12   variable: "--font-geist-mono",
+13   subsets: ["latin"],
+14 });
+15 
+16 export const metadata: Metadata = {
+17   title: "EDUCC",
+18   description: "Plataforma de gestão educacional",
+19 };
+20 
+21 export default function RootLayout({ children }: { children: ReactNode }) {
+22   return (
+23     <html lang="pt-BR">
+24       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+25         {children}
+26       </body>
+27     </html>
+28   );
+29 }
+
+===== app/(auth)/login/page.tsx =====
+1 import Link from "next/link";
+2 
+3 export default function LoginPage() {
+4   return (
+5     <main className="min-h-screen bg-slate-50">
+6       {/* Topbar simples */}
+7       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+8         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+9           <div className="text-sm font-semibold tracking-[0.18em] text-sky-700">
+10             EDUCC
+11           </div>
+12           <nav className="hidden gap-6 text-xs text-slate-500 sm:flex">
+13             <span className="font-medium text-slate-700">Dashboard</span>
+14             <span>Minhas escolas</span>
+15             <span>Ajuda</span>
+16           </nav>
+17         </div>
+18       </header>
+19 
+20       {/* Conteúdo central */}
+21       <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-5xl flex-col items-center justify-center px-4 py-10">
+22         <div className="mb-6 flex flex-col items-center gap-3">
+23           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+24             <span className="h-2 w-2 rounded-full bg-emerald-500" />
+25             PWA em desenvolvimento para escolas
+26           </span>
+27 
+28           <div className="text-center">
+29             <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
+30               Bem-vindo de volta
+31             </h1>
+32             <p className="mt-1 text-sm text-slate-500">
+33               Acesse sua conta para continuar organizando escolas, turmas e
+34               equipes pedagógicas.
+35             </p>
+36           </div>
+37         </div>
+38 
+39         <div className="w-full max-w-lg">
+40           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200 sm:p-7">
+41             {/* Botão Google (stub por enquanto) */}
+42             <button
+43               type="button"
+44               className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+45             >
+46               <span className="text-lg">G</span>
+47               <span>Entrar com Google</span>
+48             </button>
+49 
+50             {/* Divider */}
+51             <div className="mt-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+52               <span className="h-px flex-1 bg-slate-200" />
+53               <span>ou entre com e-mail</span>
+54               <span className="h-px flex-1 bg-slate-200" />
+55             </div>
+56 
+57             {/* Formulário */}
+58             <form className="mt-5 space-y-4">
+59               <div className="space-y-1.5">
+60                 <label
+61                   htmlFor="email"
+62                   className="block text-sm font-medium text-slate-800"
+63                 >
+64                   E-mail
+65                 </label>
+66                 <input
+67                   id="email"
+68                   name="email"
+69                   type="email"
+70                   autoComplete="email"
+71                   required
+72                   className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+73                   placeholder="voce@exemplo.com"
+74                 />
+75               </div>
+76 
+77               <div className="space-y-1.5">
+78                 <div className="flex items-center justify-between">
+79                   <label
+80                     htmlFor="password"
+81                     className="block text-sm font-medium text-slate-800"
+82                   >
+83                     Senha
+84                   </label>
+85                   <button
+86                     type="button"
+87                     className="text-xs font-medium text-sky-600 hover:text-sky-500"
+88                   >
+89                     Mostrar senha
+90                   </button>
+91                 </div>
+92                 <input
+93                   id="password"
+94                   name="password"
+95                   type="password"
+96                   autoComplete="current-password"
+97                   required
+98                   className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+99                   placeholder="Digite sua senha"
+100                 />
+101               </div>
+102 
+103               <div className="flex items-center justify-between text-xs text-slate-500">
+104                 <Link
+105                   href="/recover"
+106                   className="font-medium text-sky-600 hover:text-sky-500"
+107                 >
+108                   Esqueci minha senha
+109                 </Link>
+110                 <Link
+111                   href="/register"
+112                   className="font-medium text-sky-600 hover:text-sky-500"
+113                 >
+114                   Criar conta
+115                 </Link>
+116               </div>
+117 
+118               <button
+119                 type="submit"
+120                 className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50"
+121               >
+122                 Entrar
+123               </button>
+124             </form>
+125           </div>
+126 
+127           <p className="mt-4 text-center text-[11px] text-slate-400">
+128             EDUCC • Primeira versão da plataforma educacional em desenvolvimento
+129           </p>
+130         </div>
+131       </section>
+132     </main>
+133   );
+134 }

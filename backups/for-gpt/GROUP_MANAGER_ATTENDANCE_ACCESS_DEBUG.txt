@@ -1,0 +1,704 @@
+
+===== app/(app)/classes/[classId]/chamadas/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassChamadasPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23       attendances: {
+24         include: {
+25           presences: {
+26             select: {
+27               id: true,
+28               present: true,
+29             },
+30           },
+31         },
+32         orderBy: [{ lessonDate: "desc" }, { createdAt: "desc" }],
+33       },
+34     },
+35   });
+36 
+37   if (!foundClass) {
+38     notFound();
+39   }
+40 
+41   const membership = await prisma.schoolMember.findUnique({
+42     where: {
+43       userId_schoolId: {
+44         userId: user.id,
+45         schoolId: foundClass.schoolId,
+46       },
+47     },
+48   });
+49 
+50   if (!membership) {
+51     notFound();
+52   }
+53 
+54   return (
+55     <main className="min-h-screen bg-slate-50 px-4 py-10">
+56       <div className="mx-auto w-full max-w-4xl">
+57         <div className="mb-6">
+58           <Link
+59             href={`/classes/${classId}`}
+60             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+61           >
+62             ← Voltar para turma
+63           </Link>
+64         </div>
+65 
+66         <div className="flex items-start justify-between gap-4">
+67           <div>
+68             <h1 className="text-2xl font-semibold text-slate-900">
+69               Chamadas — {foundClass.name}
+70             </h1>
+71             <p className="mt-2 text-sm text-slate-500">
+72               Gerencie as chamadas desta turma.
+73             </p>
+74           </div>
+75 
+76           <Link
+77             href={`/classes/${classId}/chamadas/new`}
+78             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+79           >
+80             + Nova chamada
+81           </Link>
+82         </div>
+83 
+84         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+85           {foundClass.attendances.length === 0 ? (
+86             <div className="text-center">
+87               <p className="text-sm text-slate-500">
+88                 Ainda não há chamadas nesta turma.
+89               </p>
+90 
+91               <Link
+92                 href={`/classes/${classId}/chamadas/new`}
+93                 className="mt-4 inline-flex items-center rounded-md border border-sky-600 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50"
+94               >
+95                 Criar primeira chamada
+96               </Link>
+97             </div>
+98           ) : (
+99             <ul className="space-y-3">
+100               {foundClass.attendances.map((attendance) => {
+101                 const total = attendance.presences.length;
+102                 const presents = attendance.presences.filter(
+103                   (item) => item.present
+104                 ).length;
+105 
+106                 return (
+107                   <li key={attendance.id}>
+108                     <Link
+109                       href={`/classes/${classId}/chamadas/${attendance.id}`}
+110                       className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50"
+111                     >
+112                       <div>
+113                         <p className="text-sm font-medium text-slate-900">
+114                           {attendance.title}
+115                         </p>
+116                         <p className="mt-1 text-xs text-slate-500">
+117                           {attendance.lessonDate.toLocaleDateString("pt-BR")} •{" "}
+118                           {presents} presentes de {total}
+119                         </p>
+120                       </div>
+121 
+122                       <span className="text-sm font-medium text-sky-700">
+123                         Abrir
+124                       </span>
+125                     </Link>
+126                   </li>
+127                 );
+128               })}
+129             </ul>
+130           )}
+131         </div>
+132       </div>
+133     </main>
+134   );
+135 }
+
+===== app/(app)/classes/[classId]/chamadas/new/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import CreateAttendanceForm from "@/components/CreateAttendanceForm";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string }>;
+9 };
+10 
+11 function getTodayDateInputValue() {
+12   const now = new Date();
+13   const year = now.getFullYear();
+14   const month = `${now.getMonth() + 1}`.padStart(2, "0");
+15   const day = `${now.getDate()}`.padStart(2, "0");
+16   return `${year}-${month}-${day}`;
+17 }
+18 
+19 export default async function NewAttendancePage({ params }: PageProps) {
+20   const user = await getSessionUser();
+21 
+22   if (!user) {
+23     notFound();
+24   }
+25 
+26   const { classId } = await params;
+27 
+28   const foundClass = await prisma.class.findUnique({
+29     where: { id: classId },
+30     include: {
+31       school: true,
+32       students: {
+33         where: {
+34           deletedAt: null,
+35         },
+36         orderBy: { name: "asc" },
+37       },
+38     },
+39   });
+40 
+41   if (!foundClass) {
+42     notFound();
+43   }
+44 
+45   const membership = await prisma.schoolMember.findUnique({
+46     where: {
+47       userId_schoolId: {
+48         userId: user.id,
+49         schoolId: foundClass.schoolId,
+50       },
+51     },
+52   });
+53 
+54   if (!membership) {
+55     notFound();
+56   }
+57 
+58   const students = foundClass.students.map((student) => ({
+59     id: student.id,
+60     name: student.name,
+61   }));
+62 
+63   return (
+64     <main className="min-h-screen bg-slate-50 px-4 py-10">
+65       <div className="mx-auto w-full max-w-4xl">
+66         <div className="mb-6">
+67           <Link
+68             href={`/classes/${classId}/chamadas`}
+69             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+70           >
+71             ← Voltar para chamadas
+72           </Link>
+73         </div>
+74 
+75         <CreateAttendanceForm
+76           classId={classId}
+77           initialLessonDate={getTodayDateInputValue()}
+78           students={students}
+79         />
+80       </div>
+81     </main>
+82   );
+83 }
+
+===== app/(app)/classes/[classId]/chamadas/[attendanceId]/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import AttendanceDetailClient from "@/components/AttendanceDetailClient";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string; attendanceId: string }>;
+9 };
+10 
+11 function formatDateInput(date: Date) {
+12   const year = date.getFullYear();
+13   const month = `${date.getMonth() + 1}`.padStart(2, "0");
+14   const day = `${date.getDate()}`.padStart(2, "0");
+15   return `${year}-${month}-${day}`;
+16 }
+17 
+18 export default async function AttendanceDetailPage({ params }: PageProps) {
+19   const user = await getSessionUser();
+20 
+21   if (!user) {
+22     notFound();
+23   }
+24 
+25   const { classId, attendanceId } = await params;
+26 
+27   const attendanceBase = await prisma.attendance.findUnique({
+28     where: { id: attendanceId },
+29     include: {
+30       class: {
+31         include: {
+32           school: true,
+33           students: {
+34             where: {
+35               status: "ACTIVE",
+36             },
+37             select: {
+38               id: true,
+39               name: true,
+40             },
+41             orderBy: {
+42               name: "asc",
+43             },
+44           },
+45         },
+46       },
+47       presences: {
+48         select: {
+49           id: true,
+50           studentId: true,
+51           present: true,
+52         },
+53       },
+54     },
+55   });
+56 
+57   if (!attendanceBase || attendanceBase.classId !== classId) {
+58     notFound();
+59   }
+60 
+61   const membership = await prisma.schoolMember.findUnique({
+62     where: {
+63       userId_schoolId: {
+64         userId: user.id,
+65         schoolId: attendanceBase.class.schoolId,
+66       },
+67     },
+68   });
+69 
+70   if (!membership) {
+71     notFound();
+72   }
+73 
+74   const existingStudentIds = new Set(
+75     attendanceBase.presences.map((item) => item.studentId)
+76   );
+77 
+78   const missingStudents = attendanceBase.class.students.filter(
+79     (student) => !existingStudentIds.has(student.id)
+80   );
+81 
+82   if (missingStudents.length > 0) {
+83     await prisma.attendancePresence.createMany({
+84       data: missingStudents.map((student) => ({
+85         attendanceId,
+86         studentId: student.id,
+87         present: false,
+88       })),
+89       skipDuplicates: true,
+90     });
+91   }
+92 
+93   const attendance = await prisma.attendance.findUnique({
+94     where: { id: attendanceId },
+95     include: {
+96       class: {
+97         include: {
+98           school: true,
+99         },
+100       },
+101       presences: {
+102         where: {
+103           student: {
+104             status: "ACTIVE",
+105           },
+106         },
+107         include: {
+108           student: {
+109             select: {
+110               id: true,
+111               name: true,
+112             },
+113           },
+114         },
+115         orderBy: {
+116           student: {
+117             name: "asc",
+118           },
+119         },
+120       },
+121     },
+122   });
+123 
+124   if (!attendance || attendance.classId !== classId) {
+125     notFound();
+126   }
+127 
+128   const initialPresences = attendance.presences.map((item) => ({
+129     id: item.id,
+130     present: item.present,
+131     student: {
+132       id: item.student.id,
+133       name: item.student.name,
+134     },
+135   }));
+136 
+137   return (
+138     <main className="min-h-screen bg-slate-50 px-4 py-10">
+139       <div className="mx-auto w-full max-w-4xl">
+140         <div className="mb-6">
+141           <Link
+142             href={`/classes/${classId}/chamadas`}
+143             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+144           >
+145             ← Voltar para chamadas
+146           </Link>
+147         </div>
+148 
+149         <AttendanceDetailClient
+150           attendanceId={attendance.id}
+151           classId={classId}
+152           initialTitle={attendance.title}
+153           initialLessonDate={formatDateInput(attendance.lessonDate)}
+154           initialPresences={initialPresences}
+155         />
+156       </div>
+157     </main>
+158   );
+159 }
+
+===== app/api/classes/[classId]/attendances/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureClassAccess(userId: string, classId: string) {
+6   const foundClass = await prisma.class.findUnique({
+7     where: { id: classId },
+8     include: {
+9       school: true,
+10       students: {
+11         orderBy: { name: "asc" },
+12       },
+13     },
+14   });
+15 
+16   if (!foundClass) return null;
+17 
+18   const membership = await prisma.schoolMember.findUnique({
+19     where: {
+20       userId_schoolId: {
+21         userId,
+22         schoolId: foundClass.schoolId,
+23       },
+24     },
+25   });
+26 
+27   if (!membership) return null;
+28 
+29   return foundClass;
+30 }
+31 
+32 export async function GET(
+33   _req: NextRequest,
+34   { params }: { params: Promise<{ classId: string }> }
+35 ) {
+36   const user = await getSessionUser();
+37   if (!user) {
+38     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+39   }
+40 
+41   const { classId } = await params;
+42   const foundClass = await ensureClassAccess(user.id, classId);
+43 
+44   if (!foundClass) {
+45     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+46   }
+47 
+48   const attendances = await prisma.attendance.findMany({
+49     where: { classId },
+50     include: {
+51       presences: {
+52         select: {
+53           id: true,
+54           present: true,
+55         },
+56       },
+57     },
+58     orderBy: [{ lessonDate: "desc" }, { createdAt: "desc" }],
+59   });
+60 
+61   return NextResponse.json(attendances);
+62 }
+63 
+64 export async function POST(
+65   req: NextRequest,
+66   { params }: { params: Promise<{ classId: string }> }
+67 ) {
+68   const user = await getSessionUser();
+69   if (!user) {
+70     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+71   }
+72 
+73   const { classId } = await params;
+74   const foundClass = await ensureClassAccess(user.id, classId);
+75 
+76   if (!foundClass) {
+77     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+78   }
+79 
+80   const data = await req.json();
+81   const title = String(data.title ?? "").trim();
+82   const lessonDateRaw = String(data.lessonDate ?? "").trim();
+83   const presencesInput = Array.isArray(data.presences) ? data.presences : [];
+84 
+85   if (!title) {
+86     return NextResponse.json(
+87       { error: "Missing attendance title" },
+88       { status: 400 }
+89     );
+90   }
+91 
+92   if (!lessonDateRaw) {
+93     return NextResponse.json(
+94       { error: "Missing attendance date" },
+95       { status: 400 }
+96     );
+97   }
+98 
+99   const lessonDate = new Date(`${lessonDateRaw}T12:00:00`);
+100 
+101   if (Number.isNaN(lessonDate.getTime())) {
+102     return NextResponse.json(
+103       { error: "Invalid attendance date" },
+104       { status: 400 }
+105     );
+106   }
+107 
+108   const presentByStudentId = new Map<string, boolean>();
+109   for (const item of presencesInput) {
+110     const studentId = String(item?.studentId ?? "");
+111     if (!studentId) continue;
+112     presentByStudentId.set(studentId, Boolean(item?.present));
+113   }
+114 
+115   const activeStudents = foundClass.students.filter(
+116     (student) => !student.deletedAt
+117   );
+118 
+119   const attendance = await prisma.attendance.create({
+120     data: {
+121       title,
+122       classId,
+123       lessonDate,
+124       presences: {
+125         create: activeStudents.map((student) => ({
+126           studentId: student.id,
+127           present: presentByStudentId.get(student.id) ?? false,
+128         })),
+129       },
+130     },
+131     include: {
+132       presences: {
+133         include: {
+134           student: {
+135             select: {
+136               id: true,
+137               name: true,
+138             },
+139           },
+140         },
+141         orderBy: {
+142           student: {
+143             name: "asc",
+144           },
+145         },
+146       },
+147     },
+148   });
+149 
+150   return NextResponse.json(attendance, { status: 201 });
+151 }
+
+===== app/api/attendances/[attendanceId]/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureAttendanceAccess(userId: string, attendanceId: string) {
+6   const attendance = await prisma.attendance.findUnique({
+7     where: { id: attendanceId },
+8     include: {
+9       class: {
+10         include: {
+11           school: true,
+12         },
+13       },
+14       presences: {
+15         include: {
+16           student: {
+17             select: {
+18               id: true,
+19               name: true,
+20               deletedAt: true,
+21             },
+22           },
+23         },
+24         orderBy: {
+25           student: {
+26             name: "asc",
+27           },
+28         },
+29       },
+30     },
+31   });
+32 
+33   if (!attendance) return null;
+34 
+35   const membership = await prisma.schoolMember.findUnique({
+36     where: {
+37       userId_schoolId: {
+38         userId,
+39         schoolId: attendance.class.schoolId,
+40       },
+41     },
+42   });
+43 
+44   if (!membership) return null;
+45 
+46   return attendance;
+47 }
+48 
+49 export async function GET(
+50   _req: NextRequest,
+51   { params }: { params: Promise<{ attendanceId: string }> }
+52 ) {
+53   const user = await getSessionUser();
+54   if (!user) {
+55     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+56   }
+57 
+58   const { attendanceId } = await params;
+59   const attendance = await ensureAttendanceAccess(user.id, attendanceId);
+60 
+61   if (!attendance) {
+62     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+63   }
+64 
+65   attendance.presences = attendance.presences.filter(
+66     (p) => !p.student.deletedAt
+67   );
+68 
+69   return NextResponse.json(attendance);
+70 }
+71 
+72 export async function PATCH(
+73   req: NextRequest,
+74   { params }: { params: Promise<{ attendanceId: string }> }
+75 ) {
+76   const user = await getSessionUser();
+77   if (!user) {
+78     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+79   }
+80 
+81   const { attendanceId } = await params;
+82   const attendance = await ensureAttendanceAccess(user.id, attendanceId);
+83 
+84   if (!attendance) {
+85     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+86   }
+87 
+88   const data = await req.json();
+89   const title = String(data.title ?? "").trim();
+90   const lessonDateRaw = String(data.lessonDate ?? "").trim();
+91   const presences = Array.isArray(data.presences) ? data.presences : [];
+92 
+93   if (!title) {
+94     return NextResponse.json(
+95       { error: "Missing attendance title" },
+96       { status: 400 }
+97     );
+98   }
+99 
+100   if (!lessonDateRaw) {
+101     return NextResponse.json(
+102       { error: "Missing attendance date" },
+103       { status: 400 }
+104     );
+105   }
+106 
+107   const lessonDate = new Date(`${lessonDateRaw}T12:00:00`);
+108 
+109   if (Number.isNaN(lessonDate.getTime())) {
+110     return NextResponse.json(
+111       { error: "Invalid attendance date" },
+112       { status: 400 }
+113     );
+114   }
+115 
+116   await prisma.$transaction([
+117     prisma.attendance.update({
+118       where: { id: attendanceId },
+119       data: {
+120         title,
+121         lessonDate,
+122       },
+123     }),
+124     ...presences.map((presence: { id: string; present: boolean }) =>
+125       prisma.attendancePresence.update({
+126         where: { id: presence.id },
+127         data: { present: Boolean(presence.present) },
+128       })
+129     ),
+130   ]);
+131 
+132   const updated = await prisma.attendance.findUnique({
+133     where: { id: attendanceId },
+134     include: {
+135       class: {
+136         include: {
+137           school: true,
+138         },
+139       },
+140       presences: {
+141         include: {
+142           student: {
+143             select: {
+144               id: true,
+145               name: true,
+146               deletedAt: true,
+147             },
+148           },
+149         },
+150         orderBy: {
+151           student: {
+152             name: "asc",
+153           },
+154         },
+155       },
+156     },
+157   });
+158 
+159   if (updated) {
+160     updated.presences = updated.presences.filter(
+161       (p) => !p.student.deletedAt
+162     );
+163   }
+164 
+165   return NextResponse.json(updated);
+166 }

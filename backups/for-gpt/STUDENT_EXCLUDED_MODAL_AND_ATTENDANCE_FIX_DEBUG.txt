@@ -1,0 +1,858 @@
+
+===== app/(app)/classes/[classId]/chamadas/[attendanceId]/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import AttendanceDetailClient from "@/components/AttendanceDetailClient";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string; attendanceId: string }>;
+9 };
+10 
+11 function formatDateInput(date: Date) {
+12   const year = date.getFullYear();
+13   const month = `${date.getMonth() + 1}`.padStart(2, "0");
+14   const day = `${date.getDate()}`.padStart(2, "0");
+15   return `${year}-${month}-${day}`;
+16 }
+17 
+18 export default async function AttendanceDetailPage({ params }: PageProps) {
+19   const user = await getSessionUser();
+20 
+21   if (!user) {
+22     notFound();
+23   }
+24 
+25   const { classId, attendanceId } = await params;
+26 
+27   const attendanceBase = await prisma.attendance.findUnique({
+28     where: { id: attendanceId },
+29     include: {
+30       class: {
+31         include: {
+32           school: true,
+33           students: {
+34             select: {
+35               id: true,
+36               name: true,
+37             },
+38             orderBy: {
+39               name: "asc",
+40             },
+41           },
+42         },
+43       },
+44       presences: {
+45         select: {
+46           id: true,
+47           studentId: true,
+48           present: true,
+49         },
+50       },
+51     },
+52   });
+53 
+54   if (!attendanceBase || attendanceBase.classId !== classId) {
+55     notFound();
+56   }
+57 
+58   const membership = await prisma.schoolMember.findUnique({
+59     where: {
+60       userId_schoolId: {
+61         userId: user.id,
+62         schoolId: attendanceBase.class.schoolId,
+63       },
+64     },
+65   });
+66 
+67   if (!membership) {
+68     notFound();
+69   }
+70 
+71   const existingStudentIds = new Set(
+72     attendanceBase.presences.map((item) => item.studentId)
+73   );
+74 
+75   const missingStudents = attendanceBase.class.students.filter(
+76     (student) => !existingStudentIds.has(student.id)
+77   );
+78 
+79   if (missingStudents.length > 0) {
+80     await prisma.attendancePresence.createMany({
+81       data: missingStudents.map((student) => ({
+82         attendanceId,
+83         studentId: student.id,
+84         present: false,
+85       })),
+86       skipDuplicates: true,
+87     });
+88   }
+89 
+90   const attendance = await prisma.attendance.findUnique({
+91     where: { id: attendanceId },
+92     include: {
+93       class: {
+94         include: {
+95           school: true,
+96         },
+97       },
+98       presences: {
+99         include: {
+100           student: {
+101             select: {
+102               id: true,
+103               name: true,
+104             },
+105           },
+106         },
+107         orderBy: {
+108           student: {
+109             name: "asc",
+110           },
+111         },
+112       },
+113     },
+114   });
+115 
+116   if (!attendance || attendance.classId !== classId) {
+117     notFound();
+118   }
+119 
+120   const initialPresences = attendance.presences.map((item) => ({
+121     id: item.id,
+122     present: item.present,
+123     student: {
+124       id: item.student.id,
+125       name: item.student.name,
+126     },
+127   }));
+128 
+129   return (
+130     <main className="min-h-screen bg-slate-50 px-4 py-10">
+131       <div className="mx-auto w-full max-w-4xl">
+132         <div className="mb-6">
+133           <Link
+134             href={`/classes/${classId}/chamadas`}
+135             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+136           >
+137             ← Voltar para chamadas
+138           </Link>
+139         </div>
+140 
+141         <AttendanceDetailClient
+142           attendanceId={attendance.id}
+143           classId={classId}
+144           initialTitle={attendance.title}
+145           initialLessonDate={formatDateInput(attendance.lessonDate)}
+146           initialPresences={initialPresences}
+147         />
+148       </div>
+149     </main>
+150   );
+151 }
+
+===== app/(app)/classes/[classId]/chamadas/new/page.tsx =====
+1 import Link from "next/link";
+2 import { notFound } from "next/navigation";
+3 import CreateAttendanceForm from "@/components/CreateAttendanceForm";
+4 import { getSessionUser } from "@/lib/auth";
+5 import { prisma } from "@/lib/prisma";
+6 
+7 type PageProps = {
+8   params: Promise<{ classId: string }>;
+9 };
+10 
+11 function getTodayDateInputValue() {
+12   const now = new Date();
+13   const year = now.getFullYear();
+14   const month = `${now.getMonth() + 1}`.padStart(2, "0");
+15   const day = `${now.getDate()}`.padStart(2, "0");
+16   return `${year}-${month}-${day}`;
+17 }
+18 
+19 export default async function NewAttendancePage({ params }: PageProps) {
+20   const user = await getSessionUser();
+21 
+22   if (!user) {
+23     notFound();
+24   }
+25 
+26   const { classId } = await params;
+27 
+28   const foundClass = await prisma.class.findUnique({
+29     where: { id: classId },
+30     include: {
+31       school: true,
+32       students: {
+33         orderBy: { name: "asc" },
+34       },
+35     },
+36   });
+37 
+38   if (!foundClass) {
+39     notFound();
+40   }
+41 
+42   const membership = await prisma.schoolMember.findUnique({
+43     where: {
+44       userId_schoolId: {
+45         userId: user.id,
+46         schoolId: foundClass.schoolId,
+47       },
+48     },
+49   });
+50 
+51   if (!membership) {
+52     notFound();
+53   }
+54 
+55   const students = foundClass.students.map((student) => ({
+56     id: student.id,
+57     name: student.name,
+58   }));
+59 
+60   return (
+61     <main className="min-h-screen bg-slate-50 px-4 py-10">
+62       <div className="mx-auto w-full max-w-4xl">
+63         <div className="mb-6">
+64           <Link
+65             href={`/classes/${classId}/chamadas`}
+66             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+67           >
+68             ← Voltar para chamadas
+69           </Link>
+70         </div>
+71 
+72         <CreateAttendanceForm
+73           classId={classId}
+74           initialLessonDate={getTodayDateInputValue()}
+75           students={students}
+76         />
+77       </div>
+78     </main>
+79   );
+80 }
+
+===== app/(app)/classes/[classId]/students/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import StudentsManagerClient from "@/components/StudentsManagerClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassStudentsPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23       students: {
+24         orderBy: { name: "asc" },
+25       },
+26     },
+27   });
+28 
+29   if (!foundClass) {
+30     notFound();
+31   }
+32 
+33   const membership = await prisma.schoolMember.findUnique({
+34     where: {
+35       userId_schoolId: {
+36         userId: user.id,
+37         schoolId: foundClass.schoolId,
+38       },
+39     },
+40   });
+41 
+42   if (!membership) {
+43     notFound();
+44   }
+45 
+46   const students = foundClass.students.map((student) => ({
+47     id: student.id,
+48     name: student.name,
+49     createdAt: student.createdAt.toISOString(),
+50   }));
+51 
+52   return (
+53     <StudentsManagerClient
+54       classId={foundClass.id}
+55       className={foundClass.name}
+56       canImportSpreadsheet={!user.isTeacher}
+57       initialStudents={students}
+58     />
+59   );
+60 }
+
+===== app/api/classes/[classId]/students/[studentId]/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureClassAccess(userId: string, classId: string) {
+6   const foundClass = await prisma.class.findUnique({
+7     where: { id: classId },
+8     include: {
+9       school: true,
+10     },
+11   });
+12 
+13   if (!foundClass) return null;
+14 
+15   const membership = await prisma.schoolMember.findUnique({
+16     where: {
+17       userId_schoolId: {
+18         userId,
+19         schoolId: foundClass.schoolId,
+20       },
+21     },
+22   });
+23 
+24   if (!membership) return null;
+25 
+26   return foundClass;
+27 }
+28 
+29 export async function DELETE(
+30   req: NextRequest,
+31   { params }: { params: Promise<{ classId: string; studentId: string }> }
+32 ) {
+33   const user = await getSessionUser();
+34 
+35   if (!user) {
+36     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+37   }
+38 
+39   const { classId, studentId } = await params;
+40 
+41   const foundClass = await ensureClassAccess(user.id, classId);
+42 
+43   if (!foundClass) {
+44     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+45   }
+46 
+47   const data = await req.json();
+48   const reason = String(data.reason ?? "").trim();
+49 
+50   if (!reason) {
+51     return NextResponse.json(
+52       { error: "Deletion reason is required" },
+53       { status: 400 }
+54     );
+55   }
+56 
+57   const student = await prisma.student.findUnique({
+58     where: { id: studentId },
+59   });
+60 
+61   if (!student || student.classId !== classId) {
+62     return NextResponse.json({ error: "Student not found" }, { status: 404 });
+63   }
+64 
+65   await prisma.student.update({
+66     where: { id: studentId },
+67     data: {
+68       deletedAt: new Date(),
+69       deletedReason: reason,
+70       deletedById: user.id,
+71     },
+72   });
+73 
+74   return NextResponse.json({ success: true });
+75 }
+
+===== components/StudentsManagerClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useRef, useState } from "react";
+5 import AddStudentModal from "./AddStudentModal";
+6 
+7 type StudentItem = {
+8   id: string;
+9   name: string;
+10   createdAt: string;
+11   deletedAt?: string | null;
+12   deletedReason?: string | null;
+13 };
+14 
+15 type Props = {
+16   classId: string;
+17   className: string;
+18   canImportSpreadsheet: boolean;
+19   initialStudents: StudentItem[];
+20 };
+21 
+22 export default function StudentsManagerClient({
+23   classId,
+24   className,
+25   canImportSpreadsheet,
+26   initialStudents,
+27 }: Props) {
+28   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
+29   const [openAddModal, setOpenAddModal] = useState(false);
+30   const [addingStudent, setAddingStudent] = useState(false);
+31   const [importing, setImporting] = useState(false);
+32   const [importMessage, setImportMessage] = useState<string | null>(null);
+33   const fileInputRef = useRef<HTMLInputElement | null>(null);
+34 
+35   async function refreshStudents() {
+36     const res = await fetch(`/api/classes/${classId}/students`, {
+37       cache: "no-store",
+38     });
+39 
+40     if (!res.ok) return;
+41 
+42     const data = await res.json();
+43     setStudents(data);
+44   }
+45 
+46   async function handleAddStudent(name: string) {
+47     setAddingStudent(true);
+48 
+49     try {
+50       const res = await fetch(`/api/classes/${classId}/students`, {
+51         method: "POST",
+52         headers: { "Content-Type": "application/json" },
+53         body: JSON.stringify({ name }),
+54       });
+55 
+56       if (!res.ok) return;
+57 
+58       await refreshStudents();
+59       setOpenAddModal(false);
+60       setImportMessage(null);
+61     } finally {
+62       setAddingStudent(false);
+63     }
+64   }
+65 
+66   async function handleDeleteStudent(studentId: string) {
+67     const confirmDelete = confirm("Deseja realmente excluir este aluno?");
+68     if (!confirmDelete) return;
+69 
+70     const reason = prompt("Motivo da exclusão:");
+71     if (!reason) return;
+72 
+73     const res = await fetch(
+74       `/api/classes/${classId}/students/${studentId}`,
+75       {
+76         method: "DELETE",
+77         headers: { "Content-Type": "application/json" },
+78         body: JSON.stringify({ reason }),
+79       }
+80     );
+81 
+82     if (res.ok) {
+83       await refreshStudents();
+84     } else {
+85       alert("Erro ao excluir aluno.");
+86     }
+87   }
+88 
+89   async function handleImportFile(file: File) {
+90     setImporting(true);
+91     setImportMessage(null);
+92 
+93     try {
+94       const formData = new FormData();
+95       formData.append("file", file);
+96 
+97       const res = await fetch(`/api/classes/${classId}/students/import`, {
+98         method: "POST",
+99         body: formData,
+100       });
+101 
+102       const data = await res.json();
+103 
+104       if (!res.ok) {
+105         setImportMessage(data.error ?? "Erro ao importar planilha.");
+106         return;
+107       }
+108 
+109       setStudents(data.students);
+110 
+111       setImportMessage(
+112         `Importado: ${data.imported} | Ignorados: ${data.skipped}`
+113       );
+114 
+115       if (fileInputRef.current) fileInputRef.current.value = "";
+116     } finally {
+117       setImporting(false);
+118     }
+119   }
+120 
+121   return (
+122     <>
+123       <main className="min-h-screen bg-slate-50 px-4 py-10">
+124         <div className="mx-auto w-full max-w-4xl">
+125           <div className="mb-6">
+126             <Link href={`/classes/${classId}`} className="text-sky-700">
+127               ← Voltar
+128             </Link>
+129           </div>
+130 
+131           <div className="bg-white p-6 rounded-lg border shadow-sm">
+132             <div className="flex justify-between items-start flex-wrap gap-3">
+133               <div>
+134                 <h1 className="text-xl font-semibold">
+135                   Alunos — {className}
+136                 </h1>
+137               </div>
+138 
+139               <button
+140                 onClick={() => setOpenAddModal(true)}
+141                 className="bg-sky-600 text-white px-4 py-2 rounded-md"
+142               >
+143                 + Adicionar aluno
+144               </button>
+145             </div>
+146 
+147             {canImportSpreadsheet && (
+148               <div className="mt-6 border rounded-lg p-4 bg-slate-50">
+149                 <h2 className="font-semibold text-sm">
+150                   Importar via planilha
+151                 </h2>
+152 
+153                 <div className="mt-3 flex flex-wrap gap-2">
+154                   <a
+155                     href="/templates/students-template.xlsx"
+156                     download
+157                     className="text-sm px-3 py-2 border rounded-md bg-white hover:bg-slate-100"
+158                   >
+159                     ⬇ Baixar modelo Excel (.xlsx)
+160                   </a>
+161 
+162                   <input
+163                     ref={fileInputRef}
+164                     type="file"
+165                     accept=".xlsx,.xls,.csv"
+166                     onChange={(e) => {
+167                       const file = e.target.files?.[0];
+168                       if (file) handleImportFile(file);
+169                     }}
+170                     disabled={importing}
+171                     className="text-sm"
+172                   />
+173                 </div>
+174 
+175                 <p className="text-xs text-slate-500 mt-2">
+176                   Use a coluna Nome na primeira coluna.
+177                 </p>
+178 
+179                 {importMessage && (
+180                   <p className="text-sm mt-2">{importMessage}</p>
+181                 )}
+182               </div>
+183             )}
+184 
+185             <ul className="mt-6 border rounded-md overflow-hidden">
+186               <li className="bg-slate-100 px-4 py-2 text-sm font-semibold">
+187                 Lista de alunos
+188               </li>
+189 
+190               {students.map((s, i) => (
+191                 <li
+192                   key={s.id}
+193                   className={`px-4 py-2 border-t text-sm flex justify-between items-center ${
+194                     s.deletedAt ? "bg-red-50 text-red-700 line-through" : ""
+195                   }`}
+196                   title={s.deletedReason ?? ""}
+197                 >
+198                   <span>
+199                     {i + 1}. {s.name}
+200                     {s.deletedAt && (
+201                       <span className="ml-2 text-xs">
+202                         (Excluído)
+203                       </span>
+204                     )}
+205                   </span>
+206 
+207                   {!s.deletedAt && (
+208                     <button
+209                       onClick={() => handleDeleteStudent(s.id)}
+210                       className="text-red-600 text-xs"
+211                     >
+212                       Excluir
+213                     </button>
+214                   )}
+215                 </li>
+216               ))}
+217             </ul>
+218           </div>
+219         </div>
+220       </main>
+221 
+222       <AddStudentModal
+223         open={openAddModal}
+224         onClose={() => setOpenAddModal(false)}
+225         onSubmit={handleAddStudent}
+226         loading={addingStudent}
+227       />
+228     </>
+229   );
+230 }
+
+===== components/AttendanceDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useMemo, useState } from "react";
+5 import AddStudentModal from "./AddStudentModal";
+6 
+7 type PresenceItem = {
+8   id: string;
+9   present: boolean;
+10   student: {
+11     id: string;
+12     name: string;
+13   };
+14 };
+15 
+16 type Props = {
+17   attendanceId: string;
+18   classId: string;
+19   initialTitle: string;
+20   initialLessonDate: string;
+21   initialPresences: PresenceItem[];
+22 };
+23 
+24 export default function AttendanceDetailClient({
+25   attendanceId,
+26   classId,
+27   initialTitle,
+28   initialLessonDate,
+29   initialPresences,
+30 }: Props) {
+31   const [title, setTitle] = useState(initialTitle);
+32   const [lessonDate, setLessonDate] = useState(initialLessonDate);
+33   const [presences, setPresences] = useState<PresenceItem[]>(initialPresences);
+34   const [loading, setLoading] = useState(false);
+35   const [addingStudent, setAddingStudent] = useState(false);
+36   const [openStudentModal, setOpenStudentModal] = useState(false);
+37 
+38   const summary = useMemo(() => {
+39     const total = presences.length;
+40     const presents = presences.filter((item) => item.present).length;
+41     return { total, presents };
+42   }, [presences]);
+43 
+44   function togglePresence(id: string) {
+45     setPresences((current) =>
+46       current.map((item) =>
+47         item.id === id ? { ...item, present: !item.present } : item
+48       )
+49     );
+50   }
+51 
+52   function markAll(value: boolean) {
+53     setPresences((current) =>
+54       current.map((item) => ({
+55         ...item,
+56         present: value,
+57       }))
+58     );
+59   }
+60 
+61   async function handleAddStudent(name: string) {
+62     setAddingStudent(true);
+63 
+64     try {
+65       const res = await fetch(`/api/classes/${classId}/students`, {
+66         method: "POST",
+67         headers: { "Content-Type": "application/json" },
+68         body: JSON.stringify({
+69           name,
+70           attendanceId,
+71         }),
+72       });
+73 
+74       if (!res.ok) {
+75         console.error("Erro ao adicionar aluno");
+76         return;
+77       }
+78 
+79       const data = await res.json();
+80 
+81       if (data.presence) {
+82         setPresences((current) => [...current, data.presence]);
+83       }
+84 
+85       setOpenStudentModal(false);
+86     } catch (error) {
+87       console.error("Erro ao adicionar aluno", error);
+88     } finally {
+89       setAddingStudent(false);
+90     }
+91   }
+92 
+93   async function handleSave() {
+94     setLoading(true);
+95 
+96     try {
+97       const res = await fetch(`/api/attendances/${attendanceId}`, {
+98         method: "PATCH",
+99         headers: { "Content-Type": "application/json" },
+100         body: JSON.stringify({
+101           title,
+102           lessonDate,
+103           presences: presences.map((item) => ({
+104             id: item.id,
+105             present: item.present,
+106           })),
+107         }),
+108       });
+109 
+110       if (!res.ok) {
+111         console.error("Erro ao salvar chamada");
+112         return;
+113       }
+114 
+115       window.location.reload();
+116     } catch (error) {
+117       console.error("Erro ao salvar chamada", error);
+118     } finally {
+119       setLoading(false);
+120     }
+121   }
+122 
+123   return (
+124     <>
+125       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+126         <div className="space-y-6">
+127           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+128             <div className="grid flex-1 gap-4 md:grid-cols-[1fr_220px]">
+129               <div>
+130                 <label className="text-sm font-medium text-slate-700">
+131                   Nome da aula
+132                 </label>
+133                 <input
+134                   type="text"
+135                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+136                   value={title}
+137                   onChange={(e) => setTitle(e.target.value)}
+138                 />
+139               </div>
+140 
+141               <div>
+142                 <label className="text-sm font-medium text-slate-700">Data</label>
+143                 <input
+144                   type="date"
+145                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+146                   value={lessonDate}
+147                   onChange={(e) => setLessonDate(e.target.value)}
+148                 />
+149               </div>
+150             </div>
+151 
+152             <button
+153               type="button"
+154               onClick={() => setOpenStudentModal(true)}
+155               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+156             >
+157               Adicionar aluno
+158             </button>
+159           </div>
+160 
+161           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-sky-600 px-4 py-4 text-white">
+162             <h1 className="text-lg font-semibold">Lista de chamada</h1>
+163             <p className="text-sm font-medium">
+164               Presentes: {summary.presents} / {summary.total}
+165             </p>
+166           </div>
+167 
+168           <div className="flex flex-wrap gap-2">
+169             <button
+170               type="button"
+171               onClick={() => markAll(true)}
+172               className="rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
+173             >
+174               Marcar todos
+175             </button>
+176 
+177             <button
+178               type="button"
+179               onClick={() => markAll(false)}
+180               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+181             >
+182               Desmarcar todos
+183             </button>
+184           </div>
+185 
+186           {presences.length === 0 ? (
+187             <p className="text-sm text-slate-500">
+188               Ainda não há alunos cadastrados nesta turma.
+189             </p>
+190           ) : (
+191             <ul className="overflow-hidden rounded-md border border-slate-200">
+192               <li className="grid grid-cols-[48px_1fr_80px] items-center gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+193                 <span>#</span>
+194                 <span>Aluno</span>
+195                 <span className="text-center">✓</span>
+196               </li>
+197 
+198               {presences.map((item, index) => (
+199                 <li
+200                   key={item.id}
+201                   className="grid grid-cols-[48px_1fr_80px] items-center gap-3 border-t border-slate-200 px-4 py-3"
+202                 >
+203                   <span className="text-sm text-slate-500">{index + 1}</span>
+204 
+205                   <span className="text-sm font-medium text-slate-900">
+206                     {item.student.name}
+207                   </span>
+208 
+209                   <div className="flex justify-center">
+210                     <input
+211                       type="checkbox"
+212                       checked={item.present}
+213                       onChange={() => togglePresence(item.id)}
+214                       className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+215                     />
+216                   </div>
+217                 </li>
+218               ))}
+219             </ul>
+220           )}
+221 
+222           <div className="flex justify-between gap-3">
+223             <Link
+224               href={`/classes/${classId}/chamadas`}
+225               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+226             >
+227               Voltar
+228             </Link>
+229 
+230             <button
+231               type="button"
+232               onClick={handleSave}
+233               disabled={loading}
+234               className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+235             >
+236               {loading ? "Salvando..." : "Salvar chamada"}
+237             </button>
+238           </div>
+239         </div>
+240       </div>
+241 
+242       <AddStudentModal
+243         open={openStudentModal}
+244         onClose={() => setOpenStudentModal(false)}
+245         onSubmit={handleAddStudent}
+246         loading={addingStudent}
+247       />
+248     </>
+249   );
+250 }

@@ -1,0 +1,575 @@
+
+===== components/SchoolDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import CreateClassModal from "./CreateClassModal";
+6 
+7 type ClassItem = {
+8   id: string;
+9   name: string;
+10   year: number | null;
+11   createdAt: string;
+12   _count: {
+13     students: number;
+14   };
+15 };
+16 
+17 type Props = {
+18   schoolId: string;
+19   schoolName: string;
+20   groupId: string;
+21   initialClasses: ClassItem[];
+22 };
+23 
+24 export default function SchoolDetailClient({
+25   schoolId,
+26   schoolName,
+27   groupId,
+28   initialClasses,
+29 }: Props) {
+30   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
+31   const [openModal, setOpenModal] = useState(false);
+32   const [loadingList, setLoadingList] = useState(false);
+33 
+34   async function refreshClasses() {
+35     setLoadingList(true);
+36     try {
+37       const res = await fetch(`/api/schools/${schoolId}/classes`, {
+38         method: "GET",
+39         headers: { "Content-Type": "application/json" },
+40         cache: "no-store",
+41       });
+42 
+43       if (res.ok) {
+44         const data = (await res.json()) as ClassItem[];
+45         setClasses(
+46           data.map((item) => ({
+47             id: item.id,
+48             name: item.name,
+49             year: item.year ?? null,
+50             createdAt: item.createdAt,
+51             _count: {
+52               students: item._count?.students ?? 0,
+53             },
+54           }))
+55         );
+56       } else {
+57         console.error("Erro ao carregar turmas");
+58       }
+59     } catch (error) {
+60       console.error("Erro ao buscar turmas", error);
+61     } finally {
+62       setLoadingList(false);
+63     }
+64   }
+65 
+66   return (
+67     <main className="min-h-screen bg-slate-50 px-4 py-10">
+68       <div className="mx-auto w-full max-w-4xl">
+69         <div className="mb-6">
+70           <Link
+71             href={`/groups/${groupId}`}
+72             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+73           >
+74             ← Voltar para escolas
+75           </Link>
+76         </div>
+77 
+78         <div className="flex items-start justify-between gap-4">
+79           <div>
+80             <h1 className="text-2xl font-semibold text-slate-900">
+81               {schoolName}
+82             </h1>
+83             <p className="mt-2 text-sm text-slate-500">
+84               Aqui você cadastra e organiza as turmas pertencentes a esta escola.
+85             </p>
+86           </div>
+87 
+88           <button
+89             type="button"
+90             onClick={() => setOpenModal(true)}
+91             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+92           >
+93             + Criar turma
+94           </button>
+95         </div>
+96 
+97         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+98           {loadingList && (
+99             <p className="mb-3 text-sm text-slate-500">Atualizando turmas…</p>
+100           )}
+101 
+102           {classes.length === 0 ? (
+103             <p className="text-sm text-slate-500">
+104               Nenhuma turma cadastrada ainda nesta escola. Clique em{" "}
+105               <span className="font-semibold">“Criar turma”</span> para começar.
+106             </p>
+107           ) : (
+108             <ul className="space-y-3">
+109               {classes.map((item) => (
+110                 <li
+111                   key={item.id}
+112                   className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 hover:bg-slate-50"
+113                 >
+114                   <div>
+115                     <p className="text-sm font-medium text-slate-900">
+116                       {item.name}
+117                     </p>
+118                     <p className="mt-1 text-xs text-slate-500">
+119                       {item.year ? `Ano letivo ${item.year} • ` : ""}
+120                       {item._count.students === 0
+121                         ? "Nenhum aluno cadastrado ainda"
+122                         : item._count.students === 1
+123                         ? "1 aluno cadastrado"
+124                         : `${item._count.students} alunos cadastrados`}
+125                     </p>
+126                   </div>
+127 
+128                   <span className="text-sm font-medium text-slate-400">
+129                     Em breve
+130                   </span>
+131                 </li>
+132               ))}
+133             </ul>
+134           )}
+135         </div>
+136 
+137         <CreateClassModal
+138           schoolId={schoolId}
+139           open={openModal}
+140           onClose={() => setOpenModal(false)}
+141           onCreated={refreshClasses}
+142         />
+143       </div>
+144     </main>
+145   );
+146 }
+
+===== components/CreateClassModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type Props = {
+6   schoolId: string;
+7   open: boolean;
+8   onClose: () => void;
+9   onCreated: () => void;
+10 };
+11 
+12 export default function CreateClassModal({
+13   schoolId,
+14   open,
+15   onClose,
+16   onCreated,
+17 }: Props) {
+18   const [name, setName] = useState("");
+19   const [year, setYear] = useState("");
+20   const [loading, setLoading] = useState(false);
+21 
+22   if (!open) return null;
+23 
+24   async function handleSubmit(e: React.FormEvent) {
+25     e.preventDefault();
+26     if (!name.trim()) return;
+27 
+28     setLoading(true);
+29 
+30     try {
+31       const res = await fetch(`/api/schools/${schoolId}/classes`, {
+32         method: "POST",
+33         headers: { "Content-Type": "application/json" },
+34         body: JSON.stringify({
+35           name,
+36           year: year.trim() ? Number(year) : null,
+37         }),
+38       });
+39 
+40       if (res.ok) {
+41         setName("");
+42         setYear("");
+43         onCreated();
+44         onClose();
+45       } else {
+46         console.error("Erro ao criar turma");
+47       }
+48     } catch (error) {
+49       console.error("Erro ao criar turma", error);
+50     } finally {
+51       setLoading(false);
+52     }
+53   }
+54 
+55   return (
+56     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+57       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+58         <h2 className="mb-4 text-lg font-semibold text-slate-900">
+59           Criar nova Turma
+60         </h2>
+61 
+62         <form onSubmit={handleSubmit} className="space-y-4">
+63           <div>
+64             <label className="text-sm font-medium text-slate-700">
+65               Nome da turma
+66             </label>
+67             <input
+68               type="text"
+69               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+70               placeholder="Ex: 6º Ano A"
+71               value={name}
+72               onChange={(e) => setName(e.target.value)}
+73             />
+74           </div>
+75 
+76           <div>
+77             <label className="text-sm font-medium text-slate-700">
+78               Ano letivo
+79             </label>
+80             <input
+81               type="number"
+82               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+83               placeholder="Ex: 2026"
+84               value={year}
+85               onChange={(e) => setYear(e.target.value)}
+86             />
+87           </div>
+88 
+89           <div className="flex justify-end gap-2">
+90             <button
+91               type="button"
+92               onClick={onClose}
+93               className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
+94               disabled={loading}
+95             >
+96               Cancelar
+97             </button>
+98 
+99             <button
+100               type="submit"
+101               disabled={loading}
+102               className="rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+103             >
+104               {loading ? "Criando..." : "Criar turma"}
+105             </button>
+106           </div>
+107         </form>
+108       </div>
+109     </div>
+110   );
+111 }
+
+===== app/(app)/schools/[schoolId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 import SchoolDetailClient from "@/components/SchoolDetailClient";
+5 
+6 type PageProps = {
+7   params: Promise<{ schoolId: string }>;
+8 };
+9 
+10 export default async function SchoolPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { schoolId } = await params;
+18 
+19   const membership = await prisma.schoolMember.findUnique({
+20     where: {
+21       userId_schoolId: {
+22         userId: user.id,
+23         schoolId,
+24       },
+25     },
+26   });
+27 
+28   if (!membership) {
+29     notFound();
+30   }
+31 
+32   const school = await prisma.school.findUnique({
+33     where: { id: schoolId },
+34     include: {
+35       group: true,
+36       classes: {
+37         include: {
+38           _count: {
+39             select: { students: true },
+40           },
+41         },
+42         orderBy: { createdAt: "desc" },
+43       },
+44     },
+45   });
+46 
+47   if (!school) {
+48     notFound();
+49   }
+50 
+51   const classes = school.classes.map((item) => ({
+52     id: item.id,
+53     name: item.name,
+54     year: item.year,
+55     createdAt: item.createdAt.toISOString(),
+56     _count: {
+57       students: item._count.students,
+58     },
+59   }));
+60 
+61   return (
+62     <SchoolDetailClient
+63       schoolId={school.id}
+64       schoolName={school.name}
+65       groupId={school.groupId}
+66       initialClasses={classes}
+67     />
+68   );
+69 }
+
+===== app/api/schools/[schoolId]/classes/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureSchoolAccess(userId: string, schoolId: string) {
+6   const membership = await prisma.schoolMember.findUnique({
+7     where: {
+8       userId_schoolId: {
+9         userId,
+10         schoolId,
+11       },
+12     },
+13     include: {
+14       school: true,
+15     },
+16   });
+17 
+18   return membership;
+19 }
+20 
+21 export async function GET(
+22   _req: NextRequest,
+23   { params }: { params: Promise<{ schoolId: string }> }
+24 ) {
+25   const user = await getSessionUser();
+26   if (!user) {
+27     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+28   }
+29 
+30   const { schoolId } = await params;
+31   const membership = await ensureSchoolAccess(user.id, schoolId);
+32 
+33   if (!membership) {
+34     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+35   }
+36 
+37   const classes = await prisma.class.findMany({
+38     where: { schoolId },
+39     include: {
+40       _count: {
+41         select: { students: true },
+42       },
+43     },
+44     orderBy: { createdAt: "desc" },
+45   });
+46 
+47   return NextResponse.json(classes);
+48 }
+49 
+50 export async function POST(
+51   req: NextRequest,
+52   { params }: { params: Promise<{ schoolId: string }> }
+53 ) {
+54   const user = await getSessionUser();
+55   if (!user) {
+56     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+57   }
+58 
+59   const { schoolId } = await params;
+60   const membership = await ensureSchoolAccess(user.id, schoolId);
+61 
+62   if (!membership) {
+63     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+64   }
+65 
+66   const data = await req.json();
+67   const name = String(data.name ?? "").trim();
+68   const yearRaw = data.year;
+69 
+70   if (!name) {
+71     return NextResponse.json({ error: "Missing class name" }, { status: 400 });
+72   }
+73 
+74   const year =
+75     typeof yearRaw === "number" && Number.isFinite(yearRaw) ? yearRaw : null;
+76 
+77   const createdClass = await prisma.class.create({
+78     data: {
+79       name,
+80       year,
+81       schoolId,
+82     },
+83     include: {
+84       _count: {
+85         select: { students: true },
+86       },
+87     },
+88   });
+89 
+90   return NextResponse.json(createdClass, { status: 201 });
+91 }
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 //
+11 // ==========================
+12 // MODELO USER E SESSION (EXISTENTES)
+13 // ==========================
+14 //
+15 
+16 model User {
+17   id           String          @id @default(cuid())
+18   name         String
+19   email        String          @unique
+20   passwordHash String
+21   createdAt    DateTime        @default(now())
+22   updatedAt    DateTime        @updatedAt
+23 
+24   sessions     Session[]
+25   groupMembers GroupMember[]
+26   schoolMembers SchoolMember[]
+27   classes      Class[]         @relation("ClassTeacher")
+28 }
+29 
+30 model Session {
+31   id        String   @id @default(cuid())
+32   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+33   userId    String
+34   createdAt DateTime @default(now())
+35   expiresAt DateTime
+36 
+37   @@index([userId])
+38 }
+39 
+40 //
+41 // ==========================
+42 // MODELOS DE GRUPOS DE ESCOLAS
+43 // ==========================
+44 //
+45 
+46 model Group {
+47   id        String         @id @default(cuid())
+48   name      String
+49   createdAt DateTime       @default(now())
+50   updatedAt DateTime       @updatedAt
+51 
+52   members   GroupMember[]
+53   schools   School[]
+54 }
+55 
+56 model GroupMember {
+57   id        String   @id @default(cuid())
+58   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+59   userId    String
+60   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+61   groupId   String
+62 
+63   role      String   // OWNER, DIRECTOR, VIEWER
+64   createdAt DateTime @default(now())
+65 
+66   @@unique([userId, groupId])
+67 }
+68 
+69 //
+70 // ==========================
+71 // MODELOS DE ESCOLAS
+72 // ==========================
+73 //
+74 
+75 model School {
+76   id        String         @id @default(cuid())
+77   name      String
+78   createdAt DateTime       @default(now())
+79   updatedAt DateTime       @updatedAt
+80 
+81   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+82   groupId   String
+83 
+84   members   SchoolMember[]
+85   classes   Class[]
+86 }
+87 
+88 model SchoolMember {
+89   id        String   @id @default(cuid())
+90   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+91   userId    String
+92   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+93   schoolId  String
+94 
+95   role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+96   createdAt DateTime @default(now())
+97 
+98   @@unique([userId, schoolId])
+99 }
+100 
+101 //
+102 // ==========================
+103 // MODELOS DE TURMAS E ALUNOS
+104 // ==========================
+105 //
+106 
+107 model Class {
+108   id        String        @id @default(cuid())
+109   name      String
+110   year      Int?
+111   createdAt DateTime      @default(now())
+112   updatedAt DateTime      @updatedAt
+113 
+114   school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+115   schoolId  String
+116 
+117   teacher   User?         @relation("ClassTeacher", fields: [teacherId], references: [id])
+118   teacherId String?
+119 
+120   students  Student[]
+121 }
+122 
+123 model Student {
+124   id        String      @id @default(cuid())
+125   name      String
+126   createdAt DateTime    @default(now())
+127   updatedAt DateTime    @updatedAt
+128 
+129   class     Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+130   classId   String
+131 }
+132 
+
+===== app/(app)/classes =====
+[MISSING] app/(app)/classes
+
+===== app/api/classes =====
+[MISSING] app/api/classes
+
+===== components =====
+[DIR] components
+components
+├── CreateClassModal.tsx
+├── CreateGroupModal.tsx
+├── CreateSchoolModal.tsx
+├── GroupDetailClient.tsx
+├── GroupsDashboardClient.tsx
+└── SchoolDetailClient.tsx

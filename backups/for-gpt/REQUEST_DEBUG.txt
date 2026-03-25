@@ -1,0 +1,77 @@
+
+===== app/(app)/dashboard/page.tsx =====
+1 import { getSessionUser } from "@/lib/auth";
+2 
+3 export default async function DashboardPage() {
+4   const user = await getSessionUser();
+5 
+6   return (
+7     <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+8       <div className="max-w-xl text-center">
+9         <h1 className="text-2xl font-semibold text-slate-900">
+10           Aqui vai ser todo o fluxo de organização das escolas.
+11         </h1>
+12         {user && (
+13           <p className="mt-3 text-sm text-slate-500">
+14             Você está logado como{" "}
+15             <span className="font-medium">
+16               {user.name} ({user.email})
+17             </span>
+18             .
+19           </p>
+20         )}
+21       </div>
+22     </main>
+23   );
+24 }
+
+===== lib/prisma.ts =====
+1 import { PrismaClient } from "@prisma/client";
+2 
+3 const globalForPrisma = globalThis as unknown as {
+4   prisma?: PrismaClient;
+5 };
+6 
+7 export const prisma =
+8   globalForPrisma.prisma ??
+9   new PrismaClient({
+10     log:
+11       process.env.NODE_ENV === "development"
+12         ? ["query", "error", "warn"]
+13         : ["error"],
+14   });
+15 
+16 if (process.env.NODE_ENV !== "production") {
+17   globalForPrisma.prisma = prisma;
+18 }
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 model User {
+11   id           String   @id @default(cuid())
+12   name         String
+13   email        String   @unique
+14   passwordHash String
+15   createdAt    DateTime @default(now())
+16   updatedAt    DateTime @updatedAt
+17 
+18   sessions     Session[]
+19 }
+20 
+21 model Session {
+22   id        String   @id @default(cuid())
+23   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+24   userId    String
+25   createdAt DateTime @default(now())
+26   expiresAt DateTime
+27 
+28   @@index([userId])
+29 }

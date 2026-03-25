@@ -1,0 +1,1505 @@
+
+===== app/api/groups/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { getSessionUser } from "@/lib/auth";
+4 
+5 //
+6 // GET /api/groups
+7 // Lista todos os grupos onde o usuário é membro
+8 //
+9 export async function GET() {
+10   const user = await getSessionUser();
+11   if (!user) {
+12     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+13   }
+14 
+15   const groups = await prisma.group.findMany({
+16     where: {
+17       members: {
+18         some: {
+19           userId: user.id,
+20         },
+21       },
+22     },
+23     include: {
+24       _count: { select: { schools: true } },
+25     },
+26     orderBy: { createdAt: "desc" },
+27   });
+28 
+29   return NextResponse.json(groups);
+30 }
+31 
+32 //
+33 // POST /api/groups
+34 // Cria um grupo e adiciona o usuário como OWNER
+35 //
+36 export async function POST(req: NextRequest) {
+37   const user = await getSessionUser();
+38   if (!user) {
+39     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+40   }
+41 
+42   const data = await req.json();
+43   const name = String(data.name ?? "").trim();
+44 
+45   if (!name) {
+46     return NextResponse.json({ error: "Missing group name" }, { status: 400 });
+47   }
+48 
+49   const group = await prisma.group.create({
+50     data: {
+51       name,
+52       members: {
+53         create: {
+54           userId: user.id,
+55           role: "OWNER",
+56         },
+57       },
+58     },
+59   });
+60 
+61   return NextResponse.json(group, { status: 201 });
+62 }
+
+===== app/api/groups/[groupId]/schools/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureGroupAccess(userId: string, groupId: string) {
+6   const membership = await prisma.groupMember.findUnique({
+7     where: {
+8       userId_groupId: {
+9         userId,
+10         groupId,
+11       },
+12     },
+13   });
+14 
+15   return membership;
+16 }
+17 
+18 export async function GET(
+19   _req: NextRequest,
+20   { params }: { params: Promise<{ groupId: string }> }
+21 ) {
+22   const user = await getSessionUser();
+23   if (!user) {
+24     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+25   }
+26 
+27   const { groupId } = await params;
+28   const membership = await ensureGroupAccess(user.id, groupId);
+29 
+30   if (!membership) {
+31     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+32   }
+33 
+34   const schools = await prisma.school.findMany({
+35     where: { groupId },
+36     include: {
+37       _count: {
+38         select: { classes: true },
+39       },
+40     },
+41     orderBy: { createdAt: "desc" },
+42   });
+43 
+44   return NextResponse.json(schools);
+45 }
+46 
+47 export async function POST(
+48   req: NextRequest,
+49   { params }: { params: Promise<{ groupId: string }> }
+50 ) {
+51   const user = await getSessionUser();
+52   if (!user) {
+53     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+54   }
+55 
+56   const { groupId } = await params;
+57   const membership = await ensureGroupAccess(user.id, groupId);
+58 
+59   if (!membership) {
+60     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+61   }
+62 
+63   const data = await req.json();
+64   const name = String(data.name ?? "").trim();
+65 
+66   if (!name) {
+67     return NextResponse.json({ error: "Missing school name" }, { status: 400 });
+68   }
+69 
+70   const school = await prisma.school.create({
+71     data: {
+72       name,
+73       groupId,
+74       members: {
+75         create: {
+76           userId: user.id,
+77           role: "DIRECTOR",
+78         },
+79       },
+80     },
+81     include: {
+82       _count: {
+83         select: { classes: true },
+84       },
+85     },
+86   });
+87 
+88   return NextResponse.json(school, { status: 201 });
+89 }
+
+===== app/api/schools/[schoolId]/classes/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureSchoolAccess(userId: string, schoolId: string) {
+6   const membership = await prisma.schoolMember.findUnique({
+7     where: {
+8       userId_schoolId: {
+9         userId,
+10         schoolId,
+11       },
+12     },
+13     include: {
+14       school: true,
+15     },
+16   });
+17 
+18   return membership;
+19 }
+20 
+21 export async function GET(
+22   _req: NextRequest,
+23   { params }: { params: Promise<{ schoolId: string }> }
+24 ) {
+25   const user = await getSessionUser();
+26   if (!user) {
+27     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+28   }
+29 
+30   const { schoolId } = await params;
+31   const membership = await ensureSchoolAccess(user.id, schoolId);
+32 
+33   if (!membership) {
+34     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+35   }
+36 
+37   const classes = await prisma.class.findMany({
+38     where: { schoolId },
+39     include: {
+40       teacher: {
+41         select: {
+42           id: true,
+43           name: true,
+44           email: true,
+45         },
+46       },
+47       _count: {
+48         select: { students: true },
+49       },
+50     },
+51     orderBy: { createdAt: "desc" },
+52   });
+53 
+54   return NextResponse.json(classes);
+55 }
+56 
+57 export async function POST(
+58   req: NextRequest,
+59   { params }: { params: Promise<{ schoolId: string }> }
+60 ) {
+61   const user = await getSessionUser();
+62   if (!user) {
+63     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+64   }
+65 
+66   const { schoolId } = await params;
+67   const membership = await ensureSchoolAccess(user.id, schoolId);
+68 
+69   if (!membership) {
+70     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+71   }
+72 
+73   const data = await req.json();
+74   const name = String(data.name ?? "").trim();
+75   const yearRaw = data.year;
+76   const teacherIdRaw = String(data.teacherId ?? "").trim();
+77 
+78   if (!name) {
+79     return NextResponse.json({ error: "Missing class name" }, { status: 400 });
+80   }
+81 
+82   const year =
+83     typeof yearRaw === "number" && Number.isFinite(yearRaw) ? yearRaw : null;
+84 
+85   let teacherId: string | null = null;
+86 
+87   if (teacherIdRaw) {
+88     const teacher = await prisma.user.findFirst({
+89       where: {
+90         id: teacherIdRaw,
+91         isTeacher: true,
+92         createdById: user.id,
+93       },
+94     });
+95 
+96     if (!teacher) {
+97       return NextResponse.json(
+98         { error: "Invalid teacher for this account" },
+99         { status: 400 }
+100       );
+101     }
+102 
+103     teacherId = teacher.id;
+104   }
+105 
+106   const createdClass = await prisma.class.create({
+107     data: {
+108       name,
+109       year,
+110       schoolId,
+111       teacherId,
+112     },
+113     include: {
+114       teacher: {
+115         select: {
+116           id: true,
+117           name: true,
+118           email: true,
+119         },
+120       },
+121       _count: {
+122         select: { students: true },
+123       },
+124     },
+125   });
+126 
+127   return NextResponse.json(createdClass, { status: 201 });
+128 }
+
+===== app/api/teachers/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser, hashPassword } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 function generateTeacherPassword(name: string, cpf: string) {
+10   const cleanName = name.trim().replace(/\s+/g, "");
+11   const cleanCpf = normalizeCpf(cpf);
+12 
+13   if (cleanName.length < 3 || cleanCpf.length < 6) {
+14     return null;
+15   }
+16 
+17   const first = cleanName[0].toUpperCase();
+18   const second = cleanName[1].toLowerCase();
+19   const third = cleanName[2].toUpperCase();
+20   const cpfPart = cleanCpf.slice(0, 6);
+21 
+22   return `${first}${second}${third}@${cpfPart}.`;
+23 }
+24 
+25 export async function GET() {
+26   const user = await getSessionUser();
+27 
+28   if (!user) {
+29     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+30   }
+31 
+32   const teachers = await prisma.user.findMany({
+33     where: {
+34       createdById: user.id,
+35       isTeacher: true,
+36     },
+37     include: {
+38       _count: {
+39         select: {
+40           classes: true,
+41         },
+42       },
+43     },
+44     orderBy: { createdAt: "desc" },
+45   });
+46 
+47   return NextResponse.json(
+48     teachers.map((teacher) => ({
+49       id: teacher.id,
+50       name: teacher.name,
+51       email: teacher.email,
+52       cpf: teacher.cpf,
+53       isTeacher: teacher.isTeacher,
+54       createdAt: teacher.createdAt,
+55       _count: {
+56         classes: teacher._count.classes,
+57       },
+58     }))
+59   );
+60 }
+61 
+62 export async function POST(req: NextRequest) {
+63   const user = await getSessionUser();
+64 
+65   if (!user) {
+66     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+67   }
+68 
+69   const data = await req.json();
+70   const name = String(data.name ?? "").trim();
+71   const email = String(data.email ?? "").toLowerCase().trim();
+72   const cpfRaw = String(data.cpf ?? "").trim();
+73   const cpf = normalizeCpf(cpfRaw);
+74 
+75   if (!name || !email || !cpf) {
+76     return NextResponse.json(
+77       { error: "Missing teacher name, email or CPF" },
+78       { status: 400 }
+79     );
+80   }
+81 
+82   if (cpf.length !== 11) {
+83     return NextResponse.json(
+84       { error: "CPF must contain 11 digits" },
+85       { status: 400 }
+86     );
+87   }
+88 
+89   const existingByEmail = await prisma.user.findUnique({
+90     where: { email },
+91   });
+92 
+93   // Se usuário já existe → não altera senha
+94   if (existingByEmail) {
+95     const updated = await prisma.user.update({
+96       where: { id: existingByEmail.id },
+97       data: {
+98         isTeacher: true,
+99         createdById: user.id,
+100         cpf: existingByEmail.cpf ?? cpf,
+101       },
+102       include: {
+103         _count: {
+104           select: {
+105             classes: true,
+106           },
+107         },
+108       },
+109     });
+110 
+111     return NextResponse.json(
+112       {
+113         teacher: {
+114           id: updated.id,
+115           name: updated.name,
+116           email: updated.email,
+117           cpf: updated.cpf,
+118           isTeacher: updated.isTeacher,
+119           createdAt: updated.createdAt,
+120           _count: {
+121             classes: updated._count.classes,
+122           },
+123         },
+124         message: "Usuário já existia. Senha não foi alterada.",
+125       },
+126       { status: 200 }
+127     );
+128   }
+129 
+130   const temporaryPassword = generateTeacherPassword(name, cpf);
+131 
+132   if (!temporaryPassword) {
+133     return NextResponse.json(
+134       { error: "Could not generate password from provided name and CPF" },
+135       { status: 400 }
+136     );
+137   }
+138 
+139   const passwordHash = await hashPassword(temporaryPassword);
+140 
+141   const teacher = await prisma.user.create({
+142     data: {
+143       name,
+144       email,
+145       cpf,
+146       passwordHash,
+147       isTeacher: true,
+148       createdById: user.id,
+149     },
+150     include: {
+151       _count: {
+152         select: {
+153           classes: true,
+154         },
+155       },
+156     },
+157   });
+158 
+159   return NextResponse.json(
+160     {
+161       teacher: {
+162         id: teacher.id,
+163         name: teacher.name,
+164         email: teacher.email,
+165         cpf: teacher.cpf,
+166         isTeacher: teacher.isTeacher,
+167         createdAt: teacher.createdAt,
+168         _count: {
+169           classes: teacher._count.classes,
+170         },
+171       },
+172       temporaryPassword,
+173     },
+174     { status: 201 }
+175   );
+176 }
+
+===== app/api/teachers/[teacherId]/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 async function ensureTeacherAccess(userId: string, teacherId: string) {
+10   const teacher = await prisma.user.findFirst({
+11     where: {
+12       id: teacherId,
+13       createdById: userId,
+14       isTeacher: true,
+15     },
+16     include: {
+17       _count: {
+18         select: {
+19           classes: true,
+20         },
+21       },
+22     },
+23   });
+24 
+25   return teacher;
+26 }
+27 
+28 export async function GET(
+29   _req: NextRequest,
+30   { params }: { params: Promise<{ teacherId: string }> }
+31 ) {
+32   const user = await getSessionUser();
+33 
+34   if (!user) {
+35     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+36   }
+37 
+38   const { teacherId } = await params;
+39   const teacher = await ensureTeacherAccess(user.id, teacherId);
+40 
+41   if (!teacher) {
+42     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+43   }
+44 
+45   return NextResponse.json({
+46     id: teacher.id,
+47     name: teacher.name,
+48     email: teacher.email,
+49     cpf: teacher.cpf,
+50     isTeacher: teacher.isTeacher,
+51     createdAt: teacher.createdAt,
+52     _count: {
+53       classes: teacher._count.classes,
+54     },
+55   });
+56 }
+57 
+58 export async function PATCH(
+59   req: NextRequest,
+60   { params }: { params: Promise<{ teacherId: string }> }
+61 ) {
+62   const user = await getSessionUser();
+63 
+64   if (!user) {
+65     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+66   }
+67 
+68   const { teacherId } = await params;
+69   const teacher = await ensureTeacherAccess(user.id, teacherId);
+70 
+71   if (!teacher) {
+72     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+73   }
+74 
+75   const data = await req.json();
+76   const name = String(data.name ?? "").trim();
+77   const email = String(data.email ?? "").toLowerCase().trim();
+78   const cpfRaw = String(data.cpf ?? "").trim();
+79   const cpf = normalizeCpf(cpfRaw);
+80 
+81   if (!name || !email || !cpf) {
+82     return NextResponse.json(
+83       { error: "Name, email and CPF are required" },
+84       { status: 400 }
+85     );
+86   }
+87 
+88   if (cpf.length !== 11) {
+89     return NextResponse.json(
+90       { error: "CPF must contain 11 digits" },
+91       { status: 400 }
+92     );
+93   }
+94 
+95   const existingByEmail = await prisma.user.findFirst({
+96     where: {
+97       email,
+98       NOT: {
+99         id: teacherId,
+100       },
+101     },
+102   });
+103 
+104   if (existingByEmail) {
+105     return NextResponse.json(
+106       { error: "Email already in use" },
+107       { status: 409 }
+108     );
+109   }
+110 
+111   const existingByCpf = await prisma.user.findFirst({
+112     where: {
+113       cpf,
+114       NOT: {
+115         id: teacherId,
+116       },
+117     },
+118   });
+119 
+120   if (existingByCpf) {
+121     return NextResponse.json(
+122       { error: "CPF already in use" },
+123       { status: 409 }
+124     );
+125   }
+126 
+127   const updatedTeacher = await prisma.user.update({
+128     where: { id: teacherId },
+129     data: {
+130       name,
+131       email,
+132       cpf,
+133     },
+134     include: {
+135       _count: {
+136         select: {
+137           classes: true,
+138         },
+139       },
+140     },
+141   });
+142 
+143   return NextResponse.json({
+144     teacher: {
+145       id: updatedTeacher.id,
+146       name: updatedTeacher.name,
+147       email: updatedTeacher.email,
+148       cpf: updatedTeacher.cpf,
+149       isTeacher: updatedTeacher.isTeacher,
+150       createdAt: updatedTeacher.createdAt,
+151       _count: {
+152         classes: updatedTeacher._count.classes,
+153       },
+154     },
+155   });
+156 }
+
+===== app/(app)/groups/[groupId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import GroupDetailClient from "@/components/GroupDetailClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ groupId: string }>;
+8 };
+9 
+10 export default async function GroupPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { groupId } = await params;
+18 
+19   const membership = await prisma.groupMember.findUnique({
+20     where: {
+21       userId_groupId: {
+22         userId: user.id,
+23         groupId,
+24       },
+25     },
+26   });
+27 
+28   if (!membership) {
+29     notFound();
+30   }
+31 
+32   const group = await prisma.group.findUnique({
+33     where: { id: groupId },
+34     include: {
+35       schools: {
+36         include: {
+37           _count: {
+38             select: { classes: true },
+39           },
+40         },
+41         orderBy: { createdAt: "desc" },
+42       },
+43     },
+44   });
+45 
+46   if (!group) {
+47     notFound();
+48   }
+49 
+50   const schools = group.schools.map((school) => ({
+51     id: school.id,
+52     name: school.name,
+53     createdAt: school.createdAt.toISOString(),
+54     _count: {
+55       classes: school._count.classes,
+56     },
+57   }));
+58 
+59   return (
+60     <GroupDetailClient
+61       groupId={group.id}
+62       groupName={group.name}
+63       initialSchools={schools}
+64     />
+65   );
+66 }
+
+===== app/(app)/schools/[schoolId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 import SchoolDetailClient from "@/components/SchoolDetailClient";
+5 
+6 type PageProps = {
+7   params: Promise<{ schoolId: string }>;
+8 };
+9 
+10 export default async function SchoolPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { schoolId } = await params;
+18 
+19   const membership = await prisma.schoolMember.findUnique({
+20     where: {
+21       userId_schoolId: {
+22         userId: user.id,
+23         schoolId,
+24       },
+25     },
+26   });
+27 
+28   if (!membership) {
+29     notFound();
+30   }
+31 
+32   const school = await prisma.school.findUnique({
+33     where: { id: schoolId },
+34     include: {
+35       group: true,
+36       classes: {
+37         include: {
+38           teacher: {
+39             select: {
+40               id: true,
+41               name: true,
+42               email: true,
+43             },
+44           },
+45           _count: {
+46             select: { students: true },
+47           },
+48         },
+49         orderBy: { createdAt: "desc" },
+50       },
+51     },
+52   });
+53 
+54   if (!school) {
+55     notFound();
+56   }
+57 
+58   const teachersRaw = await prisma.user.findMany({
+59     where: {
+60       createdById: user.id,
+61       isTeacher: true,
+62     },
+63     orderBy: { name: "asc" },
+64   });
+65 
+66   const teachers = teachersRaw.map((teacher) => ({
+67     id: teacher.id,
+68     name: teacher.name,
+69     email: teacher.email,
+70   }));
+71 
+72   const classes = school.classes.map((item) => ({
+73     id: item.id,
+74     name: item.name,
+75     year: item.year,
+76     createdAt: item.createdAt.toISOString(),
+77     teacher: item.teacher
+78       ? {
+79           id: item.teacher.id,
+80           name: item.teacher.name,
+81           email: item.teacher.email,
+82         }
+83       : null,
+84     _count: {
+85       students: item._count.students,
+86     },
+87   }));
+88 
+89   return (
+90     <SchoolDetailClient
+91       schoolId={school.id}
+92       schoolName={school.name}
+93       groupId={school.groupId}
+94       teachers={teachers}
+95       initialClasses={classes}
+96     />
+97   );
+98 }
+
+===== components/GroupDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import CreateSchoolModal from "./CreateSchoolModal";
+6 
+7 type School = {
+8   id: string;
+9   name: string;
+10   createdAt: string;
+11   _count: {
+12     classes: number;
+13   };
+14 };
+15 
+16 type Props = {
+17   groupId: string;
+18   groupName: string;
+19   initialSchools: School[];
+20 };
+21 
+22 export default function GroupDetailClient({
+23   groupId,
+24   groupName,
+25   initialSchools,
+26 }: Props) {
+27   const [schools, setSchools] = useState<School[]>(initialSchools);
+28   const [openModal, setOpenModal] = useState(false);
+29   const [loadingList, setLoadingList] = useState(false);
+30 
+31   async function refreshSchools() {
+32     setLoadingList(true);
+33     try {
+34       const res = await fetch(`/api/groups/${groupId}/schools`, {
+35         method: "GET",
+36         headers: { "Content-Type": "application/json" },
+37         cache: "no-store",
+38       });
+39 
+40       if (res.ok) {
+41         const data = (await res.json()) as School[];
+42         setSchools(
+43           data.map((school) => ({
+44             id: school.id,
+45             name: school.name,
+46             createdAt: school.createdAt,
+47             _count: {
+48               classes: school._count?.classes ?? 0,
+49             },
+50           }))
+51         );
+52       } else {
+53         console.error("Erro ao carregar escolas");
+54       }
+55     } catch (error) {
+56       console.error("Erro ao buscar escolas", error);
+57     } finally {
+58       setLoadingList(false);
+59     }
+60   }
+61 
+62   return (
+63     <main className="min-h-screen bg-slate-50 px-4 py-10">
+64       <div className="mx-auto w-full max-w-4xl">
+65         <div className="mb-6">
+66           <Link
+67             href="/dashboard"
+68             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+69           >
+70             ← Voltar para grupos
+71           </Link>
+72         </div>
+73 
+74         <div className="flex items-start justify-between gap-4">
+75           <div>
+76             <h1 className="text-2xl font-semibold text-slate-900">
+77               {groupName}
+78             </h1>
+79             <p className="mt-2 text-sm text-slate-500">
+80               Aqui você cadastra e organiza as escolas pertencentes a este grupo.
+81             </p>
+82           </div>
+83 
+84           <button
+85             type="button"
+86             onClick={() => setOpenModal(true)}
+87             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+88           >
+89             + Criar escola
+90           </button>
+91         </div>
+92 
+93         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+94           {loadingList && (
+95             <p className="mb-3 text-sm text-slate-500">Atualizando escolas…</p>
+96           )}
+97 
+98           {schools.length === 0 ? (
+99             <p className="text-sm text-slate-500">
+100               Nenhuma escola cadastrada ainda neste grupo. Clique em{" "}
+101               <span className="font-semibold">“Criar escola”</span> para começar.
+102             </p>
+103           ) : (
+104             <ul className="space-y-3">
+105               {schools.map((school) => (
+106                 <li key={school.id}>
+107                   <Link
+108                     href={`/schools/${school.id}`}
+109                     className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+110                   >
+111                     <div>
+112                       <p className="text-sm font-medium text-slate-900">
+113                         {school.name}
+114                       </p>
+115                       <p className="mt-1 text-xs text-slate-500">
+116                         {school._count.classes === 0
+117                           ? "Nenhuma turma cadastrada ainda"
+118                           : school._count.classes === 1
+119                           ? "1 turma cadastrada"
+120                           : `${school._count.classes} turmas cadastradas`}
+121                       </p>
+122                     </div>
+123 
+124                     <span className="text-sm font-medium text-sky-700">
+125                       Abrir
+126                     </span>
+127                   </Link>
+128                 </li>
+129               ))}
+130             </ul>
+131           )}
+132         </div>
+133 
+134         <CreateSchoolModal
+135           groupId={groupId}
+136           open={openModal}
+137           onClose={() => setOpenModal(false)}
+138           onCreated={refreshSchools}
+139         />
+140       </div>
+141     </main>
+142   );
+143 }
+
+===== components/SchoolDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import CreateClassModal from "./CreateClassModal";
+6 
+7 type TeacherOption = {
+8   id: string;
+9   name: string;
+10   email: string;
+11 };
+12 
+13 type ClassItem = {
+14   id: string;
+15   name: string;
+16   year: number | null;
+17   createdAt: string;
+18   teacher: {
+19     id: string;
+20     name: string;
+21     email: string;
+22   } | null;
+23   _count: {
+24     students: number;
+25   };
+26 };
+27 
+28 type Props = {
+29   schoolId: string;
+30   schoolName: string;
+31   groupId: string;
+32   teachers: TeacherOption[];
+33   initialClasses: ClassItem[];
+34 };
+35 
+36 export default function SchoolDetailClient({
+37   schoolId,
+38   schoolName,
+39   groupId,
+40   teachers,
+41   initialClasses,
+42 }: Props) {
+43   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
+44   const [openModal, setOpenModal] = useState(false);
+45   const [loadingList, setLoadingList] = useState(false);
+46 
+47   async function refreshClasses() {
+48     setLoadingList(true);
+49     try {
+50       const res = await fetch(`/api/schools/${schoolId}/classes`, {
+51         method: "GET",
+52         headers: { "Content-Type": "application/json" },
+53         cache: "no-store",
+54       });
+55 
+56       if (res.ok) {
+57         const data = (await res.json()) as ClassItem[];
+58         setClasses(
+59           data.map((item) => ({
+60             id: item.id,
+61             name: item.name,
+62             year: item.year ?? null,
+63             createdAt: item.createdAt,
+64             teacher: item.teacher
+65               ? {
+66                   id: item.teacher.id,
+67                   name: item.teacher.name,
+68                   email: item.teacher.email,
+69                 }
+70               : null,
+71             _count: {
+72               students: item._count?.students ?? 0,
+73             },
+74           }))
+75         );
+76       } else {
+77         console.error("Erro ao carregar turmas");
+78       }
+79     } catch (error) {
+80       console.error("Erro ao buscar turmas", error);
+81     } finally {
+82       setLoadingList(false);
+83     }
+84   }
+85 
+86   return (
+87     <main className="min-h-screen bg-slate-50 px-4 py-10">
+88       <div className="mx-auto w-full max-w-4xl">
+89         <div className="mb-6">
+90           <Link
+91             href={`/groups/${groupId}`}
+92             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+93           >
+94             ← Voltar para escolas
+95           </Link>
+96         </div>
+97 
+98         <div className="flex items-start justify-between gap-4">
+99           <div>
+100             <h1 className="text-2xl font-semibold text-slate-900">
+101               {schoolName}
+102             </h1>
+103             <p className="mt-2 text-sm text-slate-500">
+104               Aqui você cadastra e organiza as turmas pertencentes a esta escola.
+105             </p>
+106           </div>
+107 
+108           <button
+109             type="button"
+110             onClick={() => setOpenModal(true)}
+111             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+112           >
+113             + Criar turma
+114           </button>
+115         </div>
+116 
+117         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+118           {loadingList && (
+119             <p className="mb-3 text-sm text-slate-500">Atualizando turmas…</p>
+120           )}
+121 
+122           {classes.length === 0 ? (
+123             <p className="text-sm text-slate-500">
+124               Nenhuma turma cadastrada ainda nesta escola. Clique em{" "}
+125               <span className="font-semibold">“Criar turma”</span> para começar.
+126             </p>
+127           ) : (
+128             <ul className="space-y-3">
+129               {classes.map((item) => (
+130                 <li key={item.id}>
+131                   <Link
+132                     href={`/classes/${item.id}`}
+133                     className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+134                   >
+135                     <div>
+136                       <p className="text-sm font-medium text-slate-900">
+137                         {item.name}
+138                       </p>
+139                       <p className="mt-1 text-xs text-slate-500">
+140                         {item.year ? `Ano letivo ${item.year} • ` : ""}
+141                         {item._count.students === 0
+142                           ? "Nenhum aluno cadastrado ainda"
+143                           : item._count.students === 1
+144                           ? "1 aluno cadastrado"
+145                           : `${item._count.students} alunos cadastrados`}
+146                       </p>
+147                       <p className="mt-1 text-xs text-slate-500">
+148                         {item.teacher
+149                           ? `Professor: ${item.teacher.name}`
+150                           : "Professor não vinculado"}
+151                       </p>
+152                     </div>
+153 
+154                     <span className="text-sm font-medium text-sky-700">
+155                       Abrir
+156                     </span>
+157                   </Link>
+158                 </li>
+159               ))}
+160             </ul>
+161           )}
+162         </div>
+163 
+164         <CreateClassModal
+165           schoolId={schoolId}
+166           teachers={teachers}
+167           open={openModal}
+168           onClose={() => setOpenModal(false)}
+169           onCreated={refreshClasses}
+170         />
+171       </div>
+172     </main>
+173   );
+174 }
+
+===== components/CreateTeacherModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type CreatedTeacherResult = {
+6   teacher: {
+7     id: string;
+8     name: string;
+9     email: string;
+10     cpf: string | null;
+11     isTeacher: boolean;
+12     createdAt: string;
+13     _count: {
+14       classes: number;
+15     };
+16   };
+17   temporaryPassword: string;
+18 };
+19 
+20 type ErrorResponse = {
+21   error?: string;
+22 };
+23 
+24 type Props = {
+25   open: boolean;
+26   onClose: () => void;
+27   onCreated: () => void;
+28 };
+29 
+30 function formatCpf(value: string) {
+31   const digits = value.replace(/\D/g, "").slice(0, 11);
+32 
+33   return digits
+34     .replace(/^(\d{3})(\d)/, "$1.$2")
+35     .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+36     .replace(/\.(\d{3})(\d)/, ".$1-$2");
+37 }
+38 
+39 export default function CreateTeacherModal({
+40   open,
+41   onClose,
+42   onCreated,
+43 }: Props) {
+44   const [name, setName] = useState("");
+45   const [email, setEmail] = useState("");
+46   const [cpf, setCpf] = useState("");
+47   const [loading, setLoading] = useState(false);
+48   const [created, setCreated] = useState<CreatedTeacherResult | null>(null);
+49   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+50 
+51   if (!open) return null;
+52 
+53   async function handleSubmit(e: React.FormEvent) {
+54     e.preventDefault();
+55 
+56     if (!name.trim() || !email.trim() || !cpf.trim()) {
+57       setErrorMessage("Preencha nome completo, e-mail e CPF.");
+58       return;
+59     }
+60 
+61     setLoading(true);
+62     setErrorMessage(null);
+63 
+64     try {
+65       const res = await fetch("/api/teachers", {
+66         method: "POST",
+67         headers: { "Content-Type": "application/json" },
+68         body: JSON.stringify({ name, email, cpf }),
+69       });
+70 
+71       if (!res.ok) {
+72         const errorData = (await res.json()) as ErrorResponse;
+73         setErrorMessage(errorData.error ?? "Erro ao criar professor.");
+74         return;
+75       }
+76 
+77       const data = (await res.json()) as CreatedTeacherResult;
+78       setCreated(data);
+79       setName("");
+80       setEmail("");
+81       setCpf("");
+82       onCreated();
+83     } catch (error) {
+84       console.error("Erro ao criar professor", error);
+85       setErrorMessage("Erro ao criar professor.");
+86     } finally {
+87       setLoading(false);
+88     }
+89   }
+90 
+91   function handleClose() {
+92     setCreated(null);
+93     setName("");
+94     setEmail("");
+95     setCpf("");
+96     setErrorMessage(null);
+97     onClose();
+98   }
+99 
+100   return (
+101     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+102       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+103         {!created ? (
+104           <>
+105             <h2 className="text-lg font-semibold text-slate-900">
+106               Adicionar professor
+107             </h2>
+108             <p className="mt-2 text-sm text-slate-500">
+109               Cadastre o professor com nome completo, e-mail e CPF. A senha será
+110               gerada automaticamente com base nesses dados.
+111             </p>
+112 
+113             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+114               <div>
+115                 <label className="text-sm font-medium text-slate-700">
+116                   Nome completo
+117                 </label>
+118                 <input
+119                   type="text"
+120                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+121                   placeholder="Ex: Guilherme Cruz"
+122                   value={name}
+123                   onChange={(e) => setName(e.target.value)}
+124                 />
+125               </div>
+126 
+127               <div>
+128                 <label className="text-sm font-medium text-slate-700">
+129                   E-mail
+130                 </label>
+131                 <input
+132                   type="email"
+133                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+134                   placeholder="Ex: professor@email.com"
+135                   value={email}
+136                   onChange={(e) => setEmail(e.target.value)}
+137                 />
+138               </div>
+139 
+140               <div>
+141                 <label className="text-sm font-medium text-slate-700">
+142                   CPF
+143                 </label>
+144                 <input
+145                   type="text"
+146                   inputMode="numeric"
+147                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+148                   placeholder="Ex: 111.111.111-11"
+149                   value={cpf}
+150                   onChange={(e) => setCpf(formatCpf(e.target.value))}
+151                 />
+152               </div>
+153 
+154               {errorMessage && (
+155                 <p className="text-sm text-red-600">{errorMessage}</p>
+156               )}
+157 
+158               <div className="flex justify-end gap-2">
+159                 <button
+160                   type="button"
+161                   onClick={handleClose}
+162                   className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300"
+163                   disabled={loading}
+164                 >
+165                   Cancelar
+166                 </button>
+167 
+168                 <button
+169                   type="submit"
+170                   className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+171                   disabled={loading}
+172                 >
+173                   {loading ? "Cadastrando..." : "Cadastrar professor"}
+174                 </button>
+175               </div>
+176             </form>
+177           </>
+178         ) : (
+179           <>
+180             <h2 className="text-lg font-semibold text-slate-900">
+181               Professor cadastrado
+182             </h2>
+183             <p className="mt-2 text-sm text-slate-500">
+184               Guarde essas credenciais para repassar ao professor.
+185             </p>
+186 
+187             <div className="mt-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+188               <div>
+189                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+190                   Nome
+191                 </p>
+192                 <p className="mt-1 text-sm font-medium text-slate-900">
+193                   {created.teacher.name}
+194                 </p>
+195               </div>
+196 
+197               <div>
+198                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+199                   E-mail
+200                 </p>
+201                 <p className="mt-1 text-sm font-medium text-slate-900">
+202                   {created.teacher.email}
+203                 </p>
+204               </div>
+205 
+206               <div>
+207                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+208                   CPF
+209                 </p>
+210                 <p className="mt-1 text-sm font-medium text-slate-900">
+211                   {created.teacher.cpf}
+212                 </p>
+213               </div>
+214 
+215               <div>
+216                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+217                   Senha inicial
+218                 </p>
+219                 <p className="mt-1 text-sm font-medium text-slate-900">
+220                   {created.temporaryPassword}
+221                 </p>
+222               </div>
+223             </div>
+224 
+225             <div className="mt-6 flex justify-end">
+226               <button
+227                 type="button"
+228                 onClick={handleClose}
+229                 className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+230               >
+231                 Fechar
+232               </button>
+233             </div>
+234           </>
+235         )}
+236       </div>
+237     </div>
+238   );
+239 }
+
+===== components/CreateSchoolModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type Props = {
+6   groupId: string;
+7   open: boolean;
+8   onClose: () => void;
+9   onCreated: () => void;
+10 };
+11 
+12 export default function CreateSchoolModal({
+13   groupId,
+14   open,
+15   onClose,
+16   onCreated,
+17 }: Props) {
+18   const [name, setName] = useState("");
+19   const [loading, setLoading] = useState(false);
+20 
+21   if (!open) return null;
+22 
+23   async function handleSubmit(e: React.FormEvent) {
+24     e.preventDefault();
+25     if (!name.trim()) return;
+26 
+27     setLoading(true);
+28 
+29     try {
+30       const res = await fetch(`/api/groups/${groupId}/schools`, {
+31         method: "POST",
+32         headers: { "Content-Type": "application/json" },
+33         body: JSON.stringify({ name }),
+34       });
+35 
+36       if (res.ok) {
+37         setName("");
+38         onCreated();
+39         onClose();
+40       } else {
+41         console.error("Erro ao criar escola");
+42       }
+43     } catch (error) {
+44       console.error("Erro ao criar escola", error);
+45     } finally {
+46       setLoading(false);
+47     }
+48   }
+49 
+50   return (
+51     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+52       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+53         <h2 className="mb-4 text-lg font-semibold text-slate-900">
+54           Criar nova Escola
+55         </h2>
+56 
+57         <form onSubmit={handleSubmit} className="space-y-4">
+58           <div>
+59             <label className="text-sm font-medium text-slate-700">
+60               Nome da escola
+61             </label>
+62             <input
+63               type="text"
+64               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+65               placeholder="Ex: Escola Municipal Centro"
+66               value={name}
+67               onChange={(e) => setName(e.target.value)}
+68             />
+69           </div>
+70 
+71           <div className="flex justify-end gap-2">
+72             <button
+73               type="button"
+74               onClick={onClose}
+75               className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
+76               disabled={loading}
+77             >
+78               Cancelar
+79             </button>
+80 
+81             <button
+82               type="submit"
+83               disabled={loading}
+84               className="rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+85             >
+86               {loading ? "Criando..." : "Criar escola"}
+87             </button>
+88           </div>
+89         </form>
+90       </div>
+91     </div>
+92   );
+93 }
+
+===== app/api/auth/register/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { hashPassword, createSession } from "@/lib/auth";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 export async function POST(req: NextRequest) {
+10   const formData = await req.formData();
+11   const name = String(formData.get("name") ?? "").trim();
+12   const email = String(formData.get("email") ?? "").toLowerCase().trim();
+13   const cpf = normalizeCpf(String(formData.get("cpf") ?? "").trim());
+14   const password = String(formData.get("password") ?? "");
+15 
+16   if (!name || !email || !cpf || !password) {
+17     const url = new URL("/register?error=missing_fields", req.url);
+18     return NextResponse.redirect(url);
+19   }
+20 
+21   if (cpf.length !== 11) {
+22     const url = new URL("/register?error=invalid_cpf", req.url);
+23     return NextResponse.redirect(url);
+24   }
+25 
+26   const existingByEmail = await prisma.user.findUnique({
+27     where: { email },
+28   });
+29 
+30   if (existingByEmail) {
+31     const url = new URL("/register?error=email_in_use", req.url);
+32     return NextResponse.redirect(url);
+33   }
+34 
+35   const existingByCpf = await prisma.user.findFirst({
+36     where: { cpf },
+37   });
+38 
+39   if (existingByCpf) {
+40     const url = new URL("/register?error=cpf_in_use", req.url);
+41     return NextResponse.redirect(url);
+42   }
+43 
+44   const passwordHash = await hashPassword(password);
+45 
+46   const user = await prisma.user.create({
+47     data: {
+48       name,
+49       email,
+50       cpf,
+51       passwordHash,
+52     },
+53   });
+54 
+55   const redirectUrl = await createSession(user.id, req.url);
+56   return NextResponse.redirect(redirectUrl);
+57 }

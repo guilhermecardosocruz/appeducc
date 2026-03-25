@@ -1,0 +1,678 @@
+
+===== app/(app)/dashboard/page.tsx =====
+1 import { getSessionUser } from "@/lib/auth";
+2 import { prisma } from "@/lib/prisma";
+3 import GroupsDashboardClient from "@/components/GroupsDashboardClient";
+4 
+5 export default async function DashboardPage() {
+6   const user = await getSessionUser();
+7 
+8   if (!user) {
+9     return (
+10       <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+11         <div className="max-w-xl text-center">
+12           <h1 className="text-2xl font-semibold text-slate-900">
+13             Você precisa estar autenticado para acessar o painel.
+14           </h1>
+15           <p className="mt-3 text-sm text-slate-500">
+16             Faça login para organizar seus grupos de escolas, escolas, turmas e
+17             demais estruturas educativas.
+18           </p>
+19         </div>
+20       </main>
+21     );
+22   }
+23 
+24   const groupsRaw = await prisma.group.findMany({
+25     where: {
+26       members: {
+27         some: {
+28           userId: user.id,
+29         },
+30       },
+31     },
+32     include: {
+33       _count: { select: { schools: true } },
+34     },
+35     orderBy: { createdAt: "desc" },
+36   });
+37 
+38   const teachersRaw = await prisma.user.findMany({
+39     where: {
+40       createdById: user.id,
+41       isTeacher: true,
+42     },
+43     include: {
+44       _count: {
+45         select: {
+46           classes: true,
+47         },
+48       },
+49     },
+50     orderBy: { createdAt: "desc" },
+51   });
+52 
+53   const groups = groupsRaw.map((g) => ({
+54     id: g.id,
+55     name: g.name,
+56     createdAt: g.createdAt.toISOString(),
+57     _count: { schools: g._count.schools },
+58   }));
+59 
+60   const teachers = teachersRaw.map((teacher) => ({
+61     id: teacher.id,
+62     name: teacher.name,
+63     email: teacher.email,
+64     isTeacher: teacher.isTeacher,
+65     createdAt: teacher.createdAt.toISOString(),
+66     _count: {
+67       classes: teacher._count.classes,
+68     },
+69   }));
+70 
+71   return (
+72     <main className="min-h-screen bg-slate-50 px-4 py-10">
+73       <div className="mx-auto w-full max-w-4xl">
+74         <h1 className="text-2xl font-semibold text-slate-900">
+75           Organização das escolas
+76         </h1>
+77         <p className="mt-2 max-w-2xl text-sm text-slate-500">
+78           Aqui você gerencia sua estrutura educacional em níveis:{" "}
+79           <span className="font-medium">
+80             Grupos de escolas → Escolas → Turmas → Professores e Alunos
+81           </span>
+82           .
+83         </p>
+84 
+85         <GroupsDashboardClient
+86           initialGroups={groups}
+87           initialTeachers={teachers}
+88           userName={user.name}
+89           userEmail={user.email}
+90         />
+91       </div>
+92     </main>
+93   );
+94 }
+
+===== app/(app)/classes/[classId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 import ClassDetailClient from "@/components/ClassDetailClient";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23     },
+24   });
+25 
+26   if (!foundClass) {
+27     notFound();
+28   }
+29 
+30   const membership = await prisma.schoolMember.findUnique({
+31     where: {
+32       userId_schoolId: {
+33         userId: user.id,
+34         schoolId: foundClass.schoolId,
+35       },
+36     },
+37   });
+38 
+39   if (!membership) {
+40     notFound();
+41   }
+42 
+43   return (
+44     <ClassDetailClient
+45       classId={foundClass.id}
+46       className={foundClass.name}
+47       schoolId={foundClass.schoolId}
+48     />
+49   );
+50 }
+
+===== components/ClassDetailClient.tsx =====
+1 import Link from "next/link";
+2 
+3 type Props = {
+4   classId: string;
+5   className: string;
+6   schoolId: string;
+7 };
+8 
+9 const actions = [
+10   {
+11     title: "Alunos",
+12     href: (classId: string) => `/classes/${classId}/students`,
+13     primary: false,
+14   },
+15   {
+16     title: "Ir para Chamadas",
+17     href: (classId: string) => `/classes/${classId}/chamadas`,
+18     primary: true,
+19   },
+20   {
+21     title: "Ir para Conteúdos",
+22     href: (classId: string) => `/classes/${classId}/conteudos`,
+23     primary: false,
+24   },
+25   {
+26     title: "Relatório Chamadas",
+27     href: (classId: string) => `/classes/${classId}/relatorio-chamadas`,
+28     primary: false,
+29   },
+30   {
+31     title: "Conteúdos em PDF",
+32     href: (classId: string) => `/classes/${classId}/conteudos-pdf`,
+33     primary: false,
+34   },
+35   {
+36     title: "Ajuda com IA",
+37     href: (classId: string) => `/classes/${classId}/ai-help`,
+38     primary: false,
+39   },
+40 ];
+41 
+42 export default function ClassDetailClient({
+43   classId,
+44   className,
+45   schoolId,
+46 }: Props) {
+47   return (
+48     <main className="min-h-screen bg-slate-50 px-4 py-10">
+49       <div className="mx-auto w-full max-w-4xl">
+50         <div className="mb-6">
+51           <Link
+52             href={`/schools/${schoolId}`}
+53             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+54           >
+55             ← Voltar para turmas
+56           </Link>
+57         </div>
+58 
+59         <div>
+60           <h1 className="text-2xl font-semibold text-slate-900">{className}</h1>
+61           <p className="mt-2 text-sm text-slate-500">
+62             Gerencie a turma acessando alunos, chamadas, conteúdos, relatórios e
+63             ações de apoio.
+64           </p>
+65         </div>
+66 
+67         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+68           <h2 className="text-lg font-semibold text-slate-900">Ações</h2>
+69           <p className="mt-2 text-sm text-slate-500">
+70             Use os atalhos abaixo para gerenciar a turma.
+71           </p>
+72 
+73           <div className="mt-6 space-y-3">
+74             {actions.map((action) => (
+75               <Link
+76                 key={action.title}
+77                 href={action.href(classId)}
+78                 className={[
+79                   "block rounded-md border px-4 py-4 text-center text-base font-medium transition focus:outline-none focus:ring-2 focus:ring-sky-500",
+80                   action.primary
+81                     ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700"
+82                     : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
+83                 ].join(" ")}
+84               >
+85                 {action.title}
+86               </Link>
+87             ))}
+88           </div>
+89         </div>
+90       </div>
+91     </main>
+92   );
+93 }
+
+===== app/api/account/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser, hashPassword, verifyPassword } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 export async function GET() {
+10   const user = await getSessionUser();
+11 
+12   if (!user) {
+13     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+14   }
+15 
+16   return NextResponse.json({
+17     id: user.id,
+18     name: user.name,
+19     email: user.email,
+20     cpf: user.cpf ?? "",
+21     isTeacher: user.isTeacher,
+22   });
+23 }
+24 
+25 export async function PATCH(req: NextRequest) {
+26   const user = await getSessionUser();
+27 
+28   if (!user) {
+29     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+30   }
+31 
+32   const data = await req.json();
+33 
+34   const name = String(data.name ?? "").trim();
+35   const email = String(data.email ?? "").toLowerCase().trim();
+36   const cpf = normalizeCpf(String(data.cpf ?? "").trim());
+37   const currentPassword = String(data.currentPassword ?? "");
+38   const newPassword = String(data.newPassword ?? "");
+39   const confirmNewPassword = String(data.confirmNewPassword ?? "");
+40 
+41   if (!name || !email || !cpf) {
+42     return NextResponse.json(
+43       { error: "Nome, e-mail e CPF são obrigatórios." },
+44       { status: 400 }
+45     );
+46   }
+47 
+48   if (cpf.length !== 11) {
+49     return NextResponse.json(
+50       { error: "CPF deve conter 11 dígitos." },
+51       { status: 400 }
+52     );
+53   }
+54 
+55   const existingByEmail = await prisma.user.findFirst({
+56     where: {
+57       email,
+58       NOT: { id: user.id },
+59     },
+60   });
+61 
+62   if (existingByEmail) {
+63     return NextResponse.json(
+64       { error: "Este e-mail já está em uso." },
+65       { status: 409 }
+66     );
+67   }
+68 
+69   const existingByCpf = await prisma.user.findFirst({
+70     where: {
+71       cpf,
+72       NOT: { id: user.id },
+73     },
+74   });
+75 
+76   if (existingByCpf) {
+77     return NextResponse.json(
+78       { error: "Este CPF já está em uso." },
+79       { status: 409 }
+80     );
+81   }
+82 
+83   const wantsPasswordChange =
+84     currentPassword.length > 0 ||
+85     newPassword.length > 0 ||
+86     confirmNewPassword.length > 0;
+87 
+88   let passwordHash: string | undefined;
+89 
+90   if (wantsPasswordChange) {
+91     if (!currentPassword || !newPassword || !confirmNewPassword) {
+92       return NextResponse.json(
+93         {
+94           error:
+95             "Para trocar a senha, preencha senha antiga, senha nova e repetir senha nova.",
+96         },
+97         { status: 400 }
+98       );
+99     }
+100 
+101     const dbUser = await prisma.user.findUnique({
+102       where: { id: user.id },
+103     });
+104 
+105     if (!dbUser) {
+106       return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+107     }
+108 
+109     const oldPasswordMatches = await verifyPassword(
+110       currentPassword,
+111       dbUser.passwordHash
+112     );
+113 
+114     if (!oldPasswordMatches) {
+115       return NextResponse.json(
+116         { error: "A senha antiga está incorreta." },
+117         { status: 400 }
+118       );
+119     }
+120 
+121     if (newPassword !== confirmNewPassword) {
+122       return NextResponse.json(
+123         { error: "A nova senha e a confirmação não conferem." },
+124         { status: 400 }
+125       );
+126     }
+127 
+128     if (newPassword.length < 6) {
+129       return NextResponse.json(
+130         { error: "A nova senha deve ter pelo menos 6 caracteres." },
+131         { status: 400 }
+132       );
+133     }
+134 
+135     passwordHash = await hashPassword(newPassword);
+136   }
+137 
+138   const updated = await prisma.user.update({
+139     where: { id: user.id },
+140     data: {
+141       name,
+142       email,
+143       cpf,
+144       ...(passwordHash ? { passwordHash } : {}),
+145     },
+146   });
+147 
+148   return NextResponse.json({
+149     user: {
+150       id: updated.id,
+151       name: updated.name,
+152       email: updated.email,
+153       cpf: updated.cpf ?? "",
+154       isTeacher: updated.isTeacher,
+155     },
+156     passwordChanged: Boolean(passwordHash),
+157   });
+158 }
+
+===== app/api/teachers/[teacherId]/classes/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function getTeacherOwnedByUser(userId: string, teacherId: string) {
+6   return prisma.user.findFirst({
+7     where: {
+8       id: teacherId,
+9       createdById: userId,
+10       isTeacher: true,
+11     },
+12   });
+13 }
+14 
+15 async function getTeacherClassesPayload(userId: string, teacherId: string) {
+16   const linkedClassesRaw = await prisma.class.findMany({
+17     where: {
+18       teacherId,
+19     },
+20     include: {
+21       school: {
+22         include: {
+23           group: true,
+24         },
+25       },
+26     },
+27     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+28   });
+29 
+30   const availableClassesRaw = await prisma.class.findMany({
+31     where: {
+32       teacherId: null,
+33       school: {
+34         members: {
+35           some: {
+36             userId,
+37           },
+38         },
+39       },
+40     },
+41     include: {
+42       school: {
+43         include: {
+44           group: true,
+45         },
+46       },
+47     },
+48     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+49   });
+50 
+51   return {
+52     linkedClasses: linkedClassesRaw.map((item) => ({
+53       id: item.id,
+54       name: item.name,
+55       year: item.year,
+56       school: {
+57         id: item.school.id,
+58         name: item.school.name,
+59         group: {
+60           id: item.school.group.id,
+61           name: item.school.group.name,
+62         },
+63       },
+64     })),
+65     availableClasses: availableClassesRaw.map((item) => ({
+66       id: item.id,
+67       name: item.name,
+68       year: item.year,
+69       school: {
+70         id: item.school.id,
+71         name: item.school.name,
+72         group: {
+73           id: item.school.group.id,
+74           name: item.school.group.name,
+75         },
+76       },
+77     })),
+78   };
+79 }
+80 
+81 export async function POST(
+82   req: NextRequest,
+83   { params }: { params: Promise<{ teacherId: string }> }
+84 ) {
+85   const user = await getSessionUser();
+86 
+87   if (!user) {
+88     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+89   }
+90 
+91   const { teacherId } = await params;
+92   const teacher = await getTeacherOwnedByUser(user.id, teacherId);
+93 
+94   if (!teacher) {
+95     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+96   }
+97 
+98   const data = await req.json();
+99   const classId = String(data.classId ?? "").trim();
+100 
+101   if (!classId) {
+102     return NextResponse.json({ error: "Missing classId" }, { status: 400 });
+103   }
+104 
+105   const targetClass = await prisma.class.findFirst({
+106     where: {
+107       id: classId,
+108       school: {
+109         members: {
+110           some: {
+111             userId: user.id,
+112           },
+113         },
+114       },
+115     },
+116     include: {
+117       school: {
+118         include: {
+119           group: true,
+120         },
+121       },
+122     },
+123   });
+124 
+125   if (!targetClass) {
+126     return NextResponse.json({ error: "Class not found" }, { status: 404 });
+127   }
+128 
+129   await prisma.$transaction(async (tx) => {
+130     await tx.class.update({
+131       where: { id: classId },
+132       data: {
+133         teacherId: teacher.id,
+134       },
+135     });
+136 
+137     await tx.schoolMember.upsert({
+138       where: {
+139         userId_schoolId: {
+140           userId: teacher.id,
+141           schoolId: targetClass.schoolId,
+142         },
+143       },
+144       update: {
+145         role: "TEACHER",
+146       },
+147       create: {
+148         userId: teacher.id,
+149         schoolId: targetClass.schoolId,
+150         role: "TEACHER",
+151       },
+152     });
+153 
+154     await tx.groupMember.upsert({
+155       where: {
+156         userId_groupId: {
+157           userId: teacher.id,
+158           groupId: targetClass.school.groupId,
+159         },
+160       },
+161       update: {
+162         role: "VIEWER",
+163       },
+164       create: {
+165         userId: teacher.id,
+166         groupId: targetClass.school.groupId,
+167         role: "VIEWER",
+168       },
+169     });
+170   });
+171 
+172   const payload = await getTeacherClassesPayload(user.id, teacher.id);
+173   return NextResponse.json(payload);
+174 }
+175 
+176 export async function DELETE(
+177   req: NextRequest,
+178   { params }: { params: Promise<{ teacherId: string }> }
+179 ) {
+180   const user = await getSessionUser();
+181 
+182   if (!user) {
+183     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+184   }
+185 
+186   const { teacherId } = await params;
+187   const teacher = await getTeacherOwnedByUser(user.id, teacherId);
+188 
+189   if (!teacher) {
+190     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+191   }
+192 
+193   const data = await req.json();
+194   const classId = String(data.classId ?? "").trim();
+195 
+196   if (!classId) {
+197     return NextResponse.json({ error: "Missing classId" }, { status: 400 });
+198   }
+199 
+200   const targetClass = await prisma.class.findFirst({
+201     where: {
+202       id: classId,
+203       teacherId: teacher.id,
+204     },
+205     include: {
+206       school: {
+207         include: {
+208           group: true,
+209           classes: {
+210             where: {
+211               teacherId: teacher.id,
+212             },
+213             select: {
+214               id: true,
+215             },
+216           },
+217         },
+218       },
+219     },
+220   });
+221 
+222   if (!targetClass) {
+223     return NextResponse.json({ error: "Class not found" }, { status: 404 });
+224   }
+225 
+226   await prisma.$transaction(async (tx) => {
+227     await tx.class.update({
+228       where: { id: classId },
+229       data: {
+230         teacherId: null,
+231       },
+232     });
+233 
+234     const remainingTeacherClassesInSchool = await tx.class.count({
+235       where: {
+236         teacherId: teacher.id,
+237         schoolId: targetClass.schoolId,
+238       },
+239     });
+240 
+241     if (remainingTeacherClassesInSchool === 0) {
+242       await tx.schoolMember.deleteMany({
+243         where: {
+244           userId: teacher.id,
+245           schoolId: targetClass.schoolId,
+246           role: "TEACHER",
+247         },
+248       });
+249     }
+250 
+251     const remainingTeacherClassesInGroup = await tx.class.count({
+252       where: {
+253         teacherId: teacher.id,
+254         school: {
+255           groupId: targetClass.school.groupId,
+256         },
+257       },
+258     });
+259 
+260     if (remainingTeacherClassesInGroup === 0) {
+261       await tx.groupMember.deleteMany({
+262         where: {
+263           userId: teacher.id,
+264           groupId: targetClass.school.groupId,
+265           role: "VIEWER",
+266         },
+267       });
+268     }
+269   });
+270 
+271   const payload = await getTeacherClassesPayload(user.id, teacher.id);
+272   return NextResponse.json(payload);
+273 }

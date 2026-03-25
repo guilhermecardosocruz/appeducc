@@ -1,0 +1,698 @@
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 model User {
+11   id              String         @id @default(cuid())
+12   name            String
+13   email           String         @unique
+14   cpf             String?        @unique
+15   passwordHash    String
+16   isTeacher       Boolean        @default(false)
+17   createdById     String?
+18   createdAt       DateTime       @default(now())
+19   updatedAt       DateTime       @updatedAt
+20 
+21   createdBy       User?          @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+22   createdUsers    User[]         @relation("CreatedUsers")
+23   sessions        Session[]
+24   groupMembers    GroupMember[]
+25   schoolMembers   SchoolMember[]
+26   classes         Class[]        @relation("ClassTeacher")
+27 
+28   deletedStudents Student[]      @relation("DeletedByUser")
+29 }
+30 
+31 model Session {
+32   id        String   @id @default(cuid())
+33   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+34   userId    String
+35   createdAt DateTime @default(now())
+36   expiresAt DateTime
+37 
+38   @@index([userId])
+39 }
+40 
+41 model Group {
+42   id        String        @id @default(cuid())
+43   name      String
+44   createdAt DateTime      @default(now())
+45   updatedAt DateTime      @updatedAt
+46 
+47   members   GroupMember[]
+48   schools   School[]
+49 }
+50 
+51 model GroupMember {
+52   id               String   @id @default(cuid())
+53   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+54   userId           String
+55   group            Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+56   groupId          String
+57 
+58   role             String
+59   canManageSchools Boolean  @default(false)
+60   createdAt        DateTime @default(now())
+61 
+62   @@unique([userId, groupId])
+63 }
+64 
+65 model School {
+66   id        String         @id @default(cuid())
+67   name      String
+68   createdAt DateTime       @default(now())
+69   updatedAt DateTime       @updatedAt
+70 
+71   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+72   groupId   String
+73 
+74   members   SchoolMember[]
+75   classes   Class[]
+76 }
+77 
+78 model SchoolMember {
+79   id        String   @id @default(cuid())
+80   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+81   userId    String
+82   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+83   schoolId  String
+84 
+85   role      String
+86   createdAt DateTime @default(now())
+87 
+88   @@unique([userId, schoolId])
+89 }
+90 
+91 model Class {
+92   id          String              @id @default(cuid())
+93   name        String
+94   year        Int?
+95   createdAt   DateTime            @default(now())
+96   updatedAt   DateTime            @updatedAt
+97 
+98   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+99   schoolId    String
+100 
+101   teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+102   teacherId   String?
+103 
+104   students    Student[]
+105   attendances Attendance[]
+106 }
+107 
+108 model Student {
+109   id            String               @id @default(cuid())
+110   name          String
+111   status        String               @default("ACTIVE")
+112   createdAt     DateTime             @default(now())
+113   updatedAt     DateTime             @updatedAt
+114 
+115   class         Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+116   classId       String
+117 
+118   presences     AttendancePresence[]
+119 
+120   deletedAt     DateTime?
+121   deletedReason String?
+122   deletedById   String?
+123   deletedBy     User?                @relation("DeletedByUser", fields: [deletedById], references: [id])
+124 }
+125 
+126 model Attendance {
+127   id         String               @id @default(cuid())
+128   title      String
+129   lessonDate DateTime
+130   createdAt  DateTime             @default(now())
+131   updatedAt  DateTime             @updatedAt
+132 
+133   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+134   classId    String
+135 
+136   presences  AttendancePresence[]
+137 }
+138 
+139 model AttendancePresence {
+140   id           String      @id @default(cuid())
+141   present      Boolean     @default(false)
+142   createdAt    DateTime    @default(now())
+143   updatedAt    DateTime    @updatedAt
+144 
+145   attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+146   attendanceId String
+147 
+148   student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+149   studentId    String
+150 
+151   @@unique([attendanceId, studentId])
+152 }
+
+===== app/api/groups/[groupId]/schools/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function isGroupManagerRole(role: string | null | undefined) {
+6   const normalized = String(role ?? "").trim().toUpperCase();
+7   return normalized === "OWNER" || normalized === "MANAGER";
+8 }
+9 
+10 async function getGroupAccess(userId: string, groupId: string) {
+11   const [groupMembership, schoolMemberships] = await Promise.all([
+12     prisma.groupMember.findUnique({
+13       where: {
+14         userId_groupId: {
+15           userId,
+16           groupId,
+17         },
+18       },
+19     }),
+20     prisma.schoolMember.findMany({
+21       where: {
+22         userId,
+23         school: {
+24           groupId,
+25         },
+26       },
+27       select: {
+28         schoolId: true,
+29         role: true,
+30       },
+31     }),
+32   ]);
+33 
+34   const hasAccess = Boolean(groupMembership) || schoolMemberships.length > 0;
+35   const canManage = Boolean(
+36     groupMembership && isGroupManagerRole(groupMembership.role)
+37   );
+38 
+39   return {
+40     groupMembership,
+41     schoolMemberships,
+42     hasAccess,
+43     canManage,
+44   };
+45 }
+46 
+47 export async function GET(
+48   _req: NextRequest,
+49   { params }: { params: Promise<{ groupId: string }> }
+50 ) {
+51   const user = await getSessionUser();
+52   if (!user) {
+53     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+54   }
+55 
+56   const { groupId } = await params;
+57   const access = await getGroupAccess(user.id, groupId);
+58 
+59   if (!access.hasAccess) {
+60     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+61   }
+62 
+63   const schoolIds = access.groupMembership
+64     ? undefined
+65     : access.schoolMemberships.map((item) => item.schoolId);
+66 
+67   const schools = await prisma.school.findMany({
+68     where: {
+69       groupId,
+70       ...(schoolIds ? { id: { in: schoolIds } } : {}),
+71     },
+72     include: {
+73       _count: {
+74         select: { classes: true },
+75       },
+76     },
+77     orderBy: { name: "asc" },
+78   });
+79 
+80   return NextResponse.json(schools);
+81 }
+82 
+83 export async function POST(
+84   req: NextRequest,
+85   { params }: { params: Promise<{ groupId: string }> }
+86 ) {
+87   const user = await getSessionUser();
+88   if (!user) {
+89     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+90   }
+91 
+92   const { groupId } = await params;
+93   const access = await getGroupAccess(user.id, groupId);
+94 
+95   if (!access.canManage) {
+96     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+97   }
+98 
+99   const data = await req.json();
+100   const name = String(data.name ?? "").trim();
+101 
+102   if (!name) {
+103     return NextResponse.json({ error: "Missing school name" }, { status: 400 });
+104   }
+105 
+106   const school = await prisma.school.create({
+107     data: {
+108       name,
+109       groupId,
+110       members: {
+111         create: {
+112           userId: user.id,
+113           role: "DIRECTOR",
+114         },
+115       },
+116     },
+117     include: {
+118       _count: {
+119         select: { classes: true },
+120       },
+121     },
+122   });
+123 
+124   return NextResponse.json(school, { status: 201 });
+125 }
+
+===== components/CreateSchoolModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type Props = {
+6   groupId: string;
+7   open: boolean;
+8   onClose: () => void;
+9   onCreated: () => void;
+10 };
+11 
+12 export default function CreateSchoolModal({
+13   groupId,
+14   open,
+15   onClose,
+16   onCreated,
+17 }: Props) {
+18   const [name, setName] = useState("");
+19   const [loading, setLoading] = useState(false);
+20 
+21   if (!open) return null;
+22 
+23   async function handleSubmit(e: React.FormEvent) {
+24     e.preventDefault();
+25     if (!name.trim()) return;
+26 
+27     setLoading(true);
+28 
+29     try {
+30       const res = await fetch(`/api/groups/${groupId}/schools`, {
+31         method: "POST",
+32         headers: { "Content-Type": "application/json" },
+33         body: JSON.stringify({ name }),
+34       });
+35 
+36       if (res.ok) {
+37         setName("");
+38         onCreated();
+39         onClose();
+40       } else {
+41         console.error("Erro ao criar escola");
+42       }
+43     } catch (error) {
+44       console.error("Erro ao criar escola", error);
+45     } finally {
+46       setLoading(false);
+47     }
+48   }
+49 
+50   return (
+51     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+52       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+53         <h2 className="mb-4 text-lg font-semibold text-slate-900">
+54           Criar nova Escola
+55         </h2>
+56 
+57         <form onSubmit={handleSubmit} className="space-y-4">
+58           <div>
+59             <label className="text-sm font-medium text-slate-700">
+60               Nome da escola
+61             </label>
+62             <input
+63               type="text"
+64               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+65               placeholder="Ex: Escola Municipal Centro"
+66               value={name}
+67               onChange={(e) => setName(e.target.value)}
+68             />
+69           </div>
+70 
+71           <div className="flex justify-end gap-2">
+72             <button
+73               type="button"
+74               onClick={onClose}
+75               className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
+76               disabled={loading}
+77             >
+78               Cancelar
+79             </button>
+80 
+81             <button
+82               type="submit"
+83               disabled={loading}
+84               className="rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+85             >
+86               {loading ? "Criando..." : "Criar escola"}
+87             </button>
+88           </div>
+89         </form>
+90       </div>
+91     </div>
+92   );
+93 }
+
+===== components/SchoolDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import CreateClassModal from "./CreateClassModal";
+6 
+7 type TeacherOption = {
+8   id: string;
+9   name: string;
+10   email: string;
+11 };
+12 
+13 type ClassItem = {
+14   id: string;
+15   name: string;
+16   year: number | null;
+17   createdAt: string;
+18   teacher: {
+19     id: string;
+20     name: string;
+21     email: string;
+22   } | null;
+23   _count: {
+24     students: number;
+25   };
+26 };
+27 
+28 type Props = {
+29   schoolId: string;
+30   schoolName: string;
+31   groupId: string;
+32   teachers: TeacherOption[];
+33   initialClasses: ClassItem[];
+34   canManageSchool: boolean;
+35 };
+36 
+37 export default function SchoolDetailClient({
+38   schoolId,
+39   schoolName,
+40   groupId,
+41   teachers,
+42   initialClasses,
+43   canManageSchool,
+44 }: Props) {
+45   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
+46   const [openModal, setOpenModal] = useState(false);
+47   const [loadingList, setLoadingList] = useState(false);
+48 
+49   async function refreshClasses() {
+50     setLoadingList(true);
+51     try {
+52       const res = await fetch(`/api/schools/${schoolId}/classes`, {
+53         method: "GET",
+54         headers: { "Content-Type": "application/json" },
+55         cache: "no-store",
+56       });
+57 
+58       if (res.ok) {
+59         const data = (await res.json()) as ClassItem[];
+60         setClasses(
+61           data.map((item) => ({
+62             id: item.id,
+63             name: item.name,
+64             year: item.year ?? null,
+65             createdAt: item.createdAt,
+66             teacher: item.teacher
+67               ? {
+68                   id: item.teacher.id,
+69                   name: item.teacher.name,
+70                   email: item.teacher.email,
+71                 }
+72               : null,
+73             _count: {
+74               students: item._count?.students ?? 0,
+75             },
+76           }))
+77         );
+78       } else {
+79         console.error("Erro ao carregar turmas");
+80       }
+81     } catch (error) {
+82       console.error("Erro ao buscar turmas", error);
+83     } finally {
+84       setLoadingList(false);
+85     }
+86   }
+87 
+88   return (
+89     <main className="min-h-screen bg-slate-50 px-4 py-10">
+90       <div className="mx-auto w-full max-w-4xl">
+91         <div className="mb-6">
+92           <Link
+93             href={`/groups/${groupId}`}
+94             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+95           >
+96             ← Voltar para escolas
+97           </Link>
+98         </div>
+99 
+100         <div className="flex items-start justify-between gap-4">
+101           <div>
+102             <h1 className="text-2xl font-semibold text-slate-900">
+103               {schoolName}
+104             </h1>
+105             <p className="mt-2 text-sm text-slate-500">
+106               Aqui você cadastra e organiza as turmas pertencentes a esta escola.
+107             </p>
+108           </div>
+109 
+110           {canManageSchool ? (
+111             <button
+112               type="button"
+113               onClick={() => setOpenModal(true)}
+114               className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+115             >
+116               + Criar turma
+117             </button>
+118           ) : null}
+119         </div>
+120 
+121         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+122           {loadingList && (
+123             <p className="mb-3 text-sm text-slate-500">Atualizando turmas…</p>
+124           )}
+125 
+126           {classes.length === 0 ? (
+127             <p className="text-sm text-slate-500">
+128               Nenhuma turma cadastrada ainda nesta escola.
+129             </p>
+130           ) : (
+131             <ul className="space-y-3">
+132               {classes.map((item) => (
+133                 <li key={item.id}>
+134                   <Link
+135                     href={`/classes/${item.id}`}
+136                     className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+137                   >
+138                     <div>
+139                       <p className="text-sm font-medium text-slate-900">
+140                         {item.name}
+141                       </p>
+142                       <p className="mt-1 text-xs text-slate-500">
+143                         {item.year ? `Ano letivo ${item.year} • ` : ""}
+144                         {item._count.students === 0
+145                           ? "Nenhum aluno cadastrado ainda"
+146                           : item._count.students === 1
+147                           ? "1 aluno cadastrado"
+148                           : `${item._count.students} alunos cadastrados`}
+149                       </p>
+150                       <p className="mt-1 text-xs text-slate-500">
+151                         {item.teacher
+152                           ? `Professor: ${item.teacher.name}`
+153                           : "Professor não vinculado"}
+154                       </p>
+155                     </div>
+156 
+157                     <span className="text-sm font-medium text-sky-700">
+158                       Abrir
+159                     </span>
+160                   </Link>
+161                 </li>
+162               ))}
+163             </ul>
+164           )}
+165         </div>
+166 
+167         {canManageSchool ? (
+168           <CreateClassModal
+169             schoolId={schoolId}
+170             teachers={teachers}
+171             open={openModal}
+172             onClose={() => setOpenModal(false)}
+173             onCreated={refreshClasses}
+174           />
+175         ) : null}
+176       </div>
+177     </main>
+178   );
+179 }
+
+===== app/(app)/schools/[schoolId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 import SchoolDetailClient from "@/components/SchoolDetailClient";
+5 
+6 type PageProps = {
+7   params: Promise<{ schoolId: string }>;
+8 };
+9 
+10 function canManageGroupRole(role: string | null | undefined) {
+11   const normalized = String(role ?? "").trim().toUpperCase();
+12   return normalized === "OWNER" || normalized === "MANAGER";
+13 }
+14 
+15 export default async function SchoolPage({ params }: PageProps) {
+16   const user = await getSessionUser();
+17 
+18   if (!user) {
+19     notFound();
+20   }
+21 
+22   const { schoolId } = await params;
+23 
+24   const school = await prisma.school.findUnique({
+25     where: { id: schoolId },
+26     include: {
+27       group: true,
+28       classes: {
+29         include: {
+30           teacher: {
+31             select: {
+32               id: true,
+33               name: true,
+34               email: true,
+35             },
+36           },
+37           _count: {
+38             select: { students: true },
+39           },
+40         },
+41         orderBy: { name: "asc" },
+42       },
+43     },
+44   });
+45 
+46   if (!school) {
+47     notFound();
+48   }
+49 
+50   const [schoolMembership, groupMembership] = await Promise.all([
+51     prisma.schoolMember.findUnique({
+52       where: {
+53         userId_schoolId: {
+54           userId: user.id,
+55           schoolId,
+56         },
+57       },
+58     }),
+59     prisma.groupMember.findUnique({
+60       where: {
+61         userId_groupId: {
+62           userId: user.id,
+63           groupId: school.groupId,
+64         },
+65       },
+66     }),
+67   ]);
+68 
+69   const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+70 
+71   if (!hasAccess) {
+72     notFound();
+73   }
+74 
+75   const canManageSchool =
+76     Boolean(schoolMembership) ||
+77     Boolean(groupMembership && canManageGroupRole(groupMembership.role));
+78 
+79   const teachersRaw = await prisma.user.findMany({
+80     where: {
+81       OR: [
+82         {
+83           createdById: user.id,
+84           isTeacher: true,
+85         },
+86         {
+87           schoolMembers: {
+88             some: {
+89               schoolId,
+90               role: "TEACHER",
+91             },
+92           },
+93         },
+94       ],
+95     },
+96     orderBy: { name: "asc" },
+97   });
+98 
+99   const teacherMap = new Map(
+100     teachersRaw.map((teacher) => [
+101       teacher.id,
+102       {
+103         id: teacher.id,
+104         name: teacher.name,
+105         email: teacher.email,
+106       },
+107     ])
+108   );
+109 
+110   const teachers = Array.from(teacherMap.values());
+111 
+112   const classes = school.classes.map((item) => ({
+113     id: item.id,
+114     name: item.name,
+115     year: item.year,
+116     createdAt: item.createdAt.toISOString(),
+117     teacher: item.teacher
+118       ? {
+119           id: item.teacher.id,
+120           name: item.teacher.name,
+121           email: item.teacher.email,
+122         }
+123       : null,
+124     _count: {
+125       students: item._count.students,
+126     },
+127   }));
+128 
+129   return (
+130     <SchoolDetailClient
+131       schoolId={school.id}
+132       schoolName={school.name}
+133       groupId={school.groupId}
+134       teachers={teachers}
+135       initialClasses={classes}
+136       canManageSchool={canManageSchool}
+137     />
+138   );
+139 }

@@ -1,0 +1,933 @@
+
+===== app/(app)/classes/[classId]/students/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import StudentsManagerClient from "@/components/StudentsManagerClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ classId: string }>;
+8 };
+9 
+10 export default async function ClassStudentsPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { classId } = await params;
+18 
+19   const foundClass = await prisma.class.findUnique({
+20     where: { id: classId },
+21     include: {
+22       school: true,
+23       students: {
+24         orderBy: { name: "asc" },
+25       },
+26     },
+27   });
+28 
+29   if (!foundClass) {
+30     notFound();
+31   }
+32 
+33   const membership = await prisma.schoolMember.findUnique({
+34     where: {
+35       userId_schoolId: {
+36         userId: user.id,
+37         schoolId: foundClass.schoolId,
+38       },
+39     },
+40   });
+41 
+42   if (!membership) {
+43     notFound();
+44   }
+45 
+46   const students = foundClass.students.map((student) => ({
+47     id: student.id,
+48     name: student.name,
+49     status: student.status as "ACTIVE" | "PENDING_DELETE" | "DELETED",
+50     createdAt: student.createdAt.toISOString(),
+51     deletedAt: student.deletedAt?.toISOString() ?? null,
+52     deletedReason: student.deletedReason ?? null,
+53   }));
+54 
+55   return (
+56     <StudentsManagerClient
+57       classId={foundClass.id}
+58       className={foundClass.name}
+59       canImportSpreadsheet={!user.isTeacher}
+60       initialStudents={students}
+61     />
+62   );
+63 }
+
+===== app/api/classes/[classId]/students/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureClassAccess(userId: string, classId: string) {
+6   const foundClass = await prisma.class.findUnique({
+7     where: { id: classId },
+8     include: {
+9       school: true,
+10     },
+11   });
+12 
+13   if (!foundClass) return null;
+14 
+15   const membership = await prisma.schoolMember.findUnique({
+16     where: {
+17       userId_schoolId: {
+18         userId,
+19         schoolId: foundClass.schoolId,
+20       },
+21     },
+22   });
+23 
+24   if (!membership) return null;
+25 
+26   return foundClass;
+27 }
+28 
+29 export async function GET(
+30   _req: NextRequest,
+31   { params }: { params: Promise<{ classId: string }> }
+32 ) {
+33   const user = await getSessionUser();
+34 
+35   if (!user) {
+36     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+37   }
+38 
+39   const { classId } = await params;
+40   const foundClass = await ensureClassAccess(user.id, classId);
+41 
+42   if (!foundClass) {
+43     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+44   }
+45 
+46   const students = await prisma.student.findMany({
+47     where: { classId },
+48     orderBy: { name: "asc" },
+49     select: {
+50       id: true,
+51       name: true,
+52       status: true,
+53       createdAt: true,
+54       deletedAt: true,
+55       deletedReason: true,
+56     },
+57   });
+58 
+59   return NextResponse.json(students);
+60 }
+61 
+62 export async function POST(
+63   req: NextRequest,
+64   { params }: { params: Promise<{ classId: string }> }
+65 ) {
+66   const user = await getSessionUser();
+67 
+68   if (!user) {
+69     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+70   }
+71 
+72   const { classId } = await params;
+73   const foundClass = await ensureClassAccess(user.id, classId);
+74 
+75   if (!foundClass) {
+76     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+77   }
+78 
+79   const data = await req.json();
+80   const name = String(data.name ?? "").trim();
+81   const attendanceId = String(data.attendanceId ?? "").trim();
+82 
+83   if (!name) {
+84     return NextResponse.json({ error: "Missing student name" }, { status: 400 });
+85   }
+86 
+87   const existingStudent = await prisma.student.findFirst({
+88     where: {
+89       classId,
+90       name,
+91     },
+92   });
+93 
+94   if (existingStudent) {
+95     return NextResponse.json(
+96       { error: "Student already exists in this class" },
+97       { status: 409 }
+98     );
+99   }
+100 
+101   const createdStudent = await prisma.student.create({
+102     data: {
+103       name,
+104       classId,
+105       status: "ACTIVE",
+106     },
+107   });
+108 
+109   const classAttendances = await prisma.attendance.findMany({
+110     where: { classId },
+111     select: { id: true },
+112   });
+113 
+114   if (classAttendances.length > 0) {
+115     await prisma.attendancePresence.createMany({
+116       data: classAttendances.map((attendance) => ({
+117         attendanceId: attendance.id,
+118         studentId: createdStudent.id,
+119         present: false,
+120       })),
+121       skipDuplicates: true,
+122     });
+123   }
+124 
+125   let createdPresence = null;
+126 
+127   if (attendanceId) {
+128     const attendance = await prisma.attendance.findUnique({
+129       where: { id: attendanceId },
+130     });
+131 
+132     if (!attendance || attendance.classId !== classId) {
+133       return NextResponse.json(
+134         { error: "Attendance not found for this class" },
+135         { status: 400 }
+136       );
+137     }
+138 
+139     createdPresence = await prisma.attendancePresence.findFirst({
+140       where: {
+141         attendanceId,
+142         studentId: createdStudent.id,
+143       },
+144       include: {
+145         student: {
+146           select: {
+147             id: true,
+148             name: true,
+149           },
+150         },
+151       },
+152     });
+153   }
+154 
+155   return NextResponse.json(
+156     {
+157       student: createdStudent,
+158       presence: createdPresence,
+159     },
+160     { status: 201 }
+161   );
+162 }
+
+===== app/api/classes/[classId]/students/[studentId]/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function isManagerRole(role: string | null | undefined) {
+6   const normalized = String(role ?? "").trim().toUpperCase();
+7   return ["ADMIN", "GESTOR", "MANAGER", "OWNER"].includes(normalized);
+8 }
+9 
+10 async function getAccessContext(userId: string, classId: string) {
+11   const foundClass = await prisma.class.findUnique({
+12     where: { id: classId },
+13     include: {
+14       school: true,
+15     },
+16   });
+17 
+18   if (!foundClass) return null;
+19 
+20   const [schoolMembership, groupMembership] = await Promise.all([
+21     prisma.schoolMember.findUnique({
+22       where: {
+23         userId_schoolId: {
+24           userId,
+25           schoolId: foundClass.schoolId,
+26         },
+27       },
+28     }),
+29     prisma.groupMember.findUnique({
+30       where: {
+31         userId_groupId: {
+32           userId,
+33           groupId: foundClass.school.groupId,
+34         },
+35       },
+36     }),
+37   ]);
+38 
+39   const hasAccess = Boolean(schoolMembership);
+40   const canManageDelete =
+41     isManagerRole(schoolMembership?.role) || isManagerRole(groupMembership?.role);
+42 
+43   return {
+44     foundClass,
+45     hasAccess,
+46     canManageDelete,
+47   };
+48 }
+49 
+50 export async function GET(
+51   _req: NextRequest,
+52   { params }: { params: Promise<{ classId: string; studentId: string }> }
+53 ) {
+54   const user = await getSessionUser();
+55   if (!user) {
+56     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+57   }
+58 
+59   const { classId, studentId } = await params;
+60   const access = await getAccessContext(user.id, classId);
+61 
+62   if (!access?.hasAccess) {
+63     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+64   }
+65 
+66   const student = await prisma.student.findUnique({
+67     where: { id: studentId },
+68     include: {
+69       presences: true,
+70     },
+71   });
+72 
+73   if (!student || student.classId !== classId) {
+74     return NextResponse.json({ error: "Student not found" }, { status: 404 });
+75   }
+76 
+77   const total = student.presences.length;
+78   const presents = student.presences.filter((p) => p.present).length;
+79   const absents = total - presents;
+80   const percentage = total ? Math.round((presents / total) * 100) : 0;
+81 
+82   return NextResponse.json({
+83     id: student.id,
+84     name: student.name,
+85     status: student.status,
+86     deletedAt: student.deletedAt,
+87     deletedReason: student.deletedReason,
+88     canApproveDelete: access.canManageDelete,
+89     stats: {
+90       total,
+91       presents,
+92       absents,
+93       percentage,
+94     },
+95   });
+96 }
+97 
+98 export async function PATCH(
+99   req: NextRequest,
+100   { params }: { params: Promise<{ classId: string; studentId: string }> }
+101 ) {
+102   const user = await getSessionUser();
+103   if (!user) {
+104     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+105   }
+106 
+107   const { classId, studentId } = await params;
+108   const { name } = await req.json();
+109 
+110   const access = await getAccessContext(user.id, classId);
+111   if (!access?.hasAccess) {
+112     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+113   }
+114 
+115   const normalizedName = String(name ?? "").trim();
+116 
+117   if (!normalizedName) {
+118     return NextResponse.json({ error: "Missing student name" }, { status: 400 });
+119   }
+120 
+121   const student = await prisma.student.findUnique({
+122     where: { id: studentId },
+123     select: {
+124       id: true,
+125       classId: true,
+126     },
+127   });
+128 
+129   if (!student || student.classId !== classId) {
+130     return NextResponse.json({ error: "Student not found" }, { status: 404 });
+131   }
+132 
+133   await prisma.student.update({
+134     where: { id: studentId },
+135     data: { name: normalizedName },
+136   });
+137 
+138   return NextResponse.json({ success: true });
+139 }
+140 
+141 export async function DELETE(
+142   req: NextRequest,
+143   { params }: { params: Promise<{ classId: string; studentId: string }> }
+144 ) {
+145   const user = await getSessionUser();
+146   if (!user) {
+147     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+148   }
+149 
+150   const { classId, studentId } = await params;
+151   const access = await getAccessContext(user.id, classId);
+152 
+153   if (!access?.hasAccess) {
+154     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+155   }
+156 
+157   const body = await req.json().catch(() => ({}));
+158   const reason = String(body?.reason ?? "").trim();
+159 
+160   if (!reason) {
+161     return NextResponse.json(
+162       { error: "Motivo da exclusão é obrigatório" },
+163       { status: 400 }
+164     );
+165   }
+166 
+167   const student = await prisma.student.findUnique({
+168     where: { id: studentId },
+169     select: {
+170       id: true,
+171       classId: true,
+172       status: true,
+173     },
+174   });
+175 
+176   if (!student || student.classId !== classId) {
+177     return NextResponse.json({ error: "Student not found" }, { status: 404 });
+178   }
+179 
+180   if (access.canManageDelete) {
+181     await prisma.student.update({
+182       where: { id: studentId },
+183       data: {
+184         status: "DELETED",
+185         deletedReason: reason,
+186         deletedById: user.id,
+187         deletedAt: new Date(),
+188       },
+189     });
+190 
+191     return NextResponse.json({
+192       success: true,
+193       mode: "deleted_directly",
+194     });
+195   }
+196 
+197   await prisma.student.update({
+198     where: { id: studentId },
+199     data: {
+200       status: "PENDING_DELETE",
+201       deletedReason: reason,
+202       deletedById: user.id,
+203       deletedAt: null,
+204     },
+205   });
+206 
+207   return NextResponse.json({
+208     success: true,
+209     mode: "requested_delete",
+210   });
+211 }
+
+===== app/api/classes/[classId]/students/[studentId]/restore/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureClassAccess(userId: string, classId: string) {
+6   const foundClass = await prisma.class.findUnique({
+7     where: { id: classId },
+8     include: {
+9       school: true,
+10     },
+11   });
+12 
+13   if (!foundClass) return null;
+14 
+15   const membership = await prisma.schoolMember.findUnique({
+16     where: {
+17       userId_schoolId: {
+18         userId,
+19         schoolId: foundClass.schoolId,
+20       },
+21     },
+22   });
+23 
+24   if (!membership) return null;
+25 
+26   return foundClass;
+27 }
+28 
+29 export async function POST(
+30   _req: NextRequest,
+31   { params }: { params: Promise<{ classId: string; studentId: string }> }
+32 ) {
+33   const user = await getSessionUser();
+34   if (!user) {
+35     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+36   }
+37 
+38   const { classId, studentId } = await params;
+39 
+40   const foundClass = await ensureClassAccess(user.id, classId);
+41   if (!foundClass) {
+42     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+43   }
+44 
+45   const student = await prisma.student.findUnique({
+46     where: { id: studentId },
+47   });
+48 
+49   if (!student || student.classId !== classId) {
+50     return NextResponse.json({ error: "Student not found" }, { status: 404 });
+51   }
+52 
+53   await prisma.student.update({
+54     where: { id: studentId },
+55     data: {
+56       status: "ACTIVE",
+57       deletedAt: null,
+58       deletedReason: null,
+59       deletedById: null,
+60     },
+61   });
+62 
+63   return NextResponse.json({ success: true });
+64 }
+
+===== components/StudentsManagerClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import AddStudentModal from "./AddStudentModal";
+6 import StudentModal from "./StudentModal";
+7 
+8 type StudentStatus = "ACTIVE" | "PENDING_DELETE" | "DELETED";
+9 
+10 type StudentItem = {
+11   id: string;
+12   name: string;
+13   status: StudentStatus;
+14   createdAt: string;
+15   deletedAt?: string | null;
+16   deletedReason?: string | null;
+17 };
+18 
+19 type Props = {
+20   classId: string;
+21   className: string;
+22   canImportSpreadsheet: boolean;
+23   initialStudents: StudentItem[];
+24 };
+25 
+26 export default function StudentsManagerClient({
+27   classId,
+28   className,
+29   initialStudents,
+30 }: Props) {
+31   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
+32   const [openAddModal, setOpenAddModal] = useState(false);
+33   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+34 
+35   async function refreshStudents() {
+36     const res = await fetch(`/api/classes/${classId}/students`, {
+37       cache: "no-store",
+38     });
+39 
+40     if (!res.ok) return;
+41 
+42     const data = await res.json();
+43     setStudents(data);
+44   }
+45 
+46   async function handleDeleteStudent(studentId: string) {
+47     const reason = prompt("Motivo da exclusão:");
+48     if (!reason) return;
+49 
+50     const res = await fetch(`/api/classes/${classId}/students/${studentId}`, {
+51       method: "DELETE",
+52       headers: { "Content-Type": "application/json" },
+53       body: JSON.stringify({ reason }),
+54     });
+55 
+56     if (!res.ok) {
+57       alert("Não foi possível excluir/solicitar exclusão do aluno.");
+58       return;
+59     }
+60 
+61     const data = await res.json();
+62 
+63     if (data?.mode === "deleted_directly") {
+64       alert("Aluno excluído diretamente pela gestão.");
+65     } else if (data?.mode === "requested_delete") {
+66       alert("Solicitação de exclusão enviada para aprovação da gestão.");
+67     }
+68 
+69     await refreshStudents();
+70   }
+71 
+72   function getItemClasses(student: StudentItem) {
+73     if (student.status === "ACTIVE") {
+74       return "bg-white";
+75     }
+76 
+77     return "bg-red-50 text-red-700";
+78   }
+79 
+80   function getStatusBadge(student: StudentItem) {
+81     if (student.status === "PENDING_DELETE") {
+82       return (
+83         <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+84           Aguardando aprovação da gestão
+85         </span>
+86       );
+87     }
+88 
+89     if (student.status === "DELETED") {
+90       return (
+91         <span className="ml-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800">
+92           Excluído
+93         </span>
+94       );
+95     }
+96 
+97     return null;
+98   }
+99 
+100   return (
+101     <>
+102       <main className="min-h-screen bg-slate-50 px-4 py-10">
+103         <div className="mx-auto w-full max-w-4xl">
+104           <div className="mb-6">
+105             <Link href={`/classes/${classId}`} className="text-sky-700">
+106               ← Voltar
+107             </Link>
+108           </div>
+109 
+110           <div className="rounded-lg border bg-white p-6 shadow-sm">
+111             <div className="flex flex-wrap items-start justify-between gap-3">
+112               <h1 className="text-xl font-semibold">
+113                 Alunos — {className}
+114               </h1>
+115 
+116               <button
+117                 onClick={() => setOpenAddModal(true)}
+118                 className="rounded-md bg-sky-600 px-4 py-2 text-white"
+119               >
+120                 + Adicionar aluno
+121               </button>
+122             </div>
+123 
+124             <ul className="mt-6 overflow-hidden rounded-md border">
+125               <li className="bg-slate-100 px-4 py-2 text-sm font-semibold">
+126                 Lista de alunos
+127               </li>
+128 
+129               {students.map((s, i) => {
+130                 const inactive = s.status !== "ACTIVE";
+131 
+132                 return (
+133                   <li
+134                     key={s.id}
+135                     onClick={() => setSelectedStudent(s.id)}
+136                     className={`cursor-pointer border-t px-4 py-3 text-sm ${getItemClasses(s)}`}
+137                   >
+138                     <div className="flex items-center justify-between gap-3">
+139                       <span className={inactive ? "line-through" : ""}>
+140                         {i + 1}. {s.name}
+141                         {getStatusBadge(s)}
+142                       </span>
+143 
+144                       {s.status === "ACTIVE" && (
+145                         <button
+146                           onClick={(e) => {
+147                             e.stopPropagation();
+148                             handleDeleteStudent(s.id);
+149                           }}
+150                           className="text-xs text-red-600"
+151                         >
+152                           Excluir
+153                         </button>
+154                       )}
+155                     </div>
+156 
+157                     {s.status === "PENDING_DELETE" && s.deletedReason ? (
+158                       <p className="mt-1 text-xs text-amber-800">
+159                         Motivo informado: {s.deletedReason}
+160                       </p>
+161                     ) : null}
+162                   </li>
+163                 );
+164               })}
+165             </ul>
+166           </div>
+167         </div>
+168       </main>
+169 
+170       <AddStudentModal
+171         open={openAddModal}
+172         onClose={() => setOpenAddModal(false)}
+173         onSubmit={async () => {
+174           await refreshStudents();
+175           setOpenAddModal(false);
+176         }}
+177         loading={false}
+178       />
+179 
+180       <StudentModal
+181         open={!!selectedStudent}
+182         onClose={() => setSelectedStudent(null)}
+183         classId={classId}
+184         studentId={selectedStudent}
+185         onUpdated={refreshStudents}
+186       />
+187     </>
+188   );
+189 }
+
+===== components/StudentModal.tsx =====
+1 "use client";
+2 
+3 import { useEffect, useState } from "react";
+4 
+5 type StudentStats = {
+6   total: number;
+7   presents: number;
+8   absents: number;
+9   percentage: number;
+10 };
+11 
+12 type StudentStatus = "ACTIVE" | "PENDING_DELETE" | "DELETED";
+13 
+14 type StudentData = {
+15   id: string;
+16   name: string;
+17   status: StudentStatus;
+18   deletedAt: string | null;
+19   deletedReason: string | null;
+20   canApproveDelete: boolean;
+21   stats: StudentStats;
+22 };
+23 
+24 type Props = {
+25   open: boolean;
+26   onClose: () => void;
+27   classId: string;
+28   studentId: string | null;
+29   onUpdated: () => void;
+30 };
+31 
+32 export default function StudentModal({
+33   open,
+34   onClose,
+35   classId,
+36   studentId,
+37   onUpdated,
+38 }: Props) {
+39   const [student, setStudent] = useState<StudentData | null>(null);
+40   const [name, setName] = useState("");
+41   const [loading, setLoading] = useState(false);
+42 
+43   useEffect(() => {
+44     if (!open || !studentId) return;
+45 
+46     async function load() {
+47       const res = await fetch(`/api/classes/${classId}/students/${studentId}`);
+48 
+49       if (!res.ok) return;
+50 
+51       const data: StudentData = await res.json();
+52       setStudent(data);
+53       setName(data.name);
+54     }
+55 
+56     load();
+57   }, [open, studentId, classId]);
+58 
+59   async function reloadStudent() {
+60     if (!studentId) return;
+61 
+62     const res = await fetch(`/api/classes/${classId}/students/${studentId}`);
+63     if (!res.ok) return;
+64 
+65     const data: StudentData = await res.json();
+66     setStudent(data);
+67     setName(data.name);
+68   }
+69 
+70   async function saveName() {
+71     if (!studentId) return;
+72 
+73     setLoading(true);
+74 
+75     try {
+76       await fetch(`/api/classes/${classId}/students/${studentId}`, {
+77         method: "PATCH",
+78         headers: { "Content-Type": "application/json" },
+79         body: JSON.stringify({ name }),
+80       });
+81 
+82       await onUpdated();
+83       onClose();
+84     } finally {
+85       setLoading(false);
+86     }
+87   }
+88 
+89   async function restoreStudent() {
+90     if (!studentId) return;
+91 
+92     setLoading(true);
+93 
+94     try {
+95       await fetch(`/api/classes/${classId}/students/${studentId}/restore`, {
+96         method: "POST",
+97       });
+98 
+99       await onUpdated();
+100       await reloadStudent();
+101       onClose();
+102     } finally {
+103       setLoading(false);
+104     }
+105   }
+106 
+107   async function approveDelete() {
+108     if (!studentId) return;
+109 
+110     setLoading(true);
+111 
+112     try {
+113       await fetch(`/api/classes/${classId}/students/${studentId}/approve`, {
+114         method: "POST",
+115       });
+116 
+117       await onUpdated();
+118       await reloadStudent();
+119       onClose();
+120     } finally {
+121       setLoading(false);
+122     }
+123   }
+124 
+125   async function rejectDelete() {
+126     if (!studentId) return;
+127 
+128     setLoading(true);
+129 
+130     try {
+131       await fetch(`/api/classes/${classId}/students/${studentId}/reject`, {
+132         method: "POST",
+133       });
+134 
+135       await onUpdated();
+136       await reloadStudent();
+137       onClose();
+138     } finally {
+139       setLoading(false);
+140     }
+141   }
+142 
+143   if (!open || !student) return null;
+144 
+145   const inactive = student.status !== "ACTIVE";
+146   const pendingDelete = student.status === "PENDING_DELETE";
+147   const deleted = student.status === "DELETED";
+148 
+149   return (
+150     <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4">
+151       <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-6">
+152         <h2 className="text-lg font-semibold">Aluno</h2>
+153 
+154         <div>
+155           <label className="text-sm">Nome</label>
+156           <input
+157             className="mt-1 w-full rounded border px-3 py-2"
+158             value={name}
+159             onChange={(e) => setName(e.target.value)}
+160           />
+161         </div>
+162 
+163         {inactive ? (
+164           <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+165             {pendingDelete ? (
+166               <p className="font-medium">Aguardando aprovação da gestão.</p>
+167             ) : null}
+168 
+169             {deleted ? (
+170               <p className="font-medium">Aluno excluído com aprovação.</p>
+171             ) : null}
+172 
+173             {student.deletedReason ? (
+174               <p>
+175                 <strong>Motivo:</strong> {student.deletedReason}
+176               </p>
+177             ) : null}
+178 
+179             <p>Presenças: {student.stats.presents}</p>
+180             <p>Faltas: {student.stats.absents}</p>
+181             <p>Frequência: {student.stats.percentage}%</p>
+182           </div>
+183         ) : null}
+184 
+185         <div className="flex flex-wrap gap-2">
+186           {pendingDelete && student.canApproveDelete ? (
+187             <>
+188               <button
+189                 onClick={approveDelete}
+190                 disabled={loading}
+191                 className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+192               >
+193                 Aprovar exclusão
+194               </button>
+195 
+196               <button
+197                 onClick={rejectDelete}
+198                 disabled={loading}
+199                 className="rounded bg-amber-500 px-3 py-2 text-sm text-white disabled:opacity-50"
+200               >
+201                 Rejeitar exclusão
+202               </button>
+203             </>
+204           ) : null}
+205 
+206           {inactive ? (
+207             <button
+208               onClick={restoreStudent}
+209               disabled={loading}
+210               className="rounded bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+211             >
+212               Reativar aluno
+213             </button>
+214           ) : null}
+215         </div>
+216 
+217         <div className="flex justify-end gap-2">
+218           <button onClick={onClose} disabled={loading}>
+219             Fechar
+220           </button>
+221           <button
+222             onClick={saveName}
+223             disabled={loading}
+224             className="rounded bg-sky-600 px-3 py-1 text-white disabled:opacity-50"
+225           >
+226             {loading ? "Salvando..." : "Salvar"}
+227           </button>
+228         </div>
+229       </div>
+230     </div>
+231   );
+232 }

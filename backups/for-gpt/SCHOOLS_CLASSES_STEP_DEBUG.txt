@@ -1,0 +1,537 @@
+
+===== components/GroupDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import CreateSchoolModal from "./CreateSchoolModal";
+6 
+7 type School = {
+8   id: string;
+9   name: string;
+10   createdAt: string;
+11   _count: {
+12     classes: number;
+13   };
+14 };
+15 
+16 type Props = {
+17   groupId: string;
+18   groupName: string;
+19   initialSchools: School[];
+20 };
+21 
+22 export default function GroupDetailClient({
+23   groupId,
+24   groupName,
+25   initialSchools,
+26 }: Props) {
+27   const [schools, setSchools] = useState<School[]>(initialSchools);
+28   const [openModal, setOpenModal] = useState(false);
+29   const [loadingList, setLoadingList] = useState(false);
+30 
+31   async function refreshSchools() {
+32     setLoadingList(true);
+33     try {
+34       const res = await fetch(`/api/groups/${groupId}/schools`, {
+35         method: "GET",
+36         headers: { "Content-Type": "application/json" },
+37         cache: "no-store",
+38       });
+39 
+40       if (res.ok) {
+41         const data = (await res.json()) as School[];
+42         setSchools(
+43           data.map((school) => ({
+44             id: school.id,
+45             name: school.name,
+46             createdAt: school.createdAt,
+47             _count: {
+48               classes: school._count?.classes ?? 0,
+49             },
+50           }))
+51         );
+52       } else {
+53         console.error("Erro ao carregar escolas");
+54       }
+55     } catch (error) {
+56       console.error("Erro ao buscar escolas", error);
+57     } finally {
+58       setLoadingList(false);
+59     }
+60   }
+61 
+62   return (
+63     <main className="min-h-screen bg-slate-50 px-4 py-10">
+64       <div className="mx-auto w-full max-w-4xl">
+65         <div className="mb-6">
+66           <Link
+67             href="/dashboard"
+68             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+69           >
+70             ← Voltar para grupos
+71           </Link>
+72         </div>
+73 
+74         <div className="flex items-start justify-between gap-4">
+75           <div>
+76             <h1 className="text-2xl font-semibold text-slate-900">
+77               {groupName}
+78             </h1>
+79             <p className="mt-2 text-sm text-slate-500">
+80               Aqui você cadastra e organiza as escolas pertencentes a este grupo.
+81             </p>
+82           </div>
+83 
+84           <button
+85             type="button"
+86             onClick={() => setOpenModal(true)}
+87             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+88           >
+89             + Criar escola
+90           </button>
+91         </div>
+92 
+93         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+94           {loadingList && (
+95             <p className="mb-3 text-sm text-slate-500">Atualizando escolas…</p>
+96           )}
+97 
+98           {schools.length === 0 ? (
+99             <p className="text-sm text-slate-500">
+100               Nenhuma escola cadastrada ainda neste grupo. Clique em{" "}
+101               <span className="font-semibold">“Criar escola”</span> para começar.
+102             </p>
+103           ) : (
+104             <ul className="space-y-3">
+105               {schools.map((school) => (
+106                 <li
+107                   key={school.id}
+108                   className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 hover:bg-slate-50"
+109                 >
+110                   <div>
+111                     <p className="text-sm font-medium text-slate-900">
+112                       {school.name}
+113                     </p>
+114                     <p className="mt-1 text-xs text-slate-500">
+115                       {school._count.classes === 0
+116                         ? "Nenhuma turma cadastrada ainda"
+117                         : school._count.classes === 1
+118                         ? "1 turma cadastrada"
+119                         : `${school._count.classes} turmas cadastradas`}
+120                     </p>
+121                   </div>
+122 
+123                   <span className="text-sm font-medium text-slate-400">
+124                     Em breve
+125                   </span>
+126                 </li>
+127               ))}
+128             </ul>
+129           )}
+130         </div>
+131 
+132         <CreateSchoolModal
+133           groupId={groupId}
+134           open={openModal}
+135           onClose={() => setOpenModal(false)}
+136           onCreated={refreshSchools}
+137         />
+138       </div>
+139     </main>
+140   );
+141 }
+
+===== components/CreateSchoolModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type Props = {
+6   groupId: string;
+7   open: boolean;
+8   onClose: () => void;
+9   onCreated: () => void;
+10 };
+11 
+12 export default function CreateSchoolModal({
+13   groupId,
+14   open,
+15   onClose,
+16   onCreated,
+17 }: Props) {
+18   const [name, setName] = useState("");
+19   const [loading, setLoading] = useState(false);
+20 
+21   if (!open) return null;
+22 
+23   async function handleSubmit(e: React.FormEvent) {
+24     e.preventDefault();
+25     if (!name.trim()) return;
+26 
+27     setLoading(true);
+28 
+29     try {
+30       const res = await fetch(`/api/groups/${groupId}/schools`, {
+31         method: "POST",
+32         headers: { "Content-Type": "application/json" },
+33         body: JSON.stringify({ name }),
+34       });
+35 
+36       if (res.ok) {
+37         setName("");
+38         onCreated();
+39         onClose();
+40       } else {
+41         console.error("Erro ao criar escola");
+42       }
+43     } catch (error) {
+44       console.error("Erro ao criar escola", error);
+45     } finally {
+46       setLoading(false);
+47     }
+48   }
+49 
+50   return (
+51     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+52       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+53         <h2 className="mb-4 text-lg font-semibold text-slate-900">
+54           Criar nova Escola
+55         </h2>
+56 
+57         <form onSubmit={handleSubmit} className="space-y-4">
+58           <div>
+59             <label className="text-sm font-medium text-slate-700">
+60               Nome da escola
+61             </label>
+62             <input
+63               type="text"
+64               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+65               placeholder="Ex: Escola Municipal Centro"
+66               value={name}
+67               onChange={(e) => setName(e.target.value)}
+68             />
+69           </div>
+70 
+71           <div className="flex justify-end gap-2">
+72             <button
+73               type="button"
+74               onClick={onClose}
+75               className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
+76               disabled={loading}
+77             >
+78               Cancelar
+79             </button>
+80 
+81             <button
+82               type="submit"
+83               disabled={loading}
+84               className="rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+85             >
+86               {loading ? "Criando..." : "Criar escola"}
+87             </button>
+88           </div>
+89         </form>
+90       </div>
+91     </div>
+92   );
+93 }
+
+===== app/(app)/groups/[groupId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import GroupDetailClient from "@/components/GroupDetailClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ groupId: string }>;
+8 };
+9 
+10 export default async function GroupPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { groupId } = await params;
+18 
+19   const membership = await prisma.groupMember.findUnique({
+20     where: {
+21       userId_groupId: {
+22         userId: user.id,
+23         groupId,
+24       },
+25     },
+26   });
+27 
+28   if (!membership) {
+29     notFound();
+30   }
+31 
+32   const group = await prisma.group.findUnique({
+33     where: { id: groupId },
+34     include: {
+35       schools: {
+36         include: {
+37           _count: {
+38             select: { classes: true },
+39           },
+40         },
+41         orderBy: { createdAt: "desc" },
+42       },
+43     },
+44   });
+45 
+46   if (!group) {
+47     notFound();
+48   }
+49 
+50   const schools = group.schools.map((school) => ({
+51     id: school.id,
+52     name: school.name,
+53     createdAt: school.createdAt.toISOString(),
+54     _count: {
+55       classes: school._count.classes,
+56     },
+57   }));
+58 
+59   return (
+60     <GroupDetailClient
+61       groupId={group.id}
+62       groupName={group.name}
+63       initialSchools={schools}
+64     />
+65   );
+66 }
+
+===== app/api/groups/[groupId]/schools/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function ensureGroupAccess(userId: string, groupId: string) {
+6   const membership = await prisma.groupMember.findUnique({
+7     where: {
+8       userId_groupId: {
+9         userId,
+10         groupId,
+11       },
+12     },
+13   });
+14 
+15   return membership;
+16 }
+17 
+18 export async function GET(
+19   _req: NextRequest,
+20   { params }: { params: Promise<{ groupId: string }> }
+21 ) {
+22   const user = await getSessionUser();
+23   if (!user) {
+24     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+25   }
+26 
+27   const { groupId } = await params;
+28   const membership = await ensureGroupAccess(user.id, groupId);
+29 
+30   if (!membership) {
+31     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+32   }
+33 
+34   const schools = await prisma.school.findMany({
+35     where: { groupId },
+36     include: {
+37       _count: {
+38         select: { classes: true },
+39       },
+40     },
+41     orderBy: { createdAt: "desc" },
+42   });
+43 
+44   return NextResponse.json(schools);
+45 }
+46 
+47 export async function POST(
+48   req: NextRequest,
+49   { params }: { params: Promise<{ groupId: string }> }
+50 ) {
+51   const user = await getSessionUser();
+52   if (!user) {
+53     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+54   }
+55 
+56   const { groupId } = await params;
+57   const membership = await ensureGroupAccess(user.id, groupId);
+58 
+59   if (!membership) {
+60     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+61   }
+62 
+63   const data = await req.json();
+64   const name = String(data.name ?? "").trim();
+65 
+66   if (!name) {
+67     return NextResponse.json({ error: "Missing school name" }, { status: 400 });
+68   }
+69 
+70   const school = await prisma.school.create({
+71     data: {
+72       name,
+73       groupId,
+74       members: {
+75         create: {
+76           userId: user.id,
+77           role: "DIRECTOR",
+78         },
+79       },
+80     },
+81     include: {
+82       _count: {
+83         select: { classes: true },
+84       },
+85     },
+86   });
+87 
+88   return NextResponse.json(school, { status: 201 });
+89 }
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 //
+11 // ==========================
+12 // MODELO USER E SESSION (EXISTENTES)
+13 // ==========================
+14 //
+15 
+16 model User {
+17   id           String          @id @default(cuid())
+18   name         String
+19   email        String          @unique
+20   passwordHash String
+21   createdAt    DateTime        @default(now())
+22   updatedAt    DateTime        @updatedAt
+23 
+24   sessions     Session[]
+25   groupMembers GroupMember[]
+26   schoolMembers SchoolMember[]
+27   classes      Class[]         @relation("ClassTeacher")
+28 }
+29 
+30 model Session {
+31   id        String   @id @default(cuid())
+32   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+33   userId    String
+34   createdAt DateTime @default(now())
+35   expiresAt DateTime
+36 
+37   @@index([userId])
+38 }
+39 
+40 //
+41 // ==========================
+42 // MODELOS DE GRUPOS DE ESCOLAS
+43 // ==========================
+44 //
+45 
+46 model Group {
+47   id        String         @id @default(cuid())
+48   name      String
+49   createdAt DateTime       @default(now())
+50   updatedAt DateTime       @updatedAt
+51 
+52   members   GroupMember[]
+53   schools   School[]
+54 }
+55 
+56 model GroupMember {
+57   id        String   @id @default(cuid())
+58   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+59   userId    String
+60   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+61   groupId   String
+62 
+63   role      String   // OWNER, DIRECTOR, VIEWER
+64   createdAt DateTime @default(now())
+65 
+66   @@unique([userId, groupId])
+67 }
+68 
+69 //
+70 // ==========================
+71 // MODELOS DE ESCOLAS
+72 // ==========================
+73 //
+74 
+75 model School {
+76   id        String         @id @default(cuid())
+77   name      String
+78   createdAt DateTime       @default(now())
+79   updatedAt DateTime       @updatedAt
+80 
+81   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+82   groupId   String
+83 
+84   members   SchoolMember[]
+85   classes   Class[]
+86 }
+87 
+88 model SchoolMember {
+89   id        String   @id @default(cuid())
+90   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+91   userId    String
+92   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+93   schoolId  String
+94 
+95   role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+96   createdAt DateTime @default(now())
+97 
+98   @@unique([userId, schoolId])
+99 }
+100 
+101 //
+102 // ==========================
+103 // MODELOS DE TURMAS E ALUNOS
+104 // ==========================
+105 //
+106 
+107 model Class {
+108   id        String        @id @default(cuid())
+109   name      String
+110   year      Int?
+111   createdAt DateTime      @default(now())
+112   updatedAt DateTime      @updatedAt
+113 
+114   school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+115   schoolId  String
+116 
+117   teacher   User?         @relation("ClassTeacher", fields: [teacherId], references: [id])
+118   teacherId String?
+119 
+120   students  Student[]
+121 }
+122 
+123 model Student {
+124   id        String      @id @default(cuid())
+125   name      String
+126   createdAt DateTime    @default(now())
+127   updatedAt DateTime    @updatedAt
+128 
+129   class     Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+130   classId   String
+131 }
+132 
+
+===== app/(app)/schools =====
+[MISSING] app/(app)/schools
+
+===== app/api/schools =====
+[MISSING] app/api/schools

@@ -1,0 +1,1568 @@
+
+===== app/api/teachers/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser, hashPassword } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 function generateTeacherPassword(name: string, cpf: string) {
+10   const cleanName = name.trim().replace(/\s+/g, "");
+11   const cleanCpf = normalizeCpf(cpf);
+12 
+13   if (cleanName.length < 3 || cleanCpf.length < 6) {
+14     return null;
+15   }
+16 
+17   const first = cleanName[0].toUpperCase();
+18   const second = cleanName[1].toLowerCase();
+19   const third = cleanName[2].toUpperCase();
+20   const cpfPart = cleanCpf.slice(0, 6);
+21 
+22   return `${first}${second}${third}@${cpfPart}.`;
+23 }
+24 
+25 export async function GET() {
+26   const user = await getSessionUser();
+27 
+28   if (!user) {
+29     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+30   }
+31 
+32   const teachers = await prisma.user.findMany({
+33     where: {
+34       createdById: user.id,
+35       isTeacher: true,
+36     },
+37     include: {
+38       _count: {
+39         select: {
+40           classes: true,
+41         },
+42       },
+43     },
+44     orderBy: { createdAt: "desc" },
+45   });
+46 
+47   return NextResponse.json(
+48     teachers.map((teacher) => ({
+49       id: teacher.id,
+50       name: teacher.name,
+51       email: teacher.email,
+52       cpf: teacher.cpf,
+53       isTeacher: teacher.isTeacher,
+54       createdAt: teacher.createdAt,
+55       _count: {
+56         classes: teacher._count.classes,
+57       },
+58     }))
+59   );
+60 }
+61 
+62 export async function POST(req: NextRequest) {
+63   const user = await getSessionUser();
+64 
+65   if (!user) {
+66     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+67   }
+68 
+69   const data = await req.json();
+70   const name = String(data.name ?? "").trim();
+71   const email = String(data.email ?? "").toLowerCase().trim();
+72   const cpfRaw = String(data.cpf ?? "").trim();
+73   const cpf = normalizeCpf(cpfRaw);
+74 
+75   if (!name || !email || !cpf) {
+76     return NextResponse.json(
+77       { error: "Missing teacher name, email or CPF" },
+78       { status: 400 }
+79     );
+80   }
+81 
+82   if (cpf.length !== 11) {
+83     return NextResponse.json(
+84       { error: "CPF must contain 11 digits" },
+85       { status: 400 }
+86     );
+87   }
+88 
+89   const existingByEmail = await prisma.user.findUnique({
+90     where: { email },
+91   });
+92 
+93   if (existingByEmail) {
+94     return NextResponse.json(
+95       { error: "Email already in use" },
+96       { status: 409 }
+97     );
+98   }
+99 
+100   const existingByCpf = await prisma.user.findFirst({
+101     where: { cpf },
+102   });
+103 
+104   if (existingByCpf) {
+105     return NextResponse.json(
+106       { error: "CPF already in use" },
+107       { status: 409 }
+108     );
+109   }
+110 
+111   const temporaryPassword = generateTeacherPassword(name, cpf);
+112 
+113   if (!temporaryPassword) {
+114     return NextResponse.json(
+115       { error: "Could not generate password from provided name and CPF" },
+116       { status: 400 }
+117     );
+118   }
+119 
+120   const passwordHash = await hashPassword(temporaryPassword);
+121 
+122   const teacher = await prisma.user.create({
+123     data: {
+124       name,
+125       email,
+126       cpf,
+127       passwordHash,
+128       isTeacher: true,
+129       createdById: user.id,
+130     },
+131     include: {
+132       _count: {
+133         select: {
+134           classes: true,
+135         },
+136       },
+137     },
+138   });
+139 
+140   return NextResponse.json(
+141     {
+142       teacher: {
+143         id: teacher.id,
+144         name: teacher.name,
+145         email: teacher.email,
+146         cpf: teacher.cpf,
+147         isTeacher: teacher.isTeacher,
+148         createdAt: teacher.createdAt,
+149         _count: {
+150           classes: teacher._count.classes,
+151         },
+152       },
+153       temporaryPassword,
+154     },
+155     { status: 201 }
+156   );
+157 }
+
+===== app/api/teachers/[teacherId]/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser, hashPassword } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function normalizeCpf(cpf: string) {
+6   return cpf.replace(/\D/g, "");
+7 }
+8 
+9 function generateTeacherPassword(name: string, cpf: string) {
+10   const cleanName = name.trim().replace(/\s+/g, "");
+11   const cleanCpf = normalizeCpf(cpf);
+12 
+13   if (cleanName.length < 3 || cleanCpf.length < 6) {
+14     return null;
+15   }
+16 
+17   const first = cleanName[0].toUpperCase();
+18   const second = cleanName[1].toLowerCase();
+19   const third = cleanName[2].toUpperCase();
+20   const cpfPart = cleanCpf.slice(0, 6);
+21 
+22   return `${first}${second}${third}@${cpfPart}.`;
+23 }
+24 
+25 async function ensureTeacherAccess(userId: string, teacherId: string) {
+26   const teacher = await prisma.user.findFirst({
+27     where: {
+28       id: teacherId,
+29       createdById: userId,
+30       isTeacher: true,
+31     },
+32     include: {
+33       _count: {
+34         select: {
+35           classes: true,
+36         },
+37       },
+38     },
+39   });
+40 
+41   return teacher;
+42 }
+43 
+44 export async function GET(
+45   _req: NextRequest,
+46   { params }: { params: Promise<{ teacherId: string }> }
+47 ) {
+48   const user = await getSessionUser();
+49 
+50   if (!user) {
+51     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+52   }
+53 
+54   const { teacherId } = await params;
+55   const teacher = await ensureTeacherAccess(user.id, teacherId);
+56 
+57   if (!teacher) {
+58     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+59   }
+60 
+61   return NextResponse.json({
+62     id: teacher.id,
+63     name: teacher.name,
+64     email: teacher.email,
+65     cpf: teacher.cpf,
+66     isTeacher: teacher.isTeacher,
+67     createdAt: teacher.createdAt,
+68     _count: {
+69       classes: teacher._count.classes,
+70     },
+71   });
+72 }
+73 
+74 export async function PATCH(
+75   req: NextRequest,
+76   { params }: { params: Promise<{ teacherId: string }> }
+77 ) {
+78   const user = await getSessionUser();
+79 
+80   if (!user) {
+81     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+82   }
+83 
+84   const { teacherId } = await params;
+85   const teacher = await ensureTeacherAccess(user.id, teacherId);
+86 
+87   if (!teacher) {
+88     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+89   }
+90 
+91   const data = await req.json();
+92   const name = String(data.name ?? "").trim();
+93   const email = String(data.email ?? "").toLowerCase().trim();
+94   const cpfRaw = String(data.cpf ?? "").trim();
+95   const cpf = normalizeCpf(cpfRaw);
+96 
+97   if (!name || !email || !cpf) {
+98     return NextResponse.json(
+99       { error: "Name, email and CPF are required" },
+100       { status: 400 }
+101     );
+102   }
+103 
+104   if (cpf.length !== 11) {
+105     return NextResponse.json(
+106       { error: "CPF must contain 11 digits" },
+107       { status: 400 }
+108     );
+109   }
+110 
+111   const existingByEmail = await prisma.user.findFirst({
+112     where: {
+113       email,
+114       NOT: {
+115         id: teacherId,
+116       },
+117     },
+118   });
+119 
+120   if (existingByEmail) {
+121     return NextResponse.json(
+122       { error: "Email already in use" },
+123       { status: 409 }
+124     );
+125   }
+126 
+127   const existingByCpf = await prisma.user.findFirst({
+128     where: {
+129       cpf,
+130       NOT: {
+131         id: teacherId,
+132       },
+133     },
+134   });
+135 
+136   if (existingByCpf) {
+137     return NextResponse.json(
+138       { error: "CPF already in use" },
+139       { status: 409 }
+140     );
+141   }
+142 
+143   const regeneratedPassword = generateTeacherPassword(name, cpf);
+144 
+145   if (!regeneratedPassword) {
+146     return NextResponse.json(
+147       { error: "Could not generate password from provided name and CPF" },
+148       { status: 400 }
+149     );
+150   }
+151 
+152   const passwordHash = await hashPassword(regeneratedPassword);
+153 
+154   const updatedTeacher = await prisma.user.update({
+155     where: { id: teacherId },
+156     data: {
+157       name,
+158       email,
+159       cpf,
+160       passwordHash,
+161     },
+162     include: {
+163       _count: {
+164         select: {
+165           classes: true,
+166         },
+167       },
+168     },
+169   });
+170 
+171   return NextResponse.json({
+172     teacher: {
+173       id: updatedTeacher.id,
+174       name: updatedTeacher.name,
+175       email: updatedTeacher.email,
+176       cpf: updatedTeacher.cpf,
+177       isTeacher: updatedTeacher.isTeacher,
+178       createdAt: updatedTeacher.createdAt,
+179       _count: {
+180         classes: updatedTeacher._count.classes,
+181       },
+182     },
+183     regeneratedPassword,
+184   });
+185 }
+
+===== app/api/teachers/[teacherId]/classes/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 async function getTeacherOwnedByUser(userId: string, teacherId: string) {
+6   return prisma.user.findFirst({
+7     where: {
+8       id: teacherId,
+9       createdById: userId,
+10       isTeacher: true,
+11     },
+12   });
+13 }
+14 
+15 async function getTeacherClassesPayload(userId: string, teacherId: string) {
+16   const linkedClassesRaw = await prisma.class.findMany({
+17     where: {
+18       teacherId,
+19     },
+20     include: {
+21       school: {
+22         include: {
+23           group: true,
+24         },
+25       },
+26     },
+27     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+28   });
+29 
+30   const availableClassesRaw = await prisma.class.findMany({
+31     where: {
+32       teacherId: null,
+33       school: {
+34         members: {
+35           some: {
+36             userId,
+37           },
+38         },
+39       },
+40     },
+41     include: {
+42       school: {
+43         include: {
+44           group: true,
+45         },
+46       },
+47     },
+48     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+49   });
+50 
+51   return {
+52     linkedClasses: linkedClassesRaw.map((item) => ({
+53       id: item.id,
+54       name: item.name,
+55       year: item.year,
+56       school: {
+57         id: item.school.id,
+58         name: item.school.name,
+59         group: {
+60           id: item.school.group.id,
+61           name: item.school.group.name,
+62         },
+63       },
+64     })),
+65     availableClasses: availableClassesRaw.map((item) => ({
+66       id: item.id,
+67       name: item.name,
+68       year: item.year,
+69       school: {
+70         id: item.school.id,
+71         name: item.school.name,
+72         group: {
+73           id: item.school.group.id,
+74           name: item.school.group.name,
+75         },
+76       },
+77     })),
+78   };
+79 }
+80 
+81 export async function POST(
+82   req: NextRequest,
+83   { params }: { params: Promise<{ teacherId: string }> }
+84 ) {
+85   const user = await getSessionUser();
+86 
+87   if (!user) {
+88     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+89   }
+90 
+91   const { teacherId } = await params;
+92   const teacher = await getTeacherOwnedByUser(user.id, teacherId);
+93 
+94   if (!teacher) {
+95     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+96   }
+97 
+98   const data = await req.json();
+99   const classId = String(data.classId ?? "").trim();
+100 
+101   if (!classId) {
+102     return NextResponse.json({ error: "Missing classId" }, { status: 400 });
+103   }
+104 
+105   const targetClass = await prisma.class.findFirst({
+106     where: {
+107       id: classId,
+108       school: {
+109         members: {
+110           some: {
+111             userId: user.id,
+112           },
+113         },
+114       },
+115     },
+116     include: {
+117       school: {
+118         include: {
+119           group: true,
+120         },
+121       },
+122     },
+123   });
+124 
+125   if (!targetClass) {
+126     return NextResponse.json({ error: "Class not found" }, { status: 404 });
+127   }
+128 
+129   await prisma.$transaction(async (tx) => {
+130     await tx.class.update({
+131       where: { id: classId },
+132       data: {
+133         teacherId: teacher.id,
+134       },
+135     });
+136 
+137     await tx.schoolMember.upsert({
+138       where: {
+139         userId_schoolId: {
+140           userId: teacher.id,
+141           schoolId: targetClass.schoolId,
+142         },
+143       },
+144       update: {
+145         role: "TEACHER",
+146       },
+147       create: {
+148         userId: teacher.id,
+149         schoolId: targetClass.schoolId,
+150         role: "TEACHER",
+151       },
+152     });
+153 
+154     await tx.groupMember.upsert({
+155       where: {
+156         userId_groupId: {
+157           userId: teacher.id,
+158           groupId: targetClass.school.groupId,
+159         },
+160       },
+161       update: {
+162         role: "VIEWER",
+163       },
+164       create: {
+165         userId: teacher.id,
+166         groupId: targetClass.school.groupId,
+167         role: "VIEWER",
+168       },
+169     });
+170   });
+171 
+172   const payload = await getTeacherClassesPayload(user.id, teacher.id);
+173   return NextResponse.json(payload);
+174 }
+175 
+176 export async function DELETE(
+177   req: NextRequest,
+178   { params }: { params: Promise<{ teacherId: string }> }
+179 ) {
+180   const user = await getSessionUser();
+181 
+182   if (!user) {
+183     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+184   }
+185 
+186   const { teacherId } = await params;
+187   const teacher = await getTeacherOwnedByUser(user.id, teacherId);
+188 
+189   if (!teacher) {
+190     return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+191   }
+192 
+193   const data = await req.json();
+194   const classId = String(data.classId ?? "").trim();
+195 
+196   if (!classId) {
+197     return NextResponse.json({ error: "Missing classId" }, { status: 400 });
+198   }
+199 
+200   const targetClass = await prisma.class.findFirst({
+201     where: {
+202       id: classId,
+203       teacherId: teacher.id,
+204     },
+205     include: {
+206       school: {
+207         include: {
+208           group: true,
+209           classes: {
+210             where: {
+211               teacherId: teacher.id,
+212             },
+213             select: {
+214               id: true,
+215             },
+216           },
+217         },
+218       },
+219     },
+220   });
+221 
+222   if (!targetClass) {
+223     return NextResponse.json({ error: "Class not found" }, { status: 404 });
+224   }
+225 
+226   await prisma.$transaction(async (tx) => {
+227     await tx.class.update({
+228       where: { id: classId },
+229       data: {
+230         teacherId: null,
+231       },
+232     });
+233 
+234     const remainingTeacherClassesInSchool = await tx.class.count({
+235       where: {
+236         teacherId: teacher.id,
+237         schoolId: targetClass.schoolId,
+238       },
+239     });
+240 
+241     if (remainingTeacherClassesInSchool === 0) {
+242       await tx.schoolMember.deleteMany({
+243         where: {
+244           userId: teacher.id,
+245           schoolId: targetClass.schoolId,
+246           role: "TEACHER",
+247         },
+248       });
+249     }
+250 
+251     const remainingTeacherClassesInGroup = await tx.class.count({
+252       where: {
+253         teacherId: teacher.id,
+254         school: {
+255           groupId: targetClass.school.groupId,
+256         },
+257       },
+258     });
+259 
+260     if (remainingTeacherClassesInGroup === 0) {
+261       await tx.groupMember.deleteMany({
+262         where: {
+263           userId: teacher.id,
+264           groupId: targetClass.school.groupId,
+265           role: "VIEWER",
+266         },
+267       });
+268     }
+269   });
+270 
+271   const payload = await getTeacherClassesPayload(user.id, teacher.id);
+272   return NextResponse.json(payload);
+273 }
+
+===== app/api/auth/login/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { prisma } from "@/lib/prisma";
+3 import { verifyPassword, createSession } from "@/lib/auth";
+4 
+5 export async function POST(req: NextRequest) {
+6   const formData = await req.formData();
+7   const email = String(formData.get("email") ?? "").toLowerCase().trim();
+8   const password = String(formData.get("password") ?? "");
+9 
+10   if (!email || !password) {
+11     const url = new URL("/login?error=missing_fields", req.url);
+12     return NextResponse.redirect(url);
+13   }
+14 
+15   const user = await prisma.user.findUnique({
+16     where: { email },
+17   });
+18 
+19   if (!user) {
+20     const url = new URL("/login?error=invalid_credentials", req.url);
+21     return NextResponse.redirect(url);
+22   }
+23 
+24   const valid = await verifyPassword(password, user.passwordHash);
+25 
+26   if (!valid) {
+27     const url = new URL("/login?error=invalid_credentials", req.url);
+28     return NextResponse.redirect(url);
+29   }
+30 
+31   const redirectUrl = await createSession(user.id, req.url);
+32   return NextResponse.redirect(redirectUrl);
+33 }
+
+===== components/CreateTeacherModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type CreatedTeacherResult = {
+6   teacher: {
+7     id: string;
+8     name: string;
+9     email: string;
+10     cpf: string | null;
+11     isTeacher: boolean;
+12     createdAt: string;
+13     _count: {
+14       classes: number;
+15     };
+16   };
+17   temporaryPassword: string;
+18 };
+19 
+20 type ErrorResponse = {
+21   error?: string;
+22 };
+23 
+24 type Props = {
+25   open: boolean;
+26   onClose: () => void;
+27   onCreated: () => void;
+28 };
+29 
+30 function formatCpf(value: string) {
+31   const digits = value.replace(/\D/g, "").slice(0, 11);
+32 
+33   return digits
+34     .replace(/^(\d{3})(\d)/, "$1.$2")
+35     .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+36     .replace(/\.(\d{3})(\d)/, ".$1-$2");
+37 }
+38 
+39 export default function CreateTeacherModal({
+40   open,
+41   onClose,
+42   onCreated,
+43 }: Props) {
+44   const [name, setName] = useState("");
+45   const [email, setEmail] = useState("");
+46   const [cpf, setCpf] = useState("");
+47   const [loading, setLoading] = useState(false);
+48   const [created, setCreated] = useState<CreatedTeacherResult | null>(null);
+49   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+50 
+51   if (!open) return null;
+52 
+53   async function handleSubmit(e: React.FormEvent) {
+54     e.preventDefault();
+55 
+56     if (!name.trim() || !email.trim() || !cpf.trim()) {
+57       setErrorMessage("Preencha nome completo, e-mail e CPF.");
+58       return;
+59     }
+60 
+61     setLoading(true);
+62     setErrorMessage(null);
+63 
+64     try {
+65       const res = await fetch("/api/teachers", {
+66         method: "POST",
+67         headers: { "Content-Type": "application/json" },
+68         body: JSON.stringify({ name, email, cpf }),
+69       });
+70 
+71       if (!res.ok) {
+72         const errorData = (await res.json()) as ErrorResponse;
+73         setErrorMessage(errorData.error ?? "Erro ao criar professor.");
+74         return;
+75       }
+76 
+77       const data = (await res.json()) as CreatedTeacherResult;
+78       setCreated(data);
+79       setName("");
+80       setEmail("");
+81       setCpf("");
+82       onCreated();
+83     } catch (error) {
+84       console.error("Erro ao criar professor", error);
+85       setErrorMessage("Erro ao criar professor.");
+86     } finally {
+87       setLoading(false);
+88     }
+89   }
+90 
+91   function handleClose() {
+92     setCreated(null);
+93     setName("");
+94     setEmail("");
+95     setCpf("");
+96     setErrorMessage(null);
+97     onClose();
+98   }
+99 
+100   return (
+101     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+102       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+103         {!created ? (
+104           <>
+105             <h2 className="text-lg font-semibold text-slate-900">
+106               Adicionar professor
+107             </h2>
+108             <p className="mt-2 text-sm text-slate-500">
+109               Cadastre o professor com nome completo, e-mail e CPF. A senha será
+110               gerada automaticamente com base nesses dados.
+111             </p>
+112 
+113             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+114               <div>
+115                 <label className="text-sm font-medium text-slate-700">
+116                   Nome completo
+117                 </label>
+118                 <input
+119                   type="text"
+120                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+121                   placeholder="Ex: Guilherme Cruz"
+122                   value={name}
+123                   onChange={(e) => setName(e.target.value)}
+124                 />
+125               </div>
+126 
+127               <div>
+128                 <label className="text-sm font-medium text-slate-700">
+129                   E-mail
+130                 </label>
+131                 <input
+132                   type="email"
+133                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+134                   placeholder="Ex: professor@email.com"
+135                   value={email}
+136                   onChange={(e) => setEmail(e.target.value)}
+137                 />
+138               </div>
+139 
+140               <div>
+141                 <label className="text-sm font-medium text-slate-700">
+142                   CPF
+143                 </label>
+144                 <input
+145                   type="text"
+146                   inputMode="numeric"
+147                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+148                   placeholder="Ex: 111.111.111-11"
+149                   value={cpf}
+150                   onChange={(e) => setCpf(formatCpf(e.target.value))}
+151                 />
+152               </div>
+153 
+154               {errorMessage && (
+155                 <p className="text-sm text-red-600">{errorMessage}</p>
+156               )}
+157 
+158               <div className="flex justify-end gap-2">
+159                 <button
+160                   type="button"
+161                   onClick={handleClose}
+162                   className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300"
+163                   disabled={loading}
+164                 >
+165                   Cancelar
+166                 </button>
+167 
+168                 <button
+169                   type="submit"
+170                   className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+171                   disabled={loading}
+172                 >
+173                   {loading ? "Cadastrando..." : "Cadastrar professor"}
+174                 </button>
+175               </div>
+176             </form>
+177           </>
+178         ) : (
+179           <>
+180             <h2 className="text-lg font-semibold text-slate-900">
+181               Professor cadastrado
+182             </h2>
+183             <p className="mt-2 text-sm text-slate-500">
+184               Guarde essas credenciais para repassar ao professor.
+185             </p>
+186 
+187             <div className="mt-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+188               <div>
+189                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+190                   Nome
+191                 </p>
+192                 <p className="mt-1 text-sm font-medium text-slate-900">
+193                   {created.teacher.name}
+194                 </p>
+195               </div>
+196 
+197               <div>
+198                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+199                   E-mail
+200                 </p>
+201                 <p className="mt-1 text-sm font-medium text-slate-900">
+202                   {created.teacher.email}
+203                 </p>
+204               </div>
+205 
+206               <div>
+207                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+208                   CPF
+209                 </p>
+210                 <p className="mt-1 text-sm font-medium text-slate-900">
+211                   {created.teacher.cpf}
+212                 </p>
+213               </div>
+214 
+215               <div>
+216                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+217                   Senha inicial
+218                 </p>
+219                 <p className="mt-1 text-sm font-medium text-slate-900">
+220                   {created.temporaryPassword}
+221                 </p>
+222               </div>
+223             </div>
+224 
+225             <div className="mt-6 flex justify-end">
+226               <button
+227                 type="button"
+228                 onClick={handleClose}
+229                 className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+230               >
+231                 Fechar
+232               </button>
+233             </div>
+234           </>
+235         )}
+236       </div>
+237     </div>
+238   );
+239 }
+
+===== components/TeacherDetailClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useMemo, useState } from "react";
+5 
+6 type LinkedClass = {
+7   id: string;
+8   name: string;
+9   year: number | null;
+10   school: {
+11     id: string;
+12     name: string;
+13     group: {
+14       id: string;
+15       name: string;
+16     };
+17   };
+18 };
+19 
+20 type AvailableClass = {
+21   id: string;
+22   name: string;
+23   year: number | null;
+24   school: {
+25     id: string;
+26     name: string;
+27     group: {
+28       id: string;
+29       name: string;
+30     };
+31   };
+32 };
+33 
+34 type Props = {
+35   teacherId: string;
+36   teacherName: string;
+37   teacherEmail: string;
+38   teacherCpf: string | null;
+39   linkedClasses: LinkedClass[];
+40   availableClasses: AvailableClass[];
+41 };
+42 
+43 function formatCpf(value: string) {
+44   const digits = value.replace(/\D/g, "").slice(0, 11);
+45 
+46   return digits
+47     .replace(/^(\d{3})(\d)/, "$1.$2")
+48     .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+49     .replace(/\.(\d{3})(\d)/, ".$1-$2");
+50 }
+51 
+52 export default function TeacherDetailClient({
+53   teacherId,
+54   teacherName,
+55   teacherEmail,
+56   teacherCpf,
+57   linkedClasses,
+58   availableClasses,
+59 }: Props) {
+60   const [currentLinked, setCurrentLinked] = useState(linkedClasses);
+61   const [currentAvailable, setCurrentAvailable] = useState(availableClasses);
+62   const [loadingAssignId, setLoadingAssignId] = useState<string | null>(null);
+63   const [loadingRemoveId, setLoadingRemoveId] = useState<string | null>(null);
+64 
+65   const [editOpen, setEditOpen] = useState(false);
+66   const [editName, setEditName] = useState(teacherName);
+67   const [editEmail, setEditEmail] = useState(teacherEmail);
+68   const [editCpf, setEditCpf] = useState(teacherCpf ?? "");
+69   const [savingTeacher, setSavingTeacher] = useState(false);
+70   const [teacherError, setTeacherError] = useState<string | null>(null);
+71   const [newPassword, setNewPassword] = useState<string | null>(null);
+72 
+73   const sortedAvailable = useMemo(
+74     () =>
+75       [...currentAvailable].sort((a, b) => {
+76         const groupCompare = a.school.group.name.localeCompare(
+77           b.school.group.name
+78         );
+79         if (groupCompare !== 0) return groupCompare;
+80 
+81         const schoolCompare = a.school.name.localeCompare(b.school.name);
+82         if (schoolCompare !== 0) return schoolCompare;
+83 
+84         return a.name.localeCompare(b.name);
+85       }),
+86     [currentAvailable]
+87   );
+88 
+89   async function assignClass(classId: string) {
+90     setLoadingAssignId(classId);
+91 
+92     try {
+93       const res = await fetch(`/api/teachers/${teacherId}/classes`, {
+94         method: "POST",
+95         headers: { "Content-Type": "application/json" },
+96         body: JSON.stringify({ classId }),
+97       });
+98 
+99       if (!res.ok) {
+100         console.error("Erro ao vincular turma");
+101         return;
+102       }
+103 
+104       const data = (await res.json()) as {
+105         linkedClasses: LinkedClass[];
+106         availableClasses: AvailableClass[];
+107       };
+108 
+109       setCurrentLinked(data.linkedClasses);
+110       setCurrentAvailable(data.availableClasses);
+111     } catch (error) {
+112       console.error("Erro ao vincular turma", error);
+113     } finally {
+114       setLoadingAssignId(null);
+115     }
+116   }
+117 
+118   async function removeClass(classId: string) {
+119     setLoadingRemoveId(classId);
+120 
+121     try {
+122       const res = await fetch(`/api/teachers/${teacherId}/classes`, {
+123         method: "DELETE",
+124         headers: { "Content-Type": "application/json" },
+125         body: JSON.stringify({ classId }),
+126       });
+127 
+128       if (!res.ok) {
+129         console.error("Erro ao remover vínculo da turma");
+130         return;
+131       }
+132 
+133       const data = (await res.json()) as {
+134         linkedClasses: LinkedClass[];
+135         availableClasses: AvailableClass[];
+136       };
+137 
+138       setCurrentLinked(data.linkedClasses);
+139       setCurrentAvailable(data.availableClasses);
+140     } catch (error) {
+141       console.error("Erro ao remover vínculo da turma", error);
+142     } finally {
+143       setLoadingRemoveId(null);
+144     }
+145   }
+146 
+147   async function saveTeacher() {
+148     if (!editName.trim() || !editEmail.trim() || !editCpf.trim()) {
+149       setTeacherError("Nome completo, e-mail e CPF são obrigatórios.");
+150       return;
+151     }
+152 
+153     setSavingTeacher(true);
+154     setTeacherError(null);
+155     setNewPassword(null);
+156 
+157     try {
+158       const res = await fetch(`/api/teachers/${teacherId}`, {
+159         method: "PATCH",
+160         headers: { "Content-Type": "application/json" },
+161         body: JSON.stringify({
+162           name: editName,
+163           email: editEmail,
+164           cpf: editCpf,
+165         }),
+166       });
+167 
+168       const data = (await res.json()) as {
+169         error?: string;
+170         regeneratedPassword?: string;
+171       };
+172 
+173       if (!res.ok) {
+174         setTeacherError(data.error ?? "Erro ao atualizar professor.");
+175         return;
+176       }
+177 
+178       setNewPassword(data.regeneratedPassword ?? null);
+179       setEditOpen(false);
+180       window.location.reload();
+181     } catch (error) {
+182       console.error("Erro ao atualizar professor", error);
+183       setTeacherError("Erro ao atualizar professor.");
+184     } finally {
+185       setSavingTeacher(false);
+186     }
+187   }
+188 
+189   return (
+190     <main className="min-h-screen bg-slate-50 px-4 py-10">
+191       <div className="mx-auto w-full max-w-5xl">
+192         <div className="mb-6">
+193           <Link
+194             href="/dashboard"
+195             className="text-sm font-medium text-sky-700 hover:text-sky-800"
+196           >
+197             ← Voltar para dashboard
+198           </Link>
+199         </div>
+200 
+201         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+202           <div className="flex flex-wrap items-start justify-between gap-4">
+203             <div>
+204               <h1 className="text-2xl font-semibold text-slate-900">
+205                 {teacherName}
+206               </h1>
+207               <p className="mt-2 text-sm text-slate-500">{teacherEmail}</p>
+208               <p className="mt-1 text-sm text-slate-500">
+209                 CPF: {teacherCpf ?? "Não informado"}
+210               </p>
+211               <p className="mt-3 text-sm text-slate-500">
+212                 Vincule e remova turmas deste professor. As permissões de acesso
+213                 serão refletidas conforme as turmas atendidas.
+214               </p>
+215 
+216               {newPassword && (
+217                 <p className="mt-3 text-sm font-medium text-emerald-700">
+218                   Nova senha gerada: {newPassword}
+219                 </p>
+220               )}
+221             </div>
+222 
+223             <button
+224               type="button"
+225               onClick={() => setEditOpen(true)}
+226               className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+227             >
+228               Editar professor
+229             </button>
+230           </div>
+231         </div>
+232 
+233         <div className="mt-8 grid gap-6 lg:grid-cols-2">
+234           <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+235             <h2 className="text-lg font-semibold text-slate-900">
+236               Turmas vinculadas
+237             </h2>
+238             <p className="mt-2 text-sm text-slate-500">
+239               Estas turmas estão atualmente atribuídas a este professor.
+240             </p>
+241 
+242             {currentLinked.length === 0 ? (
+243               <p className="mt-6 text-sm text-slate-500">
+244                 Nenhuma turma vinculada ainda.
+245               </p>
+246             ) : (
+247               <ul className="mt-6 space-y-3">
+248                 {currentLinked.map((item) => (
+249                   <li
+250                     key={item.id}
+251                     className="rounded-md border border-slate-200 px-4 py-3"
+252                   >
+253                     <div className="flex items-start justify-between gap-4">
+254                       <div>
+255                         <p className="text-sm font-medium text-slate-900">
+256                           {item.name}
+257                         </p>
+258                         <p className="mt-1 text-xs text-slate-500">
+259                           {item.year ? `Ano letivo ${item.year} • ` : ""}
+260                           {item.school.group.name} • {item.school.name}
+261                         </p>
+262                       </div>
+263 
+264                       <button
+265                         type="button"
+266                         onClick={() => removeClass(item.id)}
+267                         disabled={loadingRemoveId === item.id}
+268                         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+269                       >
+270                         {loadingRemoveId === item.id
+271                           ? "Removendo..."
+272                           : "Remover"}
+273                       </button>
+274                     </div>
+275                   </li>
+276                 ))}
+277               </ul>
+278             )}
+279           </section>
+280 
+281           <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+282             <h2 className="text-lg font-semibold text-slate-900">
+283               Turmas disponíveis
+284             </h2>
+285             <p className="mt-2 text-sm text-slate-500">
+286               Selecione uma turma disponível para vincular a este professor.
+287             </p>
+288 
+289             {sortedAvailable.length === 0 ? (
+290               <p className="mt-6 text-sm text-slate-500">
+291                 Não há turmas disponíveis para vínculo no momento.
+292               </p>
+293             ) : (
+294               <ul className="mt-6 space-y-3">
+295                 {sortedAvailable.map((item) => (
+296                   <li
+297                     key={item.id}
+298                     className="rounded-md border border-slate-200 px-4 py-3"
+299                   >
+300                     <div className="flex items-start justify-between gap-4">
+301                       <div>
+302                         <p className="text-sm font-medium text-slate-900">
+303                           {item.name}
+304                         </p>
+305                         <p className="mt-1 text-xs text-slate-500">
+306                           {item.year ? `Ano letivo ${item.year} • ` : ""}
+307                           {item.school.group.name} • {item.school.name}
+308                         </p>
+309                       </div>
+310 
+311                       <button
+312                         type="button"
+313                         onClick={() => assignClass(item.id)}
+314                         disabled={loadingAssignId === item.id}
+315                         className="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+316                       >
+317                         {loadingAssignId === item.id
+318                           ? "Vinculando..."
+319                           : "Vincular"}
+320                       </button>
+321                     </div>
+322                   </li>
+323                 ))}
+324               </ul>
+325             )}
+326           </section>
+327         </div>
+328 
+329         {editOpen && (
+330           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+331             <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+332               <h2 className="text-lg font-semibold text-slate-900">
+333                 Editar professor
+334               </h2>
+335               <p className="mt-2 text-sm text-slate-500">
+336                 Nome completo, e-mail e CPF são obrigatórios. Ao salvar, a senha
+337                 será regenerada automaticamente.
+338               </p>
+339 
+340               <div className="mt-6 space-y-4">
+341                 <div>
+342                   <label className="text-sm font-medium text-slate-700">
+343                     Nome completo
+344                   </label>
+345                   <input
+346                     type="text"
+347                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+348                     value={editName}
+349                     onChange={(e) => setEditName(e.target.value)}
+350                   />
+351                 </div>
+352 
+353                 <div>
+354                   <label className="text-sm font-medium text-slate-700">
+355                     E-mail
+356                   </label>
+357                   <input
+358                     type="email"
+359                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+360                     value={editEmail}
+361                     onChange={(e) => setEditEmail(e.target.value)}
+362                   />
+363                 </div>
+364 
+365                 <div>
+366                   <label className="text-sm font-medium text-slate-700">
+367                     CPF
+368                   </label>
+369                   <input
+370                     type="text"
+371                     inputMode="numeric"
+372                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+373                     value={editCpf}
+374                     onChange={(e) => setEditCpf(formatCpf(e.target.value))}
+375                   />
+376                 </div>
+377 
+378                 {teacherError && (
+379                   <p className="text-sm text-red-600">{teacherError}</p>
+380                 )}
+381 
+382                 <div className="flex justify-end gap-2">
+383                   <button
+384                     type="button"
+385                     onClick={() => {
+386                       setEditOpen(false);
+387                       setTeacherError(null);
+388                     }}
+389                     className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300"
+390                     disabled={savingTeacher}
+391                   >
+392                     Cancelar
+393                   </button>
+394 
+395                   <button
+396                     type="button"
+397                     onClick={saveTeacher}
+398                     className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+399                     disabled={savingTeacher}
+400                   >
+401                     {savingTeacher ? "Salvando..." : "Salvar alterações"}
+402                   </button>
+403                 </div>
+404               </div>
+405             </div>
+406           </div>
+407         )}
+408       </div>
+409     </main>
+410   );
+411 }
+
+===== app/(app)/teachers/[teacherId]/page.tsx =====
+1 import { notFound } from "next/navigation";
+2 import TeacherDetailClient from "@/components/TeacherDetailClient";
+3 import { getSessionUser } from "@/lib/auth";
+4 import { prisma } from "@/lib/prisma";
+5 
+6 type PageProps = {
+7   params: Promise<{ teacherId: string }>;
+8 };
+9 
+10 export default async function TeacherPage({ params }: PageProps) {
+11   const user = await getSessionUser();
+12 
+13   if (!user) {
+14     notFound();
+15   }
+16 
+17   const { teacherId } = await params;
+18 
+19   const teacher = await prisma.user.findFirst({
+20     where: {
+21       id: teacherId,
+22       createdById: user.id,
+23       isTeacher: true,
+24     },
+25   });
+26 
+27   if (!teacher) {
+28     notFound();
+29   }
+30 
+31   const linkedClassesRaw = await prisma.class.findMany({
+32     where: {
+33       teacherId: teacher.id,
+34     },
+35     include: {
+36       school: {
+37         include: {
+38           group: true,
+39         },
+40       },
+41     },
+42     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+43   });
+44 
+45   const availableClassesRaw = await prisma.class.findMany({
+46     where: {
+47       teacherId: null,
+48       school: {
+49         members: {
+50           some: {
+51             userId: user.id,
+52           },
+53         },
+54       },
+55     },
+56     include: {
+57       school: {
+58         include: {
+59           group: true,
+60         },
+61       },
+62     },
+63     orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+64   });
+65 
+66   const linkedClasses = linkedClassesRaw.map((item) => ({
+67     id: item.id,
+68     name: item.name,
+69     year: item.year,
+70     school: {
+71       id: item.school.id,
+72       name: item.school.name,
+73       group: {
+74         id: item.school.group.id,
+75         name: item.school.group.name,
+76       },
+77     },
+78   }));
+79 
+80   const availableClasses = availableClassesRaw.map((item) => ({
+81     id: item.id,
+82     name: item.name,
+83     year: item.year,
+84     school: {
+85       id: item.school.id,
+86       name: item.school.name,
+87       group: {
+88         id: item.school.group.id,
+89         name: item.school.group.name,
+90       },
+91     },
+92   }));
+93 
+94   return (
+95     <TeacherDetailClient
+96       teacherId={teacher.id}
+97       teacherName={teacher.name}
+98       teacherEmail={teacher.email}
+99       teacherCpf={teacher.cpf}
+100       linkedClasses={linkedClasses}
+101       availableClasses={availableClasses}
+102     />
+103   );
+104 }
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 model User {
+11   id            String          @id @default(cuid())
+12   name          String
+13   email         String          @unique
+14   cpf           String?         @unique
+15   passwordHash  String
+16   isTeacher     Boolean         @default(false)
+17   createdById   String?
+18   createdAt     DateTime        @default(now())
+19   updatedAt     DateTime        @updatedAt
+20 
+21   createdBy     User?           @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+22   createdUsers  User[]          @relation("CreatedUsers")
+23   sessions      Session[]
+24   groupMembers  GroupMember[]
+25   schoolMembers SchoolMember[]
+26   classes       Class[]         @relation("ClassTeacher")
+27 
+28   deletedStudents Student[]     @relation("DeletedByUser")
+29 }
+30 
+31 model Session {
+32   id        String   @id @default(cuid())
+33   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+34   userId    String
+35   createdAt DateTime @default(now())
+36   expiresAt DateTime
+37 
+38   @@index([userId])
+39 }
+40 
+41 model Group {
+42   id        String        @id @default(cuid())
+43   name      String
+44   createdAt DateTime      @default(now())
+45   updatedAt DateTime      @updatedAt
+46 
+47   members   GroupMember[]
+48   schools   School[]
+49 }
+50 
+51 model GroupMember {
+52   id        String   @id @default(cuid())
+53   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+54   userId    String
+55   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+56   groupId   String
+57 
+58   role      String
+59   createdAt DateTime @default(now())
+60 
+61   @@unique([userId, groupId])
+62 }
+63 
+64 model School {
+65   id        String         @id @default(cuid())
+66   name      String
+67   createdAt DateTime       @default(now())
+68   updatedAt DateTime       @updatedAt
+69 
+70   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+71   groupId   String
+72 
+73   members   SchoolMember[]
+74   classes   Class[]
+75 }
+76 
+77 model SchoolMember {
+78   id        String   @id @default(cuid())
+79   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+80   userId    String
+81   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+82   schoolId  String
+83 
+84   role      String
+85   createdAt DateTime @default(now())
+86 
+87   @@unique([userId, schoolId])
+88 }
+89 
+90 model Class {
+91   id          String              @id @default(cuid())
+92   name        String
+93   year        Int?
+94   createdAt   DateTime            @default(now())
+95   updatedAt   DateTime            @updatedAt
+96 
+97   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+98   schoolId    String
+99 
+100   teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+101   teacherId   String?
+102 
+103   students    Student[]
+104   attendances Attendance[]
+105 }
+106 
+107 model Student {
+108   id            String               @id @default(cuid())
+109   name          String
+110   createdAt     DateTime             @default(now())
+111   updatedAt     DateTime             @updatedAt
+112 
+113   class         Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+114   classId       String
+115 
+116   presences     AttendancePresence[]
+117 
+118   deletedAt     DateTime?
+119   deletedReason String?
+120   deletedById   String?
+121   deletedBy     User? @relation("DeletedByUser", fields: [deletedById], references: [id])
+122 }
+123 
+124 model Attendance {
+125   id         String               @id @default(cuid())
+126   title      String
+127   lessonDate DateTime
+128   createdAt  DateTime             @default(now())
+129   updatedAt  DateTime             @updatedAt
+130 
+131   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+132   classId    String
+133 
+134   presences  AttendancePresence[]
+135 }
+136 
+137 model AttendancePresence {
+138   id           String      @id @default(cuid())
+139   present      Boolean     @default(false)
+140   createdAt    DateTime    @default(now())
+141   updatedAt    DateTime    @updatedAt
+142 
+143   attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+144   attendanceId String
+145 
+146   student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+147   studentId    String
+148 
+149   @@unique([attendanceId, studentId])
+150 }

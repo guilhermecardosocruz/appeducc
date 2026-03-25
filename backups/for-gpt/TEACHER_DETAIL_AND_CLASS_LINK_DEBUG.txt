@@ -1,0 +1,834 @@
+
+===== app/(app)/dashboard/page.tsx =====
+1 import { getSessionUser } from "@/lib/auth";
+2 import { prisma } from "@/lib/prisma";
+3 import GroupsDashboardClient from "@/components/GroupsDashboardClient";
+4 
+5 export default async function DashboardPage() {
+6   const user = await getSessionUser();
+7 
+8   if (!user) {
+9     return (
+10       <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+11         <div className="max-w-xl text-center">
+12           <h1 className="text-2xl font-semibold text-slate-900">
+13             Você precisa estar autenticado para acessar o painel.
+14           </h1>
+15           <p className="mt-3 text-sm text-slate-500">
+16             Faça login para organizar seus grupos de escolas, escolas, turmas e
+17             demais estruturas educativas.
+18           </p>
+19         </div>
+20       </main>
+21     );
+22   }
+23 
+24   const groupsRaw = await prisma.group.findMany({
+25     where: {
+26       members: {
+27         some: {
+28           userId: user.id,
+29         },
+30       },
+31     },
+32     include: {
+33       _count: { select: { schools: true } },
+34     },
+35     orderBy: { createdAt: "desc" },
+36   });
+37 
+38   const teachersRaw = await prisma.user.findMany({
+39     where: {
+40       createdById: user.id,
+41       isTeacher: true,
+42     },
+43     include: {
+44       _count: {
+45         select: {
+46           classes: true,
+47         },
+48       },
+49     },
+50     orderBy: { createdAt: "desc" },
+51   });
+52 
+53   const groups = groupsRaw.map((g) => ({
+54     id: g.id,
+55     name: g.name,
+56     createdAt: g.createdAt.toISOString(),
+57     _count: { schools: g._count.schools },
+58   }));
+59 
+60   const teachers = teachersRaw.map((teacher) => ({
+61     id: teacher.id,
+62     name: teacher.name,
+63     email: teacher.email,
+64     isTeacher: teacher.isTeacher,
+65     createdAt: teacher.createdAt.toISOString(),
+66     _count: {
+67       classes: teacher._count.classes,
+68     },
+69   }));
+70 
+71   return (
+72     <main className="min-h-screen bg-slate-50 px-4 py-10">
+73       <div className="mx-auto w-full max-w-4xl">
+74         <h1 className="text-2xl font-semibold text-slate-900">
+75           Organização das escolas
+76         </h1>
+77         <p className="mt-2 max-w-2xl text-sm text-slate-500">
+78           Aqui você gerencia sua estrutura educacional em níveis:{" "}
+79           <span className="font-medium">
+80             Grupos de escolas → Escolas → Turmas → Professores e Alunos
+81           </span>
+82           .
+83         </p>
+84 
+85         <GroupsDashboardClient
+86           initialGroups={groups}
+87           initialTeachers={teachers}
+88           userName={user.name}
+89           userEmail={user.email}
+90         />
+91       </div>
+92     </main>
+93   );
+94 }
+
+===== components/GroupsDashboardClient.tsx =====
+1 "use client";
+2 
+3 import Link from "next/link";
+4 import { useState } from "react";
+5 import CreateGroupModal from "./CreateGroupModal";
+6 import CreateTeacherModal from "./CreateTeacherModal";
+7 
+8 type Group = {
+9   id: string;
+10   name: string;
+11   createdAt: string;
+12   _count: {
+13     schools: number;
+14   };
+15 };
+16 
+17 type Teacher = {
+18   id: string;
+19   name: string;
+20   email: string;
+21   isTeacher: boolean;
+22   createdAt: string;
+23   _count: {
+24     classes: number;
+25   };
+26 };
+27 
+28 type Props = {
+29   initialGroups: Group[];
+30   initialTeachers: Teacher[];
+31   userName?: string | null;
+32   userEmail?: string | null;
+33 };
+34 
+35 export default function GroupsDashboardClient({
+36   initialGroups,
+37   initialTeachers,
+38   userName,
+39   userEmail,
+40 }: Props) {
+41   const [groups, setGroups] = useState<Group[]>(initialGroups);
+42   const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
+43   const [openGroupModal, setOpenGroupModal] = useState(false);
+44   const [openTeacherModal, setOpenTeacherModal] = useState(false);
+45   const [loadingGroupList, setLoadingGroupList] = useState(false);
+46   const [loadingTeacherList, setLoadingTeacherList] = useState(false);
+47 
+48   async function refreshGroups() {
+49     setLoadingGroupList(true);
+50     try {
+51       const res = await fetch("/api/groups", {
+52         method: "GET",
+53         headers: { "Content-Type": "application/json" },
+54         cache: "no-store",
+55       });
+56 
+57       if (res.ok) {
+58         const data = (await res.json()) as Group[];
+59         setGroups(
+60           data.map((g) => ({
+61             id: g.id,
+62             name: g.name,
+63             createdAt: g.createdAt,
+64             _count: { schools: g._count?.schools ?? 0 },
+65           }))
+66         );
+67       } else {
+68         console.error("Erro ao carregar grupos");
+69       }
+70     } catch (error) {
+71       console.error("Erro ao buscar grupos", error);
+72     } finally {
+73       setLoadingGroupList(false);
+74     }
+75   }
+76 
+77   async function refreshTeachers() {
+78     setLoadingTeacherList(true);
+79     try {
+80       const res = await fetch("/api/teachers", {
+81         method: "GET",
+82         headers: { "Content-Type": "application/json" },
+83         cache: "no-store",
+84       });
+85 
+86       if (res.ok) {
+87         const data = (await res.json()) as Teacher[];
+88         setTeachers(
+89           data.map((teacher) => ({
+90             id: teacher.id,
+91             name: teacher.name,
+92             email: teacher.email,
+93             isTeacher: teacher.isTeacher,
+94             createdAt: teacher.createdAt,
+95             _count: {
+96               classes: teacher._count?.classes ?? 0,
+97             },
+98           }))
+99         );
+100       } else {
+101         console.error("Erro ao carregar professores");
+102       }
+103     } catch (error) {
+104       console.error("Erro ao buscar professores", error);
+105     } finally {
+106       setLoadingTeacherList(false);
+107     }
+108   }
+109 
+110   return (
+111     <div className="mt-8 space-y-8 text-left">
+112       <div>
+113         <p className="text-sm text-slate-500">
+114           {userName && userEmail ? (
+115             <>
+116               Logado como{" "}
+117               <span className="font-medium">
+118                 {userName} ({userEmail})
+119               </span>
+120               .
+121             </>
+122           ) : null}
+123         </p>
+124       </div>
+125 
+126       <section className="space-y-4">
+127         <div className="flex items-start justify-between gap-4">
+128           <div>
+129             <h2 className="text-lg font-semibold text-slate-900">
+130               Grupos de escolas
+131             </h2>
+132             <p className="mt-1 text-sm text-slate-500">
+133               Organize suas escolas em grupos, como redes municipais, privadas ou
+134               projetos específicos.
+135             </p>
+136           </div>
+137 
+138           <button
+139             type="button"
+140             onClick={() => setOpenGroupModal(true)}
+141             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+142           >
+143             + Criar grupo
+144           </button>
+145         </div>
+146 
+147         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+148           {loadingGroupList && (
+149             <p className="mb-3 text-sm text-slate-500">Atualizando grupos…</p>
+150           )}
+151 
+152           {groups.length === 0 ? (
+153             <p className="text-sm text-slate-500">
+154               Você ainda não possui nenhum grupo de escolas. Clique em{" "}
+155               <span className="font-semibold">“Criar grupo”</span> para começar.
+156             </p>
+157           ) : (
+158             <ul className="space-y-3">
+159               {groups.map((group) => (
+160                 <li key={group.id}>
+161                   <Link
+162                     href={`/groups/${group.id}`}
+163                     className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+164                   >
+165                     <div>
+166                       <p className="text-sm font-medium text-slate-900">
+167                         {group.name}
+168                       </p>
+169                       <p className="mt-1 text-xs text-slate-500">
+170                         {group._count.schools === 0
+171                           ? "Nenhuma escola cadastrada ainda"
+172                           : group._count.schools === 1
+173                           ? "1 escola cadastrada"
+174                           : `${group._count.schools} escolas cadastradas`}
+175                       </p>
+176                     </div>
+177 
+178                     <span className="text-sm font-medium text-sky-700">
+179                       Abrir
+180                     </span>
+181                   </Link>
+182                 </li>
+183               ))}
+184             </ul>
+185           )}
+186         </div>
+187       </section>
+188 
+189       <section className="space-y-4">
+190         <div className="flex items-start justify-between gap-4">
+191           <div>
+192             <h2 className="text-lg font-semibold text-slate-900">Professores</h2>
+193             <p className="mt-1 text-sm text-slate-500">
+194               Cadastre professores com e-mail e senha temporária para acesso ao
+195               sistema.
+196             </p>
+197           </div>
+198 
+199           <button
+200             type="button"
+201             onClick={() => setOpenTeacherModal(true)}
+202             className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+203           >
+204             + Adicionar professor
+205           </button>
+206         </div>
+207 
+208         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+209           {loadingTeacherList && (
+210             <p className="mb-3 text-sm text-slate-500">
+211               Atualizando professores…
+212             </p>
+213           )}
+214 
+215           {teachers.length === 0 ? (
+216             <p className="text-sm text-slate-500">
+217               Você ainda não cadastrou professores. Clique em{" "}
+218               <span className="font-semibold">“Adicionar professor”</span> para
+219               começar.
+220             </p>
+221           ) : (
+222             <ul className="space-y-3">
+223               {teachers.map((teacher) => (
+224                 <li
+225                   key={teacher.id}
+226                   className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3"
+227                 >
+228                   <div>
+229                     <p className="text-sm font-medium text-slate-900">
+230                       {teacher.name}
+231                     </p>
+232                     <p className="mt-1 text-xs text-slate-500">{teacher.email}</p>
+233                   </div>
+234 
+235                   <div className="text-right">
+236                     <p className="text-sm font-medium text-slate-700">
+237                       {teacher._count.classes === 0
+238                         ? "Nenhuma turma vinculada"
+239                         : teacher._count.classes === 1
+240                         ? "1 turma vinculada"
+241                         : `${teacher._count.classes} turmas vinculadas`}
+242                     </p>
+243                   </div>
+244                 </li>
+245               ))}
+246             </ul>
+247           )}
+248         </div>
+249       </section>
+250 
+251       <CreateGroupModal
+252         open={openGroupModal}
+253         onClose={() => setOpenGroupModal(false)}
+254         onCreated={refreshGroups}
+255       />
+256 
+257       <CreateTeacherModal
+258         open={openTeacherModal}
+259         onClose={() => setOpenTeacherModal(false)}
+260         onCreated={refreshTeachers}
+261       />
+262     </div>
+263   );
+264 }
+
+===== app/api/teachers/route.ts =====
+1 import { NextRequest, NextResponse } from "next/server";
+2 import { getSessionUser, hashPassword } from "@/lib/auth";
+3 import { prisma } from "@/lib/prisma";
+4 
+5 function generateTemporaryPassword(length = 10) {
+6   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+7   let password = "";
+8 
+9   for (let i = 0; i < length; i += 1) {
+10     password += chars[Math.floor(Math.random() * chars.length)];
+11   }
+12 
+13   return password;
+14 }
+15 
+16 export async function GET() {
+17   const user = await getSessionUser();
+18 
+19   if (!user) {
+20     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+21   }
+22 
+23   const teachers = await prisma.user.findMany({
+24     where: {
+25       createdById: user.id,
+26       isTeacher: true,
+27     },
+28     include: {
+29       _count: {
+30         select: {
+31           classes: true,
+32         },
+33       },
+34     },
+35     orderBy: { createdAt: "desc" },
+36   });
+37 
+38   return NextResponse.json(teachers);
+39 }
+40 
+41 export async function POST(req: NextRequest) {
+42   const user = await getSessionUser();
+43 
+44   if (!user) {
+45     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+46   }
+47 
+48   const data = await req.json();
+49   const name = String(data.name ?? "").trim();
+50   const email = String(data.email ?? "").toLowerCase().trim();
+51 
+52   if (!name || !email) {
+53     return NextResponse.json(
+54       { error: "Missing teacher name or email" },
+55       { status: 400 }
+56     );
+57   }
+58 
+59   const existing = await prisma.user.findUnique({
+60     where: { email },
+61   });
+62 
+63   if (existing) {
+64     return NextResponse.json(
+65       { error: "Email already in use" },
+66       { status: 409 }
+67     );
+68   }
+69 
+70   const temporaryPassword = generateTemporaryPassword();
+71   const passwordHash = await hashPassword(temporaryPassword);
+72 
+73   const teacher = await prisma.user.create({
+74     data: {
+75       name,
+76       email,
+77       passwordHash,
+78       isTeacher: true,
+79       createdById: user.id,
+80     },
+81     include: {
+82       _count: {
+83         select: {
+84           classes: true,
+85         },
+86       },
+87     },
+88   });
+89 
+90   return NextResponse.json(
+91     {
+92       teacher: {
+93         id: teacher.id,
+94         name: teacher.name,
+95         email: teacher.email,
+96         isTeacher: teacher.isTeacher,
+97         createdAt: teacher.createdAt,
+98         _count: {
+99           classes: teacher._count.classes,
+100         },
+101       },
+102       temporaryPassword,
+103     },
+104     { status: 201 }
+105   );
+106 }
+
+===== components/CreateTeacherModal.tsx =====
+1 "use client";
+2 
+3 import { useState } from "react";
+4 
+5 type CreatedTeacherResult = {
+6   teacher: {
+7     id: string;
+8     name: string;
+9     email: string;
+10     isTeacher: boolean;
+11     createdAt: string;
+12     _count: {
+13       classes: number;
+14     };
+15   };
+16   temporaryPassword: string;
+17 };
+18 
+19 type Props = {
+20   open: boolean;
+21   onClose: () => void;
+22   onCreated: () => void;
+23 };
+24 
+25 export default function CreateTeacherModal({
+26   open,
+27   onClose,
+28   onCreated,
+29 }: Props) {
+30   const [name, setName] = useState("");
+31   const [email, setEmail] = useState("");
+32   const [loading, setLoading] = useState(false);
+33   const [created, setCreated] = useState<CreatedTeacherResult | null>(null);
+34 
+35   if (!open) return null;
+36 
+37   async function handleSubmit(e: React.FormEvent) {
+38     e.preventDefault();
+39     if (!name.trim() || !email.trim()) return;
+40 
+41     setLoading(true);
+42 
+43     try {
+44       const res = await fetch("/api/teachers", {
+45         method: "POST",
+46         headers: { "Content-Type": "application/json" },
+47         body: JSON.stringify({ name, email }),
+48       });
+49 
+50       if (!res.ok) {
+51         console.error("Erro ao criar professor");
+52         return;
+53       }
+54 
+55       const data = (await res.json()) as CreatedTeacherResult;
+56       setCreated(data);
+57       setName("");
+58       setEmail("");
+59       onCreated();
+60     } catch (error) {
+61       console.error("Erro ao criar professor", error);
+62     } finally {
+63       setLoading(false);
+64     }
+65   }
+66 
+67   function handleClose() {
+68     setCreated(null);
+69     setName("");
+70     setEmail("");
+71     onClose();
+72   }
+73 
+74   return (
+75     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+76       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+77         {!created ? (
+78           <>
+79             <h2 className="text-lg font-semibold text-slate-900">
+80               Adicionar professor
+81             </h2>
+82             <p className="mt-2 text-sm text-slate-500">
+83               Cadastre um professor com nome completo e e-mail. A senha será
+84               gerada automaticamente.
+85             </p>
+86 
+87             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+88               <div>
+89                 <label className="text-sm font-medium text-slate-700">
+90                   Nome completo
+91                 </label>
+92                 <input
+93                   type="text"
+94                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+95                   placeholder="Ex: João da Silva"
+96                   value={name}
+97                   onChange={(e) => setName(e.target.value)}
+98                 />
+99               </div>
+100 
+101               <div>
+102                 <label className="text-sm font-medium text-slate-700">
+103                   E-mail
+104                 </label>
+105                 <input
+106                   type="email"
+107                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+108                   placeholder="Ex: joao@email.com"
+109                   value={email}
+110                   onChange={(e) => setEmail(e.target.value)}
+111                 />
+112               </div>
+113 
+114               <div className="flex justify-end gap-2">
+115                 <button
+116                   type="button"
+117                   onClick={handleClose}
+118                   className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300"
+119                   disabled={loading}
+120                 >
+121                   Cancelar
+122                 </button>
+123 
+124                 <button
+125                   type="submit"
+126                   className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+127                   disabled={loading}
+128                 >
+129                   {loading ? "Cadastrando..." : "Cadastrar professor"}
+130                 </button>
+131               </div>
+132             </form>
+133           </>
+134         ) : (
+135           <>
+136             <h2 className="text-lg font-semibold text-slate-900">
+137               Professor cadastrado
+138             </h2>
+139             <p className="mt-2 text-sm text-slate-500">
+140               Guarde essas credenciais para repassar ao professor.
+141             </p>
+142 
+143             <div className="mt-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+144               <div>
+145                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+146                   Nome
+147                 </p>
+148                 <p className="mt-1 text-sm font-medium text-slate-900">
+149                   {created.teacher.name}
+150                 </p>
+151               </div>
+152 
+153               <div>
+154                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+155                   E-mail
+156                 </p>
+157                 <p className="mt-1 text-sm font-medium text-slate-900">
+158                   {created.teacher.email}
+159                 </p>
+160               </div>
+161 
+162               <div>
+163                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+164                   Senha temporária
+165                 </p>
+166                 <p className="mt-1 text-sm font-medium text-slate-900">
+167                   {created.temporaryPassword}
+168                 </p>
+169               </div>
+170             </div>
+171 
+172             <div className="mt-6 flex justify-end">
+173               <button
+174                 type="button"
+175                 onClick={handleClose}
+176                 className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+177               >
+178                 Fechar
+179               </button>
+180             </div>
+181           </>
+182         )}
+183       </div>
+184     </div>
+185   );
+186 }
+
+===== prisma/schema.prisma =====
+1 generator client {
+2   provider = "prisma-client-js"
+3 }
+4 
+5 datasource db {
+6   provider = "postgresql"
+7   url      = env("DATABASE_URL")
+8 }
+9 
+10 //
+11 // ==========================
+12 // MODELO USER E SESSION (EXISTENTES)
+13 // ==========================
+14 //
+15 
+16 model User {
+17   id            String          @id @default(cuid())
+18   name          String
+19   email         String          @unique
+20   passwordHash  String
+21   isTeacher     Boolean         @default(false)
+22   createdById   String?
+23   createdAt     DateTime        @default(now())
+24   updatedAt     DateTime        @updatedAt
+25 
+26   createdBy     User?           @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+27   createdUsers  User[]          @relation("CreatedUsers")
+28   sessions      Session[]
+29   groupMembers  GroupMember[]
+30   schoolMembers SchoolMember[]
+31   classes       Class[]         @relation("ClassTeacher")
+32 }
+33 
+34 model Session {
+35   id        String   @id @default(cuid())
+36   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+37   userId    String
+38   createdAt DateTime @default(now())
+39   expiresAt DateTime
+40 
+41   @@index([userId])
+42 }
+43 
+44 //
+45 // ==========================
+46 // MODELOS DE GRUPOS DE ESCOLAS
+47 // ==========================
+48 //
+49 
+50 model Group {
+51   id        String        @id @default(cuid())
+52   name      String
+53   createdAt DateTime      @default(now())
+54   updatedAt DateTime      @updatedAt
+55 
+56   members   GroupMember[]
+57   schools   School[]
+58 }
+59 
+60 model GroupMember {
+61   id        String   @id @default(cuid())
+62   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+63   userId    String
+64   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+65   groupId   String
+66 
+67   role      String   // OWNER, DIRECTOR, VIEWER
+68   createdAt DateTime @default(now())
+69 
+70   @@unique([userId, groupId])
+71 }
+72 
+73 //
+74 // ==========================
+75 // MODELOS DE ESCOLAS
+76 // ==========================
+77 //
+78 
+79 model School {
+80   id        String         @id @default(cuid())
+81   name      String
+82   createdAt DateTime       @default(now())
+83   updatedAt DateTime       @updatedAt
+84 
+85   group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+86   groupId   String
+87 
+88   members   SchoolMember[]
+89   classes   Class[]
+90 }
+91 
+92 model SchoolMember {
+93   id        String   @id @default(cuid())
+94   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+95   userId    String
+96   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+97   schoolId  String
+98 
+99   role      String   // DIRECTOR, COORDINATOR, TEACHER, VIEWER
+100   createdAt DateTime @default(now())
+101 
+102   @@unique([userId, schoolId])
+103 }
+104 
+105 //
+106 // ==========================
+107 // MODELOS DE TURMAS, ALUNOS E CHAMADAS
+108 // ==========================
+109 //
+110 
+111 model Class {
+112   id          String              @id @default(cuid())
+113   name        String
+114   year        Int?
+115   createdAt   DateTime            @default(now())
+116   updatedAt   DateTime            @updatedAt
+117 
+118   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+119   schoolId    String
+120 
+121   teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+122   teacherId   String?
+123 
+124   students    Student[]
+125   attendances Attendance[]
+126 }
+127 
+128 model Student {
+129   id         String               @id @default(cuid())
+130   name       String
+131   createdAt  DateTime             @default(now())
+132   updatedAt  DateTime             @updatedAt
+133 
+134   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+135   classId    String
+136 
+137   presences  AttendancePresence[]
+138 }
+139 
+140 model Attendance {
+141   id         String               @id @default(cuid())
+142   title      String
+143   lessonDate DateTime
+144   createdAt  DateTime             @default(now())
+145   updatedAt  DateTime             @updatedAt
+146 
+147   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+148   classId    String
+149 
+150   presences  AttendancePresence[]
+151 }
+152 
+153 model AttendancePresence {
+154   id           String      @id @default(cuid())
+155   present      Boolean     @default(false)
+156   createdAt    DateTime    @default(now())
+157   updatedAt    DateTime    @updatedAt
+158 
+159   attendance   Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+160   attendanceId String
+161 
+162   student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+163   studentId    String
+164 
+165   @@unique([attendanceId, studentId])
+166 }
+
+===== app/(app)/teachers =====
+[MISSING] app/(app)/teachers
+
+===== app/api/teachers =====
+[DIR] app/api/teachers
+app/api/teachers
+└── route.ts
