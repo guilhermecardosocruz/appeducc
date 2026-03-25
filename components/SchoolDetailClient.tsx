@@ -108,12 +108,14 @@ export default function SchoolDetailClient({
           </div>
 
           <div className="flex gap-2">
-            <Link
-              href={`/schools/${schoolId}/reports`}
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
-            >
-              Relatórios
-            </Link>
+            {canManageSchool ? (
+              <Link
+                href={`/schools/${schoolId}/reports`}
+                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+              >
+                Relatórios
+              </Link>
+            ) : null}
 
             {canManageSchool ? (
               <button
