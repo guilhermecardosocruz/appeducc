@@ -101,17 +101,8 @@ export default function PwaInstallButton() {
     );
   }
 
-  if (!isMobileDevice) {
-    return null;
-  }
-
-  if (installed) {
-    return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-        App já instalado neste dispositivo.
-      </div>
-    );
-  }
+  if (!isMobileDevice) return null;
+  if (installed) return null;
 
   return (
     <div className="space-y-3">
@@ -120,7 +111,7 @@ export default function PwaInstallButton() {
         onClick={() => void handleInstall()}
         className="inline-flex w-full items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
       >
-        {canUsePrompt ? "Instalar no dispositivo" : "Instalar no dispositivo"}
+        Instalar no dispositivo
       </button>
 
       {showIosHelp && (
