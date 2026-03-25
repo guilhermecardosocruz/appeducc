@@ -8,6 +8,11 @@ type PageProps = {
   params: Promise<{ groupId: string }>;
 };
 
+function isGroupManagerRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 export default async function GroupTeachersPage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -30,6 +35,10 @@ export default async function GroupTeachersPage({ params }: PageProps) {
   });
 
   if (!groupMembership) {
+    notFound();
+  }
+
+  if (!isGroupManagerRole(groupMembership.role)) {
     notFound();
   }
 

@@ -12,6 +12,11 @@ function canManageGroupRole(role: string | null | undefined) {
   return normalized === "OWNER" || normalized === "MANAGER";
 }
 
+function canManageSchoolMembership(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized !== "" && normalized !== "TEACHER";
+}
+
 export default async function SchoolPage({ params }: PageProps) {
   const user = await getSessionUser();
 
@@ -58,14 +63,14 @@ export default async function SchoolPage({ params }: PageProps) {
   }
 
   const canManageSchool =
-    Boolean(schoolMembership) ||
+    Boolean(
+      schoolMembership && canManageSchoolMembership(schoolMembership.role)
+    ) ||
     Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
-  // 🔥 FILTRO DE TURMAS
   let classesRaw;
 
   if (user.isTeacher) {
-    // Professor vê apenas suas turmas
     classesRaw = await prisma.class.findMany({
       where: {
         schoolId,
@@ -86,7 +91,6 @@ export default async function SchoolPage({ params }: PageProps) {
       orderBy: { name: "asc" },
     });
   } else {
-    // Gestão vê todas
     classesRaw = await prisma.class.findMany({
       where: { schoolId },
       include: {
