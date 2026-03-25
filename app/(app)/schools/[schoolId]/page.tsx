@@ -25,21 +25,6 @@ export default async function SchoolPage({ params }: PageProps) {
     where: { id: schoolId },
     include: {
       group: true,
-      classes: {
-        include: {
-          teacher: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          _count: {
-            select: { students: true },
-          },
-        },
-        orderBy: { name: "asc" },
-      },
     },
   });
 
@@ -76,6 +61,50 @@ export default async function SchoolPage({ params }: PageProps) {
     Boolean(schoolMembership) ||
     Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
+  // 🔥 FILTRO DE TURMAS
+  let classesRaw;
+
+  if (user.isTeacher) {
+    // Professor vê apenas suas turmas
+    classesRaw = await prisma.class.findMany({
+      where: {
+        schoolId,
+        teacherId: user.id,
+      },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: { students: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+  } else {
+    // Gestão vê todas
+    classesRaw = await prisma.class.findMany({
+      where: { schoolId },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: { students: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+  }
+
   const teachersRaw = await prisma.user.findMany({
     where: {
       OR: [
@@ -109,7 +138,7 @@ export default async function SchoolPage({ params }: PageProps) {
 
   const teachers = Array.from(teacherMap.values());
 
-  const classes = school.classes.map((item) => ({
+  const classes = classesRaw.map((item) => ({
     id: item.id,
     name: item.name,
     year: item.year,
