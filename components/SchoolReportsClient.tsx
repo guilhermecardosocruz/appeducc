@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type ClassReport = {
@@ -80,6 +80,15 @@ export default function SchoolReportsClient({
     setLoading(false);
   }
 
+  const pdfHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+
+    const query = params.toString();
+    return `/schools/${schoolId}/reports/pdf${query ? `?${query}` : ""}`;
+  }, [schoolId, startDate, endDate]);
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-6xl">
@@ -92,9 +101,18 @@ export default function SchoolReportsClient({
           </Link>
         </div>
 
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Relatório da Escola
-        </h1>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Relatório da Escola
+          </h1>
+
+          <Link
+            href={pdfHref}
+            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+          >
+            Versão para PDF
+          </Link>
+        </div>
 
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">
@@ -175,24 +193,6 @@ export default function SchoolReportsClient({
                     {summary.presenceRate}%
                   </p>
                 </div>
-
-                <div className="rounded-lg border bg-white p-4">
-                  <p className="text-xs text-slate-500">
-                    Média presenças/chamada
-                  </p>
-                  <p className="text-xl font-semibold">
-                    {summary.avgPresencesPerAttendance}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border bg-white p-4">
-                  <p className="text-xs text-slate-500">
-                    Média faltas/chamada
-                  </p>
-                  <p className="text-xl font-semibold">
-                    {summary.avgAbsencesPerAttendance}
-                  </p>
-                </div>
               </div>
             )}
 
@@ -206,8 +206,6 @@ export default function SchoolReportsClient({
                     <th className="px-4 py-3 text-left">Presenças</th>
                     <th className="px-4 py-3 text-left">Faltas</th>
                     <th className="px-4 py-3 text-left">% Presença</th>
-                    <th className="px-4 py-3 text-left">Média P/Chamada</th>
-                    <th className="px-4 py-3 text-left">Média F/Chamada</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -220,12 +218,6 @@ export default function SchoolReportsClient({
                       <td className="px-4 py-3">{row.absences}</td>
                       <td className="px-4 py-3 font-medium">
                         {row.presenceRate}%
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.avgPresencesPerAttendance}
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.avgAbsencesPerAttendance}
                       </td>
                     </tr>
                   ))}
