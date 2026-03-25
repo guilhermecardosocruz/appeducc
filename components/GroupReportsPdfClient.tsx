@@ -60,7 +60,10 @@ export default function GroupReportsPdfClient({
         { cache: "no-store" }
       );
 
-      const json = await res.json();
+      const json = (await res.json()) as {
+        schools?: SchoolReport[];
+        summary?: Summary | null;
+      };
 
       if (!active) return;
 
@@ -118,6 +121,12 @@ export default function GroupReportsPdfClient({
               <div>Presenças: {summary.presences}</div>
               <div>Faltas: {summary.absences}</div>
               <div>% Presença: {summary.presenceRate}%</div>
+              <div>
+                Média presenças/chamada: {summary.avgPresencesPerAttendance}
+              </div>
+              <div>
+                Média faltas/chamada: {summary.avgAbsencesPerAttendance}
+              </div>
             </div>
           </>
         )}
@@ -132,6 +141,8 @@ export default function GroupReportsPdfClient({
               <th className="border px-2 py-1">Presenças</th>
               <th className="border px-2 py-1">Faltas</th>
               <th className="border px-2 py-1">% Presença</th>
+              <th className="border px-2 py-1">Média P/Chamada</th>
+              <th className="border px-2 py-1">Média F/Chamada</th>
             </tr>
           </thead>
           <tbody>
@@ -144,6 +155,12 @@ export default function GroupReportsPdfClient({
                 <td className="border px-2 py-1">{row.presences}</td>
                 <td className="border px-2 py-1">{row.absences}</td>
                 <td className="border px-2 py-1">{row.presenceRate}%</td>
+                <td className="border px-2 py-1">
+                  {row.avgPresencesPerAttendance}
+                </td>
+                <td className="border px-2 py-1">
+                  {row.avgAbsencesPerAttendance}
+                </td>
               </tr>
             ))}
           </tbody>
