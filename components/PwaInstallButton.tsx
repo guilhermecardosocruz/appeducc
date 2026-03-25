@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -76,11 +76,6 @@ export default function PwaInstallButton() {
     };
   }, [isMobileDevice]);
 
-  const canUsePrompt = useMemo(
-    () => !installed && Boolean(deferredPrompt),
-    [installed, deferredPrompt]
-  );
-
   async function handleInstall() {
     if (installed || !isMobileDevice) return;
 
@@ -116,8 +111,12 @@ export default function PwaInstallButton() {
 
       {showIosHelp && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          No iPhone/iPad, toque em <span className="font-semibold">Compartilhar</span> no Safari e depois em{" "}
-          <span className="font-semibold">Adicionar à Tela de Início</span>.
+          No iPhone/iPad, toque em{" "}
+          <span className="font-semibold">Compartilhar</span> no Safari e depois
+          em{" "}
+          <span className="font-semibold">
+            Adicionar à Tela de Início
+          </span>.
         </div>
       )}
     </div>
