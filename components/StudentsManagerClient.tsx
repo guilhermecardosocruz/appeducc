@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import AddStudentModal from "./AddStudentModal";
 import StudentModal from "./StudentModal";
 
@@ -33,6 +33,7 @@ export default function StudentsManagerClient({
   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
   const [openAddModal, setOpenAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshStudents() {
     const res = await fetch(`/api/classes/${classId}/students`, {
@@ -43,6 +44,28 @@ export default function StudentsManagerClient({
 
     const data = await res.json();
     setStudents(data);
+  }
+
+  async function handleImport(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(
+      `/api/classes/${classId}/students/import`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    if (!res.ok) {
+      alert("Erro ao importar planilha");
+      return;
+    }
+
+    const data = await res.json();
+    alert(`Importados: ${data.imported} | Ignorados: ${data.skipped}`);
+    await refreshStudents();
   }
 
   async function handleDeleteStudent(studentId: string) {
@@ -115,20 +138,31 @@ export default function StudentsManagerClient({
                 <h1 className="text-xl font-semibold">
                   Alunos — {className}
                 </h1>
-                {!canManageStudents ? (
-                  <p className="mt-2 text-sm text-amber-700">
-                    Você está com acesso somente de visualização nesta aba.
-                  </p>
-                ) : null}
               </div>
 
               {canManageStudents ? (
-                <button
-                  onClick={() => setOpenAddModal(true)}
-                  className="rounded-md bg-sky-600 px-4 py-2 text-white"
-                >
-                  + Adicionar aluno
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setOpenAddModal(true)}
+                    className="rounded-md bg-sky-600 px-4 py-2 text-white"
+                  >
+                    + Adicionar aluno
+                  </button>
+
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-md border border-slate-300 px-4 py-2"
+                  >
+                    Importar XLSX
+                  </button>
+
+                  <a
+                    href="/templates/students-template.xlsx"
+                    className="rounded-md border border-slate-300 px-4 py-2"
+                  >
+                    Baixar template
+                  </a>
+                </div>
               ) : null}
             </div>
 
@@ -177,6 +211,17 @@ export default function StudentsManagerClient({
           </div>
         </div>
       </main>
+
+      <input
+        type="file"
+        accept=".xlsx,.csv"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImport(file);
+        }}
+      />
 
       {canManageStudents ? (
         <AddStudentModal
