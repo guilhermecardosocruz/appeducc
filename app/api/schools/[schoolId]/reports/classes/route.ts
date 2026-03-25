@@ -18,6 +18,11 @@ function parseEndDate(value: string | null) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 export async function GET(req: Request, { params }: Params) {
   const user = await getSessionUser();
   if (!user) {
@@ -25,6 +30,50 @@ export async function GET(req: Request, { params }: Params) {
   }
 
   const { schoolId } = await params;
+
+  const school = await prisma.school.findUnique({
+    where: { id: schoolId },
+    include: {
+      group: true,
+    },
+  });
+
+  if (!school) {
+    return NextResponse.json({ error: "Escola não encontrada" }, { status: 404 });
+  }
+
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId,
+        },
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const canAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+
+  if (!canAccess) {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
+  const canViewReports = Boolean(
+    groupMembership && canManageGroupRole(groupMembership.role)
+  );
+
+  if (!canViewReports) {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+  }
 
   const url = new URL(req.url);
   const startDate = parseStartDate(url.searchParams.get("startDate"));
