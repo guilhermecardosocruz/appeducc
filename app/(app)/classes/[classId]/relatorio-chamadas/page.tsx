@@ -1,4 +1,7 @@
-import Link from "next/link";
+import { notFound } from "next/navigation";
+import ClassAttendanceReportClient from "@/components/ClassAttendanceReportClient";
+import { getSessionUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{ classId: string }>;
@@ -7,27 +10,49 @@ type PageProps = {
 export default async function ClassRelatorioChamadasPage({
   params,
 }: PageProps) {
+  const user = await getSessionUser();
+
+  if (!user) {
+    notFound();
+  }
+
   const { classId } = await params;
 
-  return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto w-full max-w-3xl">
-        <Link
-          href={`/classes/${classId}`}
-          className="text-sm font-medium text-sky-700 hover:text-sky-800"
-        >
-          ← Voltar para turma
-        </Link>
+  const foundClass = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      school: true,
+    },
+  });
 
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Relatório Chamadas
-          </h1>
-          <p className="mt-3 text-sm text-slate-500">
-            Esta área será conectada ao relatório de chamadas da turma na próxima etapa.
-          </p>
-        </div>
-      </div>
-    </main>
-  );
+  if (!foundClass) {
+    notFound();
+  }
+
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId: foundClass.schoolId,
+        },
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+
+  if (!hasAccess) {
+    notFound();
+  }
+
+  return <ClassAttendanceReportClient classId={classId} />;
 }
