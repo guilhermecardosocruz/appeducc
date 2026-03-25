@@ -35,7 +35,7 @@ export default function CreateAttendanceForm({
     students.map((student) => ({
       studentId: student.id,
       studentName: student.name,
-      present: false,
+      present: true,
     }))
   );
   const [loading, setLoading] = useState(false);
@@ -87,7 +87,7 @@ export default function CreateAttendanceForm({
         {
           studentId: data.student.id,
           studentName: data.student.name,
-          present: false,
+          present: true,
         },
       ]);
 
