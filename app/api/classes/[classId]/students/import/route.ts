@@ -83,13 +83,6 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.isTeacher) {
-    return NextResponse.json(
-      { error: "Only managers can import spreadsheets" },
-      { status: 403 }
-    );
-  }
-
   const { classId } = await params;
   const foundClass = await ensureClassAccess(user.id, classId);
 
