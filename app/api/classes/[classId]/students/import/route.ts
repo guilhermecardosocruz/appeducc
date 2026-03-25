@@ -3,6 +3,11 @@ import * as XLSX from "xlsx";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function isManagerRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return ["OWNER", "MANAGER"].includes(normalized);
+}
+
 async function ensureClassAccess(userId: string, classId: string) {
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
@@ -13,18 +18,36 @@ async function ensureClassAccess(userId: string, classId: string) {
 
   if (!foundClass) return null;
 
-  const membership = await prisma.schoolMember.findUnique({
-    where: {
-      userId_schoolId: {
-        userId,
-        schoolId: foundClass.schoolId,
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId,
+          schoolId: foundClass.schoolId,
+        },
       },
-    },
-  });
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
 
-  if (!membership) return null;
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const canManage =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && isManagerRole(groupMembership.role));
 
-  return foundClass;
+  if (!hasAccess) return null;
+
+  return {
+    foundClass,
+    canManage,
+  };
 }
 
 function extractNamesFromWorkbook(buffer: Buffer, filename: string) {
@@ -84,9 +107,13 @@ export async function POST(
   }
 
   const { classId } = await params;
-  const foundClass = await ensureClassAccess(user.id, classId);
+  const access = await ensureClassAccess(user.id, classId);
 
-  if (!foundClass) {
+  if (!access) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!access.canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
