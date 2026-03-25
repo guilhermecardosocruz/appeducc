@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type SchoolReport = {
   schoolId: string;
@@ -84,6 +84,15 @@ export default function GroupReportsPage({
     await loadReport(groupId, startDate, endDate);
   }
 
+  const pdfHref = useMemo(() => {
+    const query = new URLSearchParams();
+    if (startDate) query.set("startDate", startDate);
+    if (endDate) query.set("endDate", endDate);
+
+    const queryString = query.toString();
+    return `/groups/${groupId}/reports/pdf${queryString ? `?${queryString}` : ""}`;
+  }, [groupId, startDate, endDate]);
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-6xl">
@@ -96,9 +105,18 @@ export default function GroupReportsPage({
           </Link>
         </div>
 
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Relatório do Grupo
-        </h1>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Relatório do Grupo
+          </h1>
+
+          <Link
+            href={pdfHref}
+            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            Versão para PDF
+          </Link>
+        </div>
 
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">
