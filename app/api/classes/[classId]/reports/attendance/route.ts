@@ -49,11 +49,23 @@ async function ensureClassAccess(userId: string, classId: string) {
   };
 }
 
+function parseStartDate(value: string | null) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseEndDate(value: string | null) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T23:59:59.999`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 type Params = {
   params: Promise<{ classId: string }>;
 };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const user = await getSessionUser();
 
   if (!user) {
@@ -66,6 +78,10 @@ export async function GET(_req: Request, { params }: Params) {
   if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const url = new URL(req.url);
+  const startDate = parseStartDate(url.searchParams.get("startDate"));
+  const endDate = parseEndDate(url.searchParams.get("endDate"));
 
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
@@ -118,8 +134,21 @@ export async function GET(_req: Request, { params }: Params) {
 
   let totalPresences = 0;
   let totalAbsences = 0;
+  let totalAttendances = 0;
 
   for (const attendance of foundClass.attendances) {
+    const lessonDate = new Date(attendance.lessonDate);
+
+    if (startDate && lessonDate < startDate) {
+      continue;
+    }
+
+    if (endDate && lessonDate > endDate) {
+      continue;
+    }
+
+    totalAttendances += 1;
+
     for (const presence of attendance.presences) {
       if (!presence.student) continue;
       if (presence.student.deletedAt || presence.student.status !== "ACTIVE") {
@@ -159,16 +188,24 @@ export async function GET(_req: Request, { params }: Params) {
   const totalRecords = totalPresences + totalAbsences;
   const classPresenceRate =
     totalRecords > 0 ? (totalPresences / totalRecords) * 100 : 0;
+  const avgPresencesPerAttendance =
+    totalAttendances > 0 ? totalPresences / totalAttendances : 0;
+  const avgAbsencesPerAttendance =
+    totalAttendances > 0 ? totalAbsences / totalAttendances : 0;
 
   return NextResponse.json({
     summary: {
       classId: foundClass.id,
       className: foundClass.name,
       totalStudents: activeStudents.length,
-      totalAttendances: foundClass.attendances.length,
+      totalAttendances,
       totalPresences,
       totalAbsences,
       presenceRate: Number(classPresenceRate.toFixed(2)),
+      avgPresencesPerAttendance: Number(avgPresencesPerAttendance.toFixed(2)),
+      avgAbsencesPerAttendance: Number(avgAbsencesPerAttendance.toFixed(2)),
+      startDate: startDate ? startDate.toISOString() : null,
+      endDate: endDate ? endDate.toISOString() : null,
     },
     students,
   });
