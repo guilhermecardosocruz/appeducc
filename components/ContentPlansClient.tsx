@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 type ContentPlan = {
@@ -233,25 +234,34 @@ export default function ContentPlansClient({
               key={plan.id}
               className="rounded-lg border p-4 transition hover:bg-slate-50"
             >
-              <button
-                type="button"
-                onClick={() => setEditingPlan(plan)}
-                className="w-full cursor-pointer text-left"
+              <Link
+                href={`/groups/${groupId}/content-plans/${plan.id}`}
+                className="block"
               >
                 <h3 className="font-semibold">{plan.name}</h3>
                 <p className="mt-1 text-xs text-slate-500">
                   {plan._count.lessons} aula(s) • {plan._count.classLinks} turma(s)
                 </p>
-                <p className="mt-2 text-sm text-slate-500">Clique para editar</p>
-              </button>
+                <p className="mt-2 text-sm text-slate-500">Abrir planejamento</p>
+              </Link>
 
-              <button
-                type="button"
-                onClick={() => void handleDelete(plan.id)}
-                className="mt-2 text-xs text-red-500"
-              >
-                Excluir planejamento
-              </button>
+              <div className="mt-3 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlan(plan)}
+                  className="text-xs text-sky-700"
+                >
+                  Editar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(plan.id)}
+                  className="text-xs text-red-500"
+                >
+                  Excluir
+                </button>
+              </div>
             </div>
           ))
         )}
