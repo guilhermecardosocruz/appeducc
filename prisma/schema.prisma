@@ -46,6 +46,22 @@ model Group {
 
   members   GroupMember[]
   schools   School[]
+  contents  GroupContent[]
+}
+
+model GroupContent {
+  id           String   @id @default(cuid())
+  title        String
+  objectives   String?
+  methodology  String?
+  resources    String?
+  bncc         String?
+
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId      String
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model GroupMember {
