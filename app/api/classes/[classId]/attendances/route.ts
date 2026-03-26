@@ -15,6 +15,11 @@ async function ensureClassAccess(userId: string, classId: string) {
       students: {
         orderBy: { name: "asc" },
       },
+      contents: {
+        select: {
+          id: true,
+        },
+      },
     },
   });
 
@@ -71,6 +76,12 @@ export async function GET(
   const attendances = await prisma.attendance.findMany({
     where: { classId },
     include: {
+      content: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
       presences: {
         select: {
           id: true,
@@ -109,6 +120,7 @@ export async function POST(
   const data = await req.json();
   const title = String(data.title ?? "").trim();
   const lessonDateRaw = String(data.lessonDate ?? "").trim();
+  const contentIdRaw = data.contentId == null ? null : String(data.contentId).trim();
   const presencesInput = Array.isArray(data.presences) ? data.presences : [];
 
   if (!title) {
@@ -134,6 +146,23 @@ export async function POST(
     );
   }
 
+  let contentId: string | null = null;
+
+  if (contentIdRaw) {
+    const contentBelongsToClass = foundClass.contents.some(
+      (content) => content.id === contentIdRaw
+    );
+
+    if (!contentBelongsToClass) {
+      return NextResponse.json(
+        { error: "Invalid content for this class" },
+        { status: 400 }
+      );
+    }
+
+    contentId = contentIdRaw;
+  }
+
   const presentByStudentId = new Map<string, boolean>();
   for (const item of presencesInput) {
     const studentId = String(item?.studentId ?? "");
@@ -150,6 +179,7 @@ export async function POST(
       title,
       classId,
       lessonDate,
+      contentId,
       presences: {
         create: activeStudents.map((student) => ({
           studentId: student.id,
@@ -158,6 +188,12 @@ export async function POST(
       },
     },
     include: {
+      content: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
       presences: {
         include: {
           student: {

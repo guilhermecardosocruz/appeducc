@@ -9,6 +9,11 @@ type StudentItem = {
   name: string;
 };
 
+type ContentItem = {
+  id: string;
+  title: string;
+};
+
 type PresenceDraft = {
   studentId: string;
   studentName: string;
@@ -20,6 +25,7 @@ type Props = {
   initialTitle?: string;
   initialLessonDate: string;
   students: StudentItem[];
+  contents: ContentItem[];
 };
 
 export default function CreateAttendanceForm({
@@ -27,8 +33,10 @@ export default function CreateAttendanceForm({
   initialTitle = "",
   initialLessonDate,
   students,
+  contents,
 }: Props) {
   const router = useRouter();
+  const [selectedContentId, setSelectedContentId] = useState("");
   const [title, setTitle] = useState(initialTitle);
   const [lessonDate, setLessonDate] = useState(initialLessonDate);
   const [presences, setPresences] = useState<PresenceDraft[]>(
@@ -63,6 +71,15 @@ export default function CreateAttendanceForm({
         present: value,
       }))
     );
+  }
+
+  function handleContentChange(contentId: string) {
+    setSelectedContentId(contentId);
+
+    const selected = contents.find((item) => item.id === contentId);
+    if (selected) {
+      setTitle(selected.title);
+    }
   }
 
   async function handleAddStudent(name: string) {
@@ -112,6 +129,7 @@ export default function CreateAttendanceForm({
         body: JSON.stringify({
           title,
           lessonDate,
+          contentId: selectedContentId || null,
           presences: presences.map((item) => ({
             studentId: item.studentId,
             present: item.present,
@@ -139,7 +157,25 @@ export default function CreateAttendanceForm({
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="grid flex-1 gap-4 md:grid-cols-[1fr_220px]">
+            <div className="grid flex-1 gap-4 md:grid-cols-[1fr_1fr_220px]">
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  Conteúdo cadastrado
+                </label>
+                <select
+                  value={selectedContentId}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="">Selecionar depois / digitar manualmente</option>
+                  {contents.map((content) => (
+                    <option key={content.id} value={content.id}>
+                      {content.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="text-sm font-medium text-slate-700">
                   Nome da aula

@@ -107,18 +107,20 @@ model Class {
 }
 
 model Content {
-  id           String   @id @default(cuid())
+  id           String        @id @default(cuid())
   title        String
   objectives   String?
   methodology  String?
   resources    String?
   bncc         String?
 
-  class        Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class        Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
   classId      String
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  attendances  Attendance[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Student {
@@ -148,6 +150,9 @@ model Attendance {
 
   class      Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
   classId    String
+
+  content    Content?             @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  contentId  String?
 
   presences  AttendancePresence[]
 }

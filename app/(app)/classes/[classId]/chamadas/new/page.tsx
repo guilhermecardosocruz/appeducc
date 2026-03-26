@@ -40,6 +40,9 @@ export default async function NewAttendancePage({ params }: PageProps) {
         },
         orderBy: { name: "asc" },
       },
+      contents: {
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -79,6 +82,11 @@ export default async function NewAttendancePage({ params }: PageProps) {
     name: student.name,
   }));
 
+  const contents = foundClass.contents.map((content) => ({
+    id: content.id,
+    title: content.title,
+  }));
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-4xl">
@@ -95,6 +103,7 @@ export default async function NewAttendancePage({ params }: PageProps) {
           classId={classId}
           initialLessonDate={getTodayDateInputValue()}
           students={students}
+          contents={contents}
         />
       </div>
     </main>
