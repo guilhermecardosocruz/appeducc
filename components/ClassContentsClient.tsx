@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type ContentItem = {
   id: string;
@@ -25,10 +25,12 @@ export default function ClassContentsClient({
   canManageClass,
 }: Props) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [contents, setContents] = useState<ContentItem[]>(initialContents);
   const [openForm, setOpenForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
@@ -109,6 +111,52 @@ export default function ClassContentsClient({
     }
   }
 
+  async function handleImportFile(file: File) {
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      setError("Envie um arquivo .xlsx.");
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/classes/${classId}/contents/import`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await res.json()) as {
+        error?: string;
+        imported?: number;
+      };
+
+      if (!res.ok) {
+        setError(data.error ?? "Erro ao importar planilha.");
+        return;
+      }
+
+      await refreshContents();
+      router.refresh();
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      window.alert(
+        `${data.imported ?? 0} conteúdo(s) importado(s) com sucesso.`
+      );
+    } catch (importError) {
+      console.error("Erro ao importar conteúdos", importError);
+      setError("Erro ao importar planilha.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -121,16 +169,47 @@ export default function ClassContentsClient({
         </div>
 
         {canManageClass ? (
-          <button
-            type="button"
-            onClick={() => {
-              setOpenForm((current) => !current);
-              setError(null);
-            }}
-            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-          >
-            {openForm ? "Fechar" : "Novo conteúdo"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/templates/contents-template.xlsx"
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Baixar modelo Excel
+            </a>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+            >
+              {importing ? "Importando..." : "Importar Excel"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOpenForm((current) => !current);
+                setError(null);
+              }}
+              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+            >
+              {openForm ? "Fechar" : "Novo conteúdo"}
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  void handleImportFile(file);
+                }
+              }}
+            />
+          </div>
         ) : null}
       </div>
 
@@ -141,7 +220,10 @@ export default function ClassContentsClient({
       ) : null}
 
       {openForm && canManageClass ? (
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5"
+        >
           <div>
             <label className="text-sm font-medium text-slate-700">
               Nome da aula
@@ -215,6 +297,10 @@ export default function ClassContentsClient({
             </button>
           </div>
         </form>
+      ) : null}
+
+      {!openForm && error ? (
+        <p className="mt-4 text-sm text-red-600">{error}</p>
       ) : null}
 
       <div className="mt-6 space-y-4">
