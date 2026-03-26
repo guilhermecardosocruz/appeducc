@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type SchoolReport = {
@@ -60,10 +61,7 @@ export default function GroupReportsPdfClient({
         { cache: "no-store" }
       );
 
-      const json = (await res.json()) as {
-        schools?: SchoolReport[];
-        summary?: Summary | null;
-      };
+      const json = await res.json();
 
       if (!active) return;
 
@@ -77,6 +75,15 @@ export default function GroupReportsPdfClient({
       active = false;
     };
   }, [groupId, startDate, endDate]);
+
+  const backHref = `/groups/${groupId}/reports${
+    startDate || endDate
+      ? `?${new URLSearchParams({
+          ...(startDate ? { startDate } : {}),
+          ...(endDate ? { endDate } : {}),
+        }).toString()}`
+      : ""
+  }`;
 
   return (
     <>
@@ -92,7 +99,14 @@ export default function GroupReportsPdfClient({
       `}</style>
 
       <main className="min-h-screen bg-white px-8 py-8">
-        <div className="no-print mb-6">
+        <div className="no-print mb-6 flex justify-between">
+          <Link
+            href={backHref}
+            className="text-sm font-medium text-sky-700 hover:text-sky-800"
+          >
+            ← Voltar para relatório
+          </Link>
+
           <button
             type="button"
             onClick={() => window.print()}
@@ -112,22 +126,6 @@ export default function GroupReportsPdfClient({
               Período: {formatDate(summary.startDate)} até{" "}
               {formatDate(summary.endDate)}
             </p>
-
-            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div>Escolas: {summary.schools}</div>
-              <div>Turmas: {summary.classes}</div>
-              <div>Alunos: {summary.students}</div>
-              <div>Chamadas: {summary.totalAttendances}</div>
-              <div>Presenças: {summary.presences}</div>
-              <div>Faltas: {summary.absences}</div>
-              <div>% Presença: {summary.presenceRate}%</div>
-              <div>
-                Média presenças/chamada: {summary.avgPresencesPerAttendance}
-              </div>
-              <div>
-                Média faltas/chamada: {summary.avgAbsencesPerAttendance}
-              </div>
-            </div>
           </>
         )}
 
@@ -141,8 +139,6 @@ export default function GroupReportsPdfClient({
               <th className="border px-2 py-1">Presenças</th>
               <th className="border px-2 py-1">Faltas</th>
               <th className="border px-2 py-1">% Presença</th>
-              <th className="border px-2 py-1">Média P/Chamada</th>
-              <th className="border px-2 py-1">Média F/Chamada</th>
             </tr>
           </thead>
           <tbody>
@@ -155,12 +151,6 @@ export default function GroupReportsPdfClient({
                 <td className="border px-2 py-1">{row.presences}</td>
                 <td className="border px-2 py-1">{row.absences}</td>
                 <td className="border px-2 py-1">{row.presenceRate}%</td>
-                <td className="border px-2 py-1">
-                  {row.avgPresencesPerAttendance}
-                </td>
-                <td className="border px-2 py-1">
-                  {row.avgAbsencesPerAttendance}
-                </td>
               </tr>
             ))}
           </tbody>

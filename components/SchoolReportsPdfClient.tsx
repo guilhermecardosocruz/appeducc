@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type ClassReport = {
@@ -76,6 +77,15 @@ export default function SchoolReportsPdfClient({
     };
   }, [schoolId, startDate, endDate]);
 
+  const backHref = `/schools/${schoolId}/reports${
+    startDate || endDate
+      ? `?${new URLSearchParams({
+          ...(startDate ? { startDate } : {}),
+          ...(endDate ? { endDate } : {}),
+        }).toString()}`
+      : ""
+  }`;
+
   return (
     <>
       <style jsx global>{`
@@ -91,7 +101,14 @@ export default function SchoolReportsPdfClient({
       `}</style>
 
       <main className="min-h-screen bg-white px-8 py-8">
-        <div className="no-print mb-6">
+        <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href={backHref}
+            className="text-sm font-medium text-sky-700 hover:text-sky-800"
+          >
+            ← Voltar para relatório
+          </Link>
+
           <button
             type="button"
             onClick={() => window.print()}
