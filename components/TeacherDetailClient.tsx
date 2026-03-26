@@ -38,6 +38,7 @@ type Props = {
   teacherCpf: string | null;
   linkedClasses: LinkedClass[];
   availableClasses: AvailableClass[];
+  groupId?: string;
 };
 
 function formatCpf(value: string) {
@@ -56,6 +57,7 @@ export default function TeacherDetailClient({
   teacherCpf,
   linkedClasses,
   availableClasses,
+  groupId,
 }: Props) {
   const [currentLinked, setCurrentLinked] = useState(linkedClasses);
   const [currentAvailable, setCurrentAvailable] = useState(availableClasses);
@@ -186,15 +188,20 @@ export default function TeacherDetailClient({
     }
   }
 
+  const backHref = groupId ? `/groups/${groupId}/teachers` : "/dashboard";
+  const backLabel = groupId
+    ? "← Voltar para professores"
+    : "← Voltar para dashboard";
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-6">
           <Link
-            href="/dashboard"
+            href={backHref}
             className="text-sm font-medium text-sky-700 hover:text-sky-800"
           >
-            ← Voltar para dashboard
+            {backLabel}
           </Link>
         </div>
 

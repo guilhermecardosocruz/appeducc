@@ -83,7 +83,9 @@ export default function TeachersListClient({
             {teachers.map((teacher) => (
               <li key={teacher.id}>
                 <Link
-                  href={`/teachers/${teacher.id}`}
+                  href={`/teachers/${teacher.id}${
+                    groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""
+                  }`}
                   className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 hover:bg-slate-50"
                 >
                   <div>

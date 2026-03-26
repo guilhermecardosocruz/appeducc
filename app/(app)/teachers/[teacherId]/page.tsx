@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{ teacherId: string }>;
+  searchParams: Promise<{ groupId?: string }>;
 };
 
-export default async function TeacherPage({ params }: PageProps) {
+export default async function TeacherPage({ params, searchParams }: PageProps) {
   const user = await getSessionUser();
 
   if (!user) {
@@ -15,6 +16,7 @@ export default async function TeacherPage({ params }: PageProps) {
   }
 
   const { teacherId } = await params;
+  const { groupId } = await searchParams;
 
   const userGroupIds = await prisma.groupMember.findMany({
     where: {
@@ -134,6 +136,7 @@ export default async function TeacherPage({ params }: PageProps) {
       teacherCpf={teacher.cpf}
       linkedClasses={linkedClasses}
       availableClasses={availableClasses}
+      groupId={groupId}
     />
   );
 }

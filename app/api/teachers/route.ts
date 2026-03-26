@@ -1,58 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, hashPassword } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUser } from "@/lib/auth";
 
-function normalizeCpf(cpf: string) {
-  return cpf.replace(/\D/g, "");
+function normalizeRole(value: string | null | undefined) {
+  return String(value ?? "").trim().toUpperCase();
 }
 
-function generateTeacherPassword(name: string, cpf: string) {
-  const cleanName = name.trim().replace(/\s+/g, "");
-  const cleanCpf = normalizeCpf(cpf);
-
-  if (cleanName.length < 3 || cleanCpf.length < 6) {
-    return null;
-  }
-
-  const first = cleanName[0].toUpperCase();
-  const second = cleanName[1].toLowerCase();
-  const third = cleanName[2].toUpperCase();
-  const cpfPart = cleanCpf.slice(0, 6);
-
-  return `${first}${second}${third}@${cpfPart}.`;
+function isManagerRole(value: string | null | undefined) {
+  const role = normalizeRole(value);
+  return role === "OWNER" || role === "MANAGER";
 }
 
-async function getAccessibleGroupIds(userId: string) {
-  const memberships = await prisma.groupMember.findMany({
-    where: { userId },
-    select: { groupId: true },
-  });
-
-  return memberships.map((item) => item.groupId);
-}
-
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const user = await getSessionUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const url = new URL(req.url);
-  const groupId = url.searchParams.get("groupId")?.trim() || "";
+  const { searchParams } = new URL(req.url);
+  const groupId = searchParams.get("groupId");
+
+  const memberships = await prisma.groupMember.findMany({
+    where: {
+      userId: user.id,
+    },
+    select: {
+      groupId: true,
+      role: true,
+    },
+  });
+
+  const accessibleGroupIds = memberships.map((item) => item.groupId);
 
   if (groupId) {
-    const membership = await prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: {
-          userId: user.id,
-          groupId,
-        },
-      },
-    });
+    const membership = memberships.find((item) => item.groupId === groupId);
 
-    if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!membership || !isManagerRole(membership.role)) {
+      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
     }
 
     const memberIds = await prisma.groupMember.findMany({
@@ -89,28 +74,33 @@ export async function GET(req: NextRequest) {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        name: "asc",
+      },
     });
 
-    return NextResponse.json(
-      teachers.map((teacher) => ({
-        id: teacher.id,
-        name: teacher.name,
-        email: teacher.email,
-        cpf: teacher.cpf,
-        isTeacher: teacher.isTeacher,
-        createdAt: teacher.createdAt,
-        _count: {
-          classes: teacher._count.classes,
-        },
-      }))
-    );
+    return NextResponse.json(teachers);
   }
 
   const teachers = await prisma.user.findMany({
     where: {
-      createdById: user.id,
       isTeacher: true,
+      OR: [
+        {
+          createdById: user.id,
+        },
+        {
+          schoolMembers: {
+            some: {
+              school: {
+                groupId: {
+                  in: accessibleGroupIds,
+                },
+              },
+            },
+          },
+        },
+      ],
     },
     include: {
       _count: {
@@ -119,151 +109,83 @@ export async function GET(req: NextRequest) {
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: {
+      name: "asc",
+    },
   });
 
-  return NextResponse.json(
-    teachers.map((teacher) => ({
-      id: teacher.id,
-      name: teacher.name,
-      email: teacher.email,
-      cpf: teacher.cpf,
-      isTeacher: teacher.isTeacher,
-      createdAt: teacher.createdAt,
-      _count: {
-        classes: teacher._count.classes,
-      },
-    }))
-  );
+  return NextResponse.json(teachers);
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   const user = await getSessionUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const data = await req.json();
-  const name = String(data.name ?? "").trim();
-  const email = String(data.email ?? "").toLowerCase().trim();
-  const cpfRaw = String(data.cpf ?? "").trim();
-  const cpf = normalizeCpf(cpfRaw);
-  const groupId = String(data.groupId ?? "").trim();
+  const body = await req.json();
+  const name = String(body?.name ?? "").trim();
+  const email = String(body?.email ?? "").trim().toLowerCase();
+  const cpf = String(body?.cpf ?? "").trim();
+  const groupId = String(body?.groupId ?? "").trim();
 
-  if (!name || !email || !cpf) {
+  if (!name || !email || !cpf || !groupId) {
     return NextResponse.json(
-      { error: "Missing teacher name, email or CPF" },
+      { error: "Nome, e-mail, CPF e grupo são obrigatórios." },
       { status: 400 }
     );
   }
 
-  if (cpf.length !== 11) {
-    return NextResponse.json(
-      { error: "CPF must contain 11 digits" },
-      { status: 400 }
-    );
-  }
-
-  if (groupId) {
-    const membership = await prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: {
-          userId: user.id,
-          groupId,
-        },
+  const membership = await prisma.groupMember.findUnique({
+    where: {
+      userId_groupId: {
+        userId: user.id,
+        groupId,
       },
-    });
-
-    if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
-
-  const existingByEmail = await prisma.user.findUnique({
-    where: { email },
+    },
   });
 
-  if (existingByEmail) {
-    const updated = await prisma.user.update({
-      where: { id: existingByEmail.id },
-      data: {
-        isTeacher: true,
-        createdById: user.id,
-        cpf: existingByEmail.cpf ?? cpf,
-      },
-      include: {
-        _count: {
-          select: {
-            classes: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json(
-      {
-        teacher: {
-          id: updated.id,
-          name: updated.name,
-          email: updated.email,
-          cpf: updated.cpf,
-          isTeacher: updated.isTeacher,
-          createdAt: updated.createdAt,
-          _count: {
-            classes: updated._count.classes,
-          },
-        },
-        message: "Usuário já existia. Senha não foi alterada.",
-      },
-      { status: 200 }
-    );
+  if (!membership || !isManagerRole(membership.role)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const temporaryPassword = generateTeacherPassword(name, cpf);
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [{ email }, { cpf }],
+    },
+  });
 
-  if (!temporaryPassword) {
+  if (existingUser) {
     return NextResponse.json(
-      { error: "Could not generate password from provided name and CPF" },
+      { error: "Já existe um usuário com este e-mail ou CPF." },
       { status: 400 }
     );
   }
 
-  const passwordHash = await hashPassword(temporaryPassword);
+  const generatedPassword = Math.random().toString(36).slice(-8);
 
   const teacher = await prisma.user.create({
     data: {
       name,
       email,
       cpf,
-      passwordHash,
+      passwordHash: generatedPassword,
       isTeacher: true,
       createdById: user.id,
     },
-    include: {
-      _count: {
-        select: {
-          classes: true,
-        },
-      },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      cpf: true,
+      isTeacher: true,
+      createdAt: true,
     },
   });
 
-  return NextResponse.json(
-    {
-      teacher: {
-        id: teacher.id,
-        name: teacher.name,
-        email: teacher.email,
-        cpf: teacher.cpf,
-        isTeacher: teacher.isTeacher,
-        createdAt: teacher.createdAt,
-        _count: {
-          classes: teacher._count.classes,
-        },
-      },
-      temporaryPassword,
-    },
-    { status: 201 }
-  );
+  return NextResponse.json({
+    teacher,
+    generatedPassword,
+  });
 }
