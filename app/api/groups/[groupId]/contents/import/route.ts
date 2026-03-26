@@ -3,6 +3,14 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 
+type Row = {
+  Title?: string;
+  Objectives?: string;
+  Methodology?: string;
+  Resources?: string;
+  BNCC?: string;
+};
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
@@ -28,9 +36,9 @@ export async function POST(
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
 
-  const rows = XLSX.utils.sheet_to_json(sheet);
+  const rows = XLSX.utils.sheet_to_json<Row>(sheet);
 
-  for (const row of rows as any[]) {
+  for (const row of rows) {
     await prisma.groupContent.create({
       data: {
         groupId,
