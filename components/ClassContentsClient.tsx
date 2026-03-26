@@ -199,36 +199,58 @@ export default function ClassContentsClient({
 
       {openForm && (
         <form onSubmit={handleSubmit} className="mt-6 space-y-3">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Nome da aula"
-            className="w-full border p-2 rounded"
-          />
-          <textarea
-            value={objectives}
-            onChange={(e) => setObjectives(e.target.value)}
-            placeholder="Objetivos"
-            className="w-full border p-2 rounded"
-          />
-          <textarea
-            value={methodology}
-            onChange={(e) => setMethodology(e.target.value)}
-            placeholder="Metodologia"
-            className="w-full border p-2 rounded"
-          />
-          <textarea
-            value={resources}
-            onChange={(e) => setResources(e.target.value)}
-            placeholder="Recursos"
-            className="w-full border p-2 rounded"
-          />
-          <textarea
-            value={bncc}
-            onChange={(e) => setBncc(e.target.value)}
-            placeholder="BNCC"
-            className="w-full border p-2 rounded"
-          />
+          <div>
+            <label className="block text-sm font-medium">Nome da aula</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">
+              Objetivos de aprendizagem
+            </label>
+            <textarea
+              value={objectives}
+              onChange={(e) => setObjectives(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">
+              Desenvolvimento / Metodologia
+            </label>
+            <textarea
+              value={methodology}
+              onChange={(e) => setMethodology(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">
+              Recursos pedagógicos
+            </label>
+            <textarea
+              value={resources}
+              onChange={(e) => setResources(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">
+              Habilidades BNCC
+            </label>
+            <textarea
+              value={bncc}
+              onChange={(e) => setBncc(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
 
           <button className="bg-sky-600 text-white px-4 py-2 rounded">
             Salvar
@@ -245,12 +267,6 @@ export default function ClassContentsClient({
           >
             <h3 className="font-semibold">{content.title}</h3>
             <p className="text-sm text-slate-500">Clique para editar</p>
-            <button
-              onClick={() => handleDeleteContent(content.id)}
-              className="mt-2 text-red-500 text-xs"
-            >
-              Excluir conteúdo
-            </button>
           </div>
         ))}
       </div>
@@ -260,60 +276,83 @@ export default function ClassContentsClient({
           <div className="bg-white p-6 rounded-xl w-[600px] space-y-3">
             <h2 className="text-lg font-semibold">Editar conteúdo</h2>
 
-            <input
-              value={editingContent.title}
-              onChange={(e) =>
-                setEditingContent({
-                  ...editingContent,
-                  title: e.target.value,
-                })
-              }
-              className="w-full border p-2 rounded"
-            />
+            <div>
+              <label className="block text-sm font-medium">Nome da aula</label>
+              <input
+                value={editingContent.title}
+                onChange={(e) =>
+                  setEditingContent({
+                    ...editingContent,
+                    title: e.target.value,
+                  })
+                }
+                className="w-full border p-2 rounded"
+              />
+            </div>
 
-            <textarea
-              value={editingContent.objectives ?? ""}
-              onChange={(e) =>
-                setEditingContent({
-                  ...editingContent,
-                  objectives: e.target.value,
-                })
-              }
-              className="w-full border p-2 rounded"
-            />
+            <div>
+              <label className="block text-sm font-medium">
+                Objetivos de aprendizagem
+              </label>
+              <textarea
+                value={editingContent.objectives ?? ""}
+                onChange={(e) =>
+                  setEditingContent({
+                    ...editingContent,
+                    objectives: e.target.value,
+                  })
+                }
+                className="w-full border p-2 rounded"
+              />
+            </div>
 
-            <textarea
-              value={editingContent.methodology ?? ""}
-              onChange={(e) =>
-                setEditingContent({
-                  ...editingContent,
-                  methodology: e.target.value,
-                })
-              }
-              className="w-full border p-2 rounded"
-            />
+            <div>
+              <label className="block text-sm font-medium">
+                Desenvolvimento / Metodologia
+              </label>
+              <textarea
+                value={editingContent.methodology ?? ""}
+                onChange={(e) =>
+                  setEditingContent({
+                    ...editingContent,
+                    methodology: e.target.value,
+                  })
+                }
+                className="w-full border p-2 rounded"
+              />
+            </div>
 
-            <textarea
-              value={editingContent.resources ?? ""}
-              onChange={(e) =>
-                setEditingContent({
-                  ...editingContent,
-                  resources: e.target.value,
-                })
-              }
-              className="w-full border p-2 rounded"
-            />
+            <div>
+              <label className="block text-sm font-medium">
+                Recursos pedagógicos
+              </label>
+              <textarea
+                value={editingContent.resources ?? ""}
+                onChange={(e) =>
+                  setEditingContent({
+                    ...editingContent,
+                    resources: e.target.value,
+                  })
+                }
+                className="w-full border p-2 rounded"
+              />
+            </div>
 
-            <textarea
-              value={editingContent.bncc ?? ""}
-              onChange={(e) =>
-                setEditingContent({
-                  ...editingContent,
-                  bncc: e.target.value,
-                })
-              }
-              className="w-full border p-2 rounded"
-            />
+            <div>
+              <label className="block text-sm font-medium">
+                Habilidades BNCC
+              </label>
+              <textarea
+                value={editingContent.bncc ?? ""}
+                onChange={(e) =>
+                  setEditingContent({
+                    ...editingContent,
+                    bncc: e.target.value,
+                  })
+                }
+                className="w-full border p-2 rounded"
+              />
+            </div>
 
             <div className="flex justify-between">
               <button
