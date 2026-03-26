@@ -39,27 +39,17 @@ export default function ClassContentsClient({
   const [resources, setResources] = useState("");
   const [bncc, setBncc] = useState("");
 
+  const [editingContent, setEditingContent] = useState<ContentItem | null>(null);
+
   async function refreshContents() {
     const res = await fetch(`/api/classes/${classId}/contents`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
       cache: "no-store",
     });
 
-    if (!res.ok) {
-      return;
-    }
+    if (!res.ok) return;
 
-    const data = (await res.json()) as Array<{
-      id: string;
-      title: string;
-      objectives: string | null;
-      methodology: string | null;
-      resources: string | null;
-      bncc: string | null;
-      createdAt: string;
-    }>;
-
+    const data = await res.json();
     setContents(data);
   }
 
@@ -87,7 +77,7 @@ export default function ClassContentsClient({
         }),
       });
 
-      const data = (await res.json()) as { error?: string };
+      const data = await res.json();
 
       if (!res.ok) {
         setError(data.error ?? "Erro ao criar conteúdo.");
@@ -103,12 +93,34 @@ export default function ClassContentsClient({
 
       await refreshContents();
       router.refresh();
-    } catch (submitError) {
-      console.error("Erro ao criar conteúdo", submitError);
-      setError("Erro ao criar conteúdo.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleUpdateContent() {
+    if (!editingContent) return;
+
+    await fetch(`/api/classes/${classId}/contents/${editingContent.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editingContent),
+    });
+
+    setEditingContent(null);
+    await refreshContents();
+    router.refresh();
+  }
+
+  async function handleDeleteContent(id: string) {
+    if (!confirm("Tem certeza que deseja excluir este conteúdo?")) return;
+
+    await fetch(`/api/classes/${classId}/contents/${id}`, {
+      method: "DELETE",
+    });
+
+    await refreshContents();
+    router.refresh();
   }
 
   async function handleImportFile(file: File) {
@@ -118,7 +130,6 @@ export default function ClassContentsClient({
     }
 
     setImporting(true);
-    setError(null);
 
     try {
       const formData = new FormData();
@@ -129,15 +140,7 @@ export default function ClassContentsClient({
         body: formData,
       });
 
-      const data = (await res.json()) as {
-        error?: string;
-        imported?: number;
-      };
-
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao importar planilha.");
-        return;
-      }
+      const data = await res.json();
 
       await refreshContents();
       router.refresh();
@@ -146,12 +149,7 @@ export default function ClassContentsClient({
         fileInputRef.current.value = "";
       }
 
-      window.alert(
-        `${data.imported ?? 0} conteúdo(s) importado(s) com sucesso.`
-      );
-    } catch (importError) {
-      console.error("Erro ao importar conteúdos", importError);
-      setError("Erro ao importar planilha.");
+      alert(`${data.imported ?? 0} conteúdo(s) importado(s).`);
     } finally {
       setImporting(false);
     }
@@ -159,42 +157,30 @@ export default function ClassContentsClient({
 
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Conteúdos</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Organize o planejamento da turma com nome da aula, objetivos,
-            metodologia, recursos pedagógicos e habilidades BNCC.
-          </p>
-        </div>
+      <div className="flex justify-between">
+        <h1 className="text-2xl font-semibold">Conteúdos</h1>
 
-        {canManageClass ? (
-          <div className="flex flex-wrap gap-2">
+        {canManageClass && (
+          <div className="flex gap-2">
             <a
               href="/templates/contents-template.xlsx"
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              className="border px-3 py-2 rounded"
             >
-              Baixar modelo Excel
+              Modelo Excel
             </a>
 
             <button
-              type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+              className="border px-3 py-2 rounded"
             >
-              {importing ? "Importando..." : "Importar Excel"}
+              Importar Excel
             </button>
 
             <button
-              type="button"
-              onClick={() => {
-                setOpenForm((current) => !current);
-                setError(null);
-              }}
-              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+              onClick={() => setOpenForm(!openForm)}
+              className="bg-sky-600 text-white px-3 py-2 rounded"
             >
-              {openForm ? "Fechar" : "Novo conteúdo"}
+              Novo conteúdo
             </button>
 
             <input
@@ -204,168 +190,157 @@ export default function ClassContentsClient({
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  void handleImportFile(file);
-                }
+                if (file) handleImportFile(file);
               }}
             />
           </div>
-        ) : null}
-      </div>
-
-      {!canManageClass ? (
-        <p className="mt-4 text-sm text-amber-700">
-          Você está com acesso somente de visualização nesta turma.
-        </p>
-      ) : null}
-
-      {openForm && canManageClass ? (
-        <form
-          onSubmit={handleSubmit}
-          className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5"
-        >
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Nome da aula
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Aula 01 - Introdução à Robótica"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Objetivos de aprendizagem
-            </label>
-            <textarea
-              value={objectives}
-              onChange={(e) => setObjectives(e.target.value)}
-              rows={4}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Desenvolvimento / Metodologia
-            </label>
-            <textarea
-              value={methodology}
-              onChange={(e) => setMethodology(e.target.value)}
-              rows={5}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Recursos pedagógicos
-            </label>
-            <textarea
-              value={resources}
-              onChange={(e) => setResources(e.target.value)}
-              rows={3}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Habilidades BNCC
-            </label>
-            <textarea
-              value={bncc}
-              onChange={(e) => setBncc(e.target.value)}
-              rows={3}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-            >
-              {loading ? "Salvando..." : "Salvar conteúdo"}
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {!openForm && error ? (
-        <p className="mt-4 text-sm text-red-600">{error}</p>
-      ) : null}
-
-      <div className="mt-6 space-y-4">
-        {contents.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Nenhum conteúdo cadastrado ainda.
-          </p>
-        ) : (
-          contents.map((content, index) => (
-            <div
-              key={content.id}
-              className="rounded-xl border border-slate-200 p-5"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                    Conteúdo {index + 1}
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                    {content.title}
-                  </h2>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4">
-                <section>
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Objetivos de aprendizagem
-                  </h3>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                    {content.objectives?.trim() || "Não informado."}
-                  </p>
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Desenvolvimento / Metodologia
-                  </h3>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                    {content.methodology?.trim() || "Não informado."}
-                  </p>
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Recursos pedagógicos
-                  </h3>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                    {content.resources?.trim() || "Não informado."}
-                  </p>
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Habilidades BNCC
-                  </h3>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                    {content.bncc?.trim() || "Não informado."}
-                  </p>
-                </section>
-              </div>
-            </div>
-          ))
         )}
       </div>
+
+      {openForm && (
+        <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Nome da aula"
+            className="w-full border p-2 rounded"
+          />
+          <textarea
+            value={objectives}
+            onChange={(e) => setObjectives(e.target.value)}
+            placeholder="Objetivos"
+            className="w-full border p-2 rounded"
+          />
+          <textarea
+            value={methodology}
+            onChange={(e) => setMethodology(e.target.value)}
+            placeholder="Metodologia"
+            className="w-full border p-2 rounded"
+          />
+          <textarea
+            value={resources}
+            onChange={(e) => setResources(e.target.value)}
+            placeholder="Recursos"
+            className="w-full border p-2 rounded"
+          />
+          <textarea
+            value={bncc}
+            onChange={(e) => setBncc(e.target.value)}
+            placeholder="BNCC"
+            className="w-full border p-2 rounded"
+          />
+
+          <button className="bg-sky-600 text-white px-4 py-2 rounded">
+            Salvar
+          </button>
+        </form>
+      )}
+
+      <div className="mt-6 grid gap-3 md:grid-cols-3 sm:grid-cols-1">
+        {contents.map((content) => (
+          <div
+            key={content.id}
+            className="border rounded-lg p-4 cursor-pointer hover:bg-slate-50"
+            onClick={() => setEditingContent(content)}
+          >
+            <h3 className="font-semibold">{content.title}</h3>
+            <p className="text-sm text-slate-500">Clique para editar</p>
+            <button
+              onClick={() => handleDeleteContent(content.id)}
+              className="mt-2 text-red-500 text-xs"
+            >
+              Excluir conteúdo
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {editingContent && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-xl w-[600px] space-y-3">
+            <h2 className="text-lg font-semibold">Editar conteúdo</h2>
+
+            <input
+              value={editingContent.title}
+              onChange={(e) =>
+                setEditingContent({
+                  ...editingContent,
+                  title: e.target.value,
+                })
+              }
+              className="w-full border p-2 rounded"
+            />
+
+            <textarea
+              value={editingContent.objectives ?? ""}
+              onChange={(e) =>
+                setEditingContent({
+                  ...editingContent,
+                  objectives: e.target.value,
+                })
+              }
+              className="w-full border p-2 rounded"
+            />
+
+            <textarea
+              value={editingContent.methodology ?? ""}
+              onChange={(e) =>
+                setEditingContent({
+                  ...editingContent,
+                  methodology: e.target.value,
+                })
+              }
+              className="w-full border p-2 rounded"
+            />
+
+            <textarea
+              value={editingContent.resources ?? ""}
+              onChange={(e) =>
+                setEditingContent({
+                  ...editingContent,
+                  resources: e.target.value,
+                })
+              }
+              className="w-full border p-2 rounded"
+            />
+
+            <textarea
+              value={editingContent.bncc ?? ""}
+              onChange={(e) =>
+                setEditingContent({
+                  ...editingContent,
+                  bncc: e.target.value,
+                })
+              }
+              className="w-full border p-2 rounded"
+            />
+
+            <div className="flex justify-between">
+              <button
+                onClick={() => handleDeleteContent(editingContent.id)}
+                className="bg-red-600 text-white px-4 py-2 rounded"
+              >
+                Excluir
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditingContent(null)}
+                  className="border px-4 py-2 rounded"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleUpdateContent}
+                  className="bg-sky-600 text-white px-4 py-2 rounded"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
