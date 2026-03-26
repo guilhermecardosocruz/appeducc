@@ -39,14 +39,15 @@ model Session {
 }
 
 model Group {
-  id        String        @id @default(cuid())
-  name      String
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  members   GroupMember[]
-  schools   School[]
-  contents  GroupContent[]
+  members      GroupMember[]
+  schools      School[]
+  contents     GroupContent[]
+  contentPlans ContentPlan[]
 }
 
 model GroupMember {
@@ -90,21 +91,22 @@ model SchoolMember {
 }
 
 model Class {
-  id          String              @id @default(cuid())
-  name        String
-  year        Int?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id               String              @id @default(cuid())
+  name             String
+  year             Int?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  schoolId    String
+  school           School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId         String
 
-  teacher     User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
-  teacherId   String?
+  teacher          User?               @relation("ClassTeacher", fields: [teacherId], references: [id])
+  teacherId        String?
 
-  students    Student[]
-  attendances Attendance[]
-  contents    Content[]
+  students         Student[]
+  attendances      Attendance[]
+  contents         Content[]
+  contentPlanLinks ContentPlanClass[]
 }
 
 model Content {
@@ -182,9 +184,58 @@ model GroupContent {
   resources   String?
   bncc        String?
 
-  groupId String
-  group   Group @relation(fields: [groupId], references: [id])
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ContentPlan {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+
+  groupId     String
+  group       Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  lessons     ContentPlanLesson[]
+  classLinks  ContentPlanClass[]
+
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model ContentPlanLesson {
+  id            String       @id @default(cuid())
+  orderIndex    Int
+  title         String
+  objectives    String?
+  methodology   String?
+  resources     String?
+  bncc          String?
+
+  contentPlanId String
+  contentPlan   ContentPlan  @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([contentPlanId, orderIndex])
+}
+
+model ContentPlanClass {
+  id            String      @id @default(cuid())
+
+  contentPlanId String
+  contentPlan   ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+
+  classId       String
+  class         Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  status        String      @default("LINKED")
+  linkedAt      DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([contentPlanId, classId])
 }
