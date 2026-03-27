@@ -84,33 +84,24 @@ export default function CreateAttendanceForm({
 
   async function handleAddStudent(name: string) {
     setAddingStudent(true);
-
     try {
       const res = await fetch(`/api/classes/${classId}/students`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ name }),
       });
 
       if (!res.ok) {
-        console.error("Erro ao adicionar aluno");
+        alert("Erro ao adicionar aluno");
         return;
       }
 
-      const data = await res.json();
-
-      setPresences((current) => [
-        ...current,
-        {
-          studentId: data.student.id,
-          studentName: data.student.name,
-          present: true,
-        },
-      ]);
-
+      router.refresh();
       setOpenStudentModal(false);
     } catch (error) {
-      console.error("Erro ao adicionar aluno", error);
+      console.error(error);
     } finally {
       setAddingStudent(false);
     }
@@ -138,12 +129,12 @@ export default function CreateAttendanceForm({
       });
 
       if (!res.ok) {
-        console.error("Erro ao criar chamada");
+        alert("Erro ao criar chamada");
         return;
       }
 
-      const created = await res.json();
-      router.push(`/classes/${classId}/chamadas/${created.id}`);
+      alert("Chamada criada com sucesso!");
+      router.push(`/classes/${classId}/chamadas`);
       router.refresh();
     } catch (error) {
       console.error("Erro ao criar chamada", error);
@@ -156,127 +147,96 @@ export default function CreateAttendanceForm({
     <>
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="grid flex-1 gap-4 md:grid-cols-[1fr_1fr_220px]">
-              <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Conteúdo cadastrado
-                </label>
-                <select
-                  value={selectedContentId}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                >
-                  <option value="">Selecionar depois / digitar manualmente</option>
-                  {contents.map((content) => (
-                    <option key={content.id} value={content.id}>
-                      {content.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Nome da aula
-                </label>
-                <input
-                  type="text"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  placeholder="Ex: Aula 01 - Introdução"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Data</label>
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  value={lessonDate}
-                  onChange={(e) => setLessonDate(e.target.value)}
-                />
-              </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Conteúdo da aula
+              </label>
+              <select
+                value={selectedContentId}
+                onChange={(e) => handleContentChange(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="">Selecionar conteúdo</option>
+                {contents.map((content) => (
+                  <option key={content.id} value={content.id}>
+                    {content.title}
+                  </option>
+                ))}
+              </select>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Data da aula
+              </label>
+              <input
+                type="date"
+                value={lessonDate}
+                onChange={(e) => setLessonDate(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Título da chamada
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => markAll(true)}
+              className="rounded-md border px-3 py-1 text-sm"
+            >
+              Marcar todos
+            </button>
+            <button
+              type="button"
+              onClick={() => markAll(false)}
+              className="rounded-md border px-3 py-1 text-sm"
+            >
+              Desmarcar todos
+            </button>
             <button
               type="button"
               onClick={() => setOpenStudentModal(true)}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              className="rounded-md border px-3 py-1 text-sm"
             >
               Adicionar aluno
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-sky-600 px-4 py-4 text-white">
-            <h1 className="text-lg font-semibold">Lista de chamada</h1>
-            <p className="text-sm font-medium">
-              Presentes: {summary.presents} / {summary.total}
-            </p>
+          <div className="space-y-2">
+            {presences.map((item) => (
+              <div
+                key={item.studentId}
+                className="flex items-center justify-between rounded-md border px-3 py-2"
+              >
+                <span>{item.studentName}</span>
+                <input
+                  type="checkbox"
+                  checked={item.present}
+                  onChange={() => togglePresence(item.studentId)}
+                />
+              </div>
+            ))}
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => markAll(true)}
-              className="rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
-            >
-              Marcar todos
-            </button>
-
-            <button
-              type="button"
-              onClick={() => markAll(false)}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Desmarcar todos
-            </button>
-          </div>
-
-          {presences.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Ainda não há alunos cadastrados nesta turma.
-            </p>
-          ) : (
-            <ul className="overflow-hidden rounded-md border border-slate-200">
-              <li className="grid grid-cols-[48px_1fr_80px] items-center gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                <span>Nº</span>
-                <span>Aluno</span>
-                <span className="text-center">✓</span>
-              </li>
-
-              {presences.map((item, index) => (
-                <li
-                  key={item.studentId}
-                  className="grid grid-cols-[48px_1fr_80px] items-center gap-3 border-t border-slate-200 px-4 py-3"
-                >
-                  <span className="text-sm text-slate-500">{index + 1}</span>
-
-                  <span className="text-sm font-medium text-slate-900">
-                    {item.studentName}
-                  </span>
-
-                  <div className="flex justify-center">
-                    <input
-                      type="checkbox"
-                      checked={item.present}
-                      onChange={() => togglePresence(item.studentId)}
-                      className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
 
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={loading}
-              className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+              className="rounded-md bg-sky-600 px-4 py-2 text-white"
             >
-              {loading ? "Criando..." : "Criar chamada"}
+              Criar chamada
             </button>
           </div>
         </form>
