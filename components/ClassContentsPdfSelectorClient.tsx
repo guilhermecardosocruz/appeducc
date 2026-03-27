@@ -39,10 +39,9 @@ export default function ClassContentsPdfSelectorClient({
     setSelectedIds([]);
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
+  function handleGeneratePdf() {
     const params = new URLSearchParams();
+
     for (const contentId of selectedIds) {
       params.append("contentId", contentId);
     }
@@ -88,9 +87,18 @@ export default function ClassContentsPdfSelectorClient({
           >
             Desmarcar tudo
           </button>
+
+          <button
+            type="button"
+            onClick={handleGeneratePdf}
+            disabled={selectedIds.length === 0}
+            className="rounded bg-sky-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Gerar PDF
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+        <div className="mt-6 space-y-3">
           {contents.length === 0 ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
               Nenhum conteúdo cadastrado para esta turma.
@@ -114,15 +122,7 @@ export default function ClassContentsPdfSelectorClient({
               );
             })
           )}
-
-          <button
-            type="submit"
-            disabled={selectedIds.length === 0}
-            className="mt-4 rounded bg-sky-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Salvar em PDF
-          </button>
-        </form>
+        </div>
       </div>
     </main>
   );
