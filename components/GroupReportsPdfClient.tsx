@@ -126,6 +126,61 @@ export default function GroupReportsPdfClient({
               Período: {formatDate(summary.startDate)} até{" "}
               {formatDate(summary.endDate)}
             </p>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <div className="border p-3">
+                <p className="text-xs">Escolas</p>
+                <p className="text-lg font-semibold">{summary.schools}</p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Turmas</p>
+                <p className="text-lg font-semibold">{summary.classes}</p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Alunos</p>
+                <p className="text-lg font-semibold">{summary.students}</p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Chamadas</p>
+                <p className="text-lg font-semibold">
+                  {summary.totalAttendances}
+                </p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Presenças</p>
+                <p className="text-lg font-semibold">{summary.presences}</p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Faltas</p>
+                <p className="text-lg font-semibold">{summary.absences}</p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">% Presença</p>
+                <p className="text-lg font-semibold">
+                  {summary.presenceRate}%
+                </p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Média presenças/chamada</p>
+                <p className="text-lg font-semibold">
+                  {summary.avgPresencesPerAttendance}
+                </p>
+              </div>
+
+              <div className="border p-3">
+                <p className="text-xs">Média faltas/chamada</p>
+                <p className="text-lg font-semibold">
+                  {summary.avgAbsencesPerAttendance}
+                </p>
+              </div>
+            </div>
           </>
         )}
 
