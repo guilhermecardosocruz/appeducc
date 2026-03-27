@@ -1,0 +1,7 @@
+Renomeie este arquivo de exemplo para montar sua planilha .xlsx com estas colunas:
+
+orderIndex,title,objectives,methodology,resources,bncc
+
+Exemplo:
+1,Aula 1,Objetivos da aula 1,Metodologia da aula 1,Recursos da aula 1,BNCC da aula 1
+2,Aula 2,Objetivos da aula 2,Metodologia da aula 2,Recursos da aula 2,BNCC da aula 2
