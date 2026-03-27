@@ -1,63 +1,82 @@
-import Link from "next/link";
+import { notFound } from "next/navigation";
+import ClassContentsPdfSelectorClient from "@/components/ClassContentsPdfSelectorClient";
+import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{ classId: string }>;
 };
 
+function canManageGroupRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
 export default async function ClassConteudosPdfPage({ params }: PageProps) {
+  const user = await getSessionUser();
+
+  if (!user) {
+    notFound();
+  }
+
   const { classId } = await params;
 
-  const contents = await prisma.content.findMany({
-    where: { classId },
-    orderBy: { createdAt: "asc" },
+  const foundClass = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      school: true,
+      contents: {
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
 
+  if (!foundClass) {
+    notFound();
+  }
+
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId: foundClass.schoolId,
+        },
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+
+  if (!hasAccess) {
+    notFound();
+  }
+
+  const canManageClass =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
+
+  if (!canManageClass && !schoolMembership && !groupMembership) {
+    notFound();
+  }
+
+  const contents = foundClass.contents.map((content) => ({
+    id: content.id,
+    title: content.title,
+  }));
+
   return (
-    <main className="min-h-screen bg-white px-8 py-8">
-      <div className="mx-auto w-full max-w-4xl">
-        <Link
-          href={`/classes/${classId}/conteudos`}
-          className="text-sm font-medium text-sky-700 hover:text-sky-800"
-        >
-          ← Voltar para conteúdos
-        </Link>
-
-        <h1 className="mt-6 text-2xl font-semibold">
-          Gerar PDF dos conteúdos
-        </h1>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Selecione as aulas que deseja incluir no PDF.
-        </p>
-
-        <form
-          method="GET"
-          action={`/classes/${classId}/conteudos-pdf/print`}
-          className="mt-6 space-y-3"
-        >
-          {contents.map((content) => (
-            <label
-              key={content.id}
-              className="flex items-center gap-3 border p-3"
-            >
-              <input
-                type="checkbox"
-                name="contentId"
-                value={content.id}
-              />
-              <span>{content.title}</span>
-            </label>
-          ))}
-
-          <button
-            type="submit"
-            className="mt-4 rounded bg-sky-600 px-4 py-2 text-white"
-          >
-            Gerar PDF
-          </button>
-        </form>
-      </div>
-    </main>
+    <ClassContentsPdfSelectorClient
+      classId={classId}
+      contents={contents}
+    />
   );
 }
