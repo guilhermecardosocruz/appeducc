@@ -110,20 +110,27 @@ model Class {
 }
 
 model Content {
-  id           String        @id @default(cuid())
-  title        String
-  objectives   String?
-  methodology  String?
-  resources    String?
-  bncc         String?
+  id                        String              @id @default(cuid())
+  title                     String
+  objectives                String?
+  methodology               String?
+  resources                 String?
+  bncc                      String?
+  isCustomized              Boolean             @default(false)
 
-  class        Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId      String
+  class                     Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId                   String
 
-  attendances  Attendance[]
+  sourceContentPlan         ContentPlan?        @relation("SourceContentPlan", fields: [sourceContentPlanId], references: [id], onDelete: SetNull)
+  sourceContentPlanId       String?
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  sourceContentPlanLesson   ContentPlanLesson?  @relation("SourceContentPlanLesson", fields: [sourceContentPlanLessonId], references: [id], onDelete: SetNull)
+  sourceContentPlanLessonId String?
+
+  attendances               Attendance[]
+
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 }
 
 model Student {
@@ -192,34 +199,37 @@ model GroupContent {
 }
 
 model ContentPlan {
-  id          String              @id @default(cuid())
-  name        String
-  description String?
+  id              String              @id @default(cuid())
+  name            String
+  description     String?
 
-  groupId     String
-  group       Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId         String
+  group           Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  lessons     ContentPlanLesson[]
-  classLinks  ContentPlanClass[]
+  lessons         ContentPlanLesson[]
+  classLinks      ContentPlanClass[]
+  appliedContents Content[]           @relation("SourceContentPlan")
 
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 }
 
 model ContentPlanLesson {
-  id            String       @id @default(cuid())
-  orderIndex    Int
-  title         String
-  objectives    String?
-  methodology   String?
-  resources     String?
-  bncc          String?
+  id               String       @id @default(cuid())
+  orderIndex       Int
+  title            String
+  objectives       String?
+  methodology      String?
+  resources        String?
+  bncc             String?
 
-  contentPlanId String
-  contentPlan   ContentPlan  @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+  contentPlanId    String
+  contentPlan      ContentPlan  @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  derivedContents  Content[]    @relation("SourceContentPlanLesson")
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@unique([contentPlanId, orderIndex])
 }
