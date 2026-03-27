@@ -39,6 +39,20 @@ export default async function ContentPlanDetailPage({ params }: PageProps) {
       lessons: {
         orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
       },
+      classLinks: {
+        include: {
+          class: {
+            include: {
+              school: {
+                include: {
+                  group: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ class: { school: { name: "asc" } } }, { class: { name: "asc" } }],
+      },
       _count: {
         select: {
           lessons: true,
@@ -52,6 +66,27 @@ export default async function ContentPlanDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const linkedClassIds = plan.classLinks.map((item) => item.classId);
+
+  const availableClassesRaw = await prisma.class.findMany({
+    where: {
+      school: {
+        groupId,
+      },
+      id: {
+        notIn: linkedClassIds,
+      },
+    },
+    include: {
+      school: {
+        include: {
+          group: true,
+        },
+      },
+    },
+    orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
+  });
+
   const lessons = plan.lessons.map((lesson) => ({
     id: lesson.id,
     orderIndex: lesson.orderIndex,
@@ -62,9 +97,38 @@ export default async function ContentPlanDetailPage({ params }: PageProps) {
     bncc: lesson.bncc ?? undefined,
   }));
 
+  const linkedClasses = plan.classLinks.map((item) => ({
+    id: item.class.id,
+    name: item.class.name,
+    year: item.class.year,
+    status: item.status,
+    school: {
+      id: item.class.school.id,
+      name: item.class.school.name,
+      group: {
+        id: item.class.school.group.id,
+        name: item.class.school.group.name,
+      },
+    },
+  }));
+
+  const availableClasses = availableClassesRaw.map((item) => ({
+    id: item.id,
+    name: item.name,
+    year: item.year,
+    school: {
+      id: item.school.id,
+      name: item.school.name,
+      group: {
+        id: item.school.group.id,
+        name: item.school.group.name,
+      },
+    },
+  }));
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-6xl">
         <div className="mb-6">
           <Link
             href={`/groups/${groupId}/content-plans`}
@@ -89,6 +153,8 @@ export default async function ContentPlanDetailPage({ params }: PageProps) {
           groupId={groupId}
           planId={planId}
           initialLessons={lessons}
+          linkedClasses={linkedClasses}
+          availableClasses={availableClasses}
         />
       </div>
     </main>
