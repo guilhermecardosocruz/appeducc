@@ -14,23 +14,18 @@ const actions = [
     primary: false,
   },
   {
-    title: "Ir para Chamadas",
+    title: "Chamadas",
     href: (classId: string) => `/classes/${classId}/chamadas`,
     primary: true,
   },
   {
-    title: "Ir para Conteúdos",
+    title: "Conteúdos",
     href: (classId: string) => `/classes/${classId}/conteudos`,
     primary: false,
   },
   {
     title: "Relatório Chamadas",
     href: (classId: string) => `/classes/${classId}/relatorio-chamadas`,
-    primary: false,
-  },
-  {
-    title: "Conteúdos em PDF",
-    href: (classId: string) => `/classes/${classId}/conteudos-pdf`,
     primary: false,
   },
   {
