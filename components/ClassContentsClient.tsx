@@ -204,46 +204,55 @@ export default function ClassContentsClient({
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold">Conteúdos</h1>
 
-        {canManageClass && (
-          <div className="flex flex-wrap gap-2">
-            <a
-              href="/templates/contents-template.xlsx"
-              className="rounded border px-3 py-2 text-sm"
-            >
-              Modelo Excel
-            </a>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/classes/${classId}/conteudos-pdf`}
+            className="rounded border px-3 py-2 text-sm"
+          >
+            Gerar PDF
+          </a>
 
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="rounded border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {importing ? "Importando..." : "Importar Excel"}
-            </button>
+          {canManageClass ? (
+            <>
+              <a
+                href="/templates/contents-template.xlsx"
+                className="rounded border px-3 py-2 text-sm"
+              >
+                Modelo Excel
+              </a>
 
-            <button
-              type="button"
-              onClick={() => setOpenForm(!openForm)}
-              className="rounded bg-sky-600 px-3 py-2 text-sm text-white"
-            >
-              {openForm ? "Fechar" : "Novo conteúdo"}
-            </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className="rounded border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importing ? "Importando..." : "Importar Excel"}
+              </button>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  void handleImportFile(file);
-                }
-              }}
-            />
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => setOpenForm(!openForm)}
+                className="rounded bg-sky-600 px-3 py-2 text-sm text-white"
+              >
+                {openForm ? "Fechar" : "Novo conteúdo"}
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleImportFile(file);
+                  }
+                }}
+              />
+            </>
+          ) : null}
+        </div>
       </div>
 
       {(loading || importing || error) && (
@@ -404,7 +413,9 @@ export default function ClassContentsClient({
                 >
                   Excluir
                 </button>
-              ) : <div />}
+              ) : (
+                <div />
+              )}
 
               <div className="flex gap-2">
                 <button
