@@ -94,7 +94,7 @@ export default function AttendanceDetailClient({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
           />
         </div>
 
@@ -106,7 +106,7 @@ export default function AttendanceDetailClient({
             type="date"
             value={lessonDate}
             onChange={(e) => setLessonDate(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
           />
         </div>
       </div>
@@ -115,30 +115,37 @@ export default function AttendanceDetailClient({
         <button
           type="button"
           onClick={() => markAll(true)}
-          className="rounded-md border px-3 py-1 text-sm"
+          className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
         >
           Marcar todos
         </button>
         <button
           type="button"
           onClick={() => markAll(false)}
-          className="rounded-md border px-3 py-1 text-sm"
+          className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
         >
           Desmarcar todos
         </button>
       </div>
 
-      <div className="mt-4 space-y-2">
-        {presences.map((item) => (
+      <div className="mt-4 overflow-hidden rounded-md border">
+        {presences.map((item, index) => (
           <div
             key={item.id}
-            className="flex items-center justify-between rounded-md border px-3 py-2"
+            onClick={() => togglePresence(item.id)}
+            className={`flex cursor-pointer items-center justify-between px-4 py-3
+              ${index % 2 === 0 ? "bg-sky-50" : "bg-sky-100"}
+              hover:bg-sky-200`}
           >
-            <span>{item.student.name}</span>
+            <span className="font-medium text-slate-900">
+              {item.student.name}
+            </span>
+
             <input
               type="checkbox"
               checked={item.present}
               onChange={() => togglePresence(item.id)}
+              className="h-5 w-5"
             />
           </div>
         ))}
@@ -147,7 +154,7 @@ export default function AttendanceDetailClient({
       <div className="mt-6 flex justify-between">
         <Link
           href={`/classes/${classId}/chamadas`}
-          className="rounded-md border px-4 py-2 text-sm"
+          className="rounded-md border px-4 py-2 text-sm bg-white hover:bg-slate-100"
         >
           Voltar
         </Link>
