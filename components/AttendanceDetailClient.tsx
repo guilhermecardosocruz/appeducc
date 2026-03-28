@@ -155,9 +155,10 @@ export default function AttendanceDetailClient({
         <button
           type="button"
           onClick={handleSave}
-          className="rounded-md bg-sky-600 px-4 py-2 text-white"
+          disabled={loading}
+          className="rounded-md bg-sky-600 px-4 py-2 text-white disabled:opacity-50"
         >
-          Salvar chamada
+          {loading ? "Salvando..." : "Salvar chamada"}
         </button>
       </div>
     </div>
