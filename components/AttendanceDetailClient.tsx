@@ -133,9 +133,9 @@ export default function AttendanceDetailClient({
           <div
             key={item.id}
             onClick={() => togglePresence(item.id)}
-            className={`flex cursor-pointer items-center justify-between px-4 py-3
-              ${index % 2 === 0 ? "bg-sky-50" : "bg-sky-100"}
-              hover:bg-sky-200`}
+            className={`flex cursor-pointer items-center justify-between px-4 py-3 ${
+              index % 2 === 0 ? "bg-sky-50" : "bg-sky-100"
+            } hover:bg-sky-200`}
           >
             <span className="font-medium text-slate-900">
               {item.student.name}
@@ -144,6 +144,7 @@ export default function AttendanceDetailClient({
             <input
               type="checkbox"
               checked={item.present}
+              onClick={(e) => e.stopPropagation()}
               onChange={() => togglePresence(item.id)}
               className="h-5 w-5"
             />
