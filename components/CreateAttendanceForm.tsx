@@ -84,9 +84,7 @@ export default function CreateAttendanceForm({
     try {
       const res = await fetch(`/api/classes/${classId}/students`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
 
@@ -166,6 +164,46 @@ export default function CreateAttendanceForm({
     <>
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Conteúdo + Data */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Conteúdo da aula
+              </label>
+              <select
+                value={selectedContentId}
+                onChange={(e) => handleContentChange(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
+              >
+                <option value="">Selecionar conteúdo</option>
+                {contents.map((content) => (
+                  <option key={content.id} value={content.id}>
+                    {content.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Data da aula
+              </label>
+              <input
+                ref={dateRef}
+                type="date"
+                value={lessonDate}
+                onChange={(e) => setLessonDate(e.target.value)}
+                className={`mt-1 w-full rounded-md border px-3 py-2 text-base ${
+                  dateError ? "border-red-500" : "border-slate-300"
+                }`}
+              />
+              {dateError && (
+                <p className="mt-1 text-sm text-red-600">{dateError}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Título */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Título da chamada
@@ -184,24 +222,57 @@ export default function CreateAttendanceForm({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Data da aula
-            </label>
-            <input
-              ref={dateRef}
-              type="date"
-              value={lessonDate}
-              onChange={(e) => setLessonDate(e.target.value)}
-              className={`mt-1 w-full rounded-md border px-3 py-2 text-base ${
-                dateError ? "border-red-500" : "border-slate-300"
-              }`}
-            />
-            {dateError && (
-              <p className="mt-1 text-sm text-red-600">{dateError}</p>
-            )}
+          {/* Botões */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => markAll(true)}
+              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
+            >
+              Marcar todos
+            </button>
+            <button
+              type="button"
+              onClick={() => markAll(false)}
+              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
+            >
+              Desmarcar todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenStudentModal(true)}
+              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
+            >
+              Adicionar aluno
+            </button>
           </div>
 
+          {/* Lista de alunos */}
+          <div className="overflow-hidden rounded-md border">
+            {presences.map((item, index) => (
+              <div
+                key={item.studentId}
+                onClick={() => togglePresence(item.studentId)}
+                className={`flex cursor-pointer items-center justify-between px-4 py-3 ${
+                  index % 2 === 0 ? "bg-sky-50" : "bg-sky-100"
+                } hover:bg-sky-200`}
+              >
+                <span className="font-medium text-slate-900">
+                  {item.studentName}
+                </span>
+
+                <input
+                  type="checkbox"
+                  checked={item.present}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => togglePresence(item.studentId)}
+                  className="h-5 w-5"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Botão criar */}
           <div className="flex justify-end">
             <button
               type="submit"
