@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import AddStudentModal from "./AddStudentModal";
 
 type StudentItem = {
@@ -50,12 +50,6 @@ export default function CreateAttendanceForm({
   const [addingStudent, setAddingStudent] = useState(false);
   const [openStudentModal, setOpenStudentModal] = useState(false);
 
-  const summary = useMemo(() => {
-    const total = presences.length;
-    const presents = presences.filter((item) => item.present).length;
-    return { total, presents };
-  }, [presences]);
-
   function togglePresence(studentId: string) {
     setPresences((current) =>
       current.map((item) =>
@@ -75,11 +69,8 @@ export default function CreateAttendanceForm({
 
   function handleContentChange(contentId: string) {
     setSelectedContentId(contentId);
-
     const selected = contents.find((item) => item.id === contentId);
-    if (selected) {
-      setTitle(selected.title);
-    }
+    if (selected) setTitle(selected.title);
   }
 
   async function handleAddStudent(name: string) {
@@ -155,7 +146,7 @@ export default function CreateAttendanceForm({
               <select
                 value={selectedContentId}
                 onChange={(e) => handleContentChange(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
               >
                 <option value="">Selecionar conteúdo</option>
                 {contents.map((content) => (
@@ -174,7 +165,7 @@ export default function CreateAttendanceForm({
                 type="date"
                 value={lessonDate}
                 onChange={(e) => setLessonDate(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
               />
             </div>
           </div>
@@ -187,7 +178,7 @@ export default function CreateAttendanceForm({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
             />
           </div>
 
@@ -195,37 +186,44 @@ export default function CreateAttendanceForm({
             <button
               type="button"
               onClick={() => markAll(true)}
-              className="rounded-md border px-3 py-1 text-sm"
+              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
             >
               Marcar todos
             </button>
             <button
               type="button"
               onClick={() => markAll(false)}
-              className="rounded-md border px-3 py-1 text-sm"
+              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
             >
               Desmarcar todos
             </button>
             <button
               type="button"
               onClick={() => setOpenStudentModal(true)}
-              className="rounded-md border px-3 py-1 text-sm"
+              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
             >
               Adicionar aluno
             </button>
           </div>
 
-          <div className="space-y-2">
-            {presences.map((item) => (
+          <div className="overflow-hidden rounded-md border">
+            {presences.map((item, index) => (
               <div
                 key={item.studentId}
-                className="flex items-center justify-between rounded-md border px-3 py-2"
+                onClick={() => togglePresence(item.studentId)}
+                className={`flex cursor-pointer items-center justify-between px-4 py-3
+                  ${index % 2 === 0 ? "bg-sky-50" : "bg-sky-100"}
+                  hover:bg-sky-200`}
               >
-                <span>{item.studentName}</span>
+                <span className="font-medium text-slate-900">
+                  {item.studentName}
+                </span>
+
                 <input
                   type="checkbox"
                   checked={item.present}
                   onChange={() => togglePresence(item.studentId)}
+                  className="h-5 w-5"
                 />
               </div>
             ))}
@@ -234,9 +232,10 @@ export default function CreateAttendanceForm({
           <div className="flex justify-end">
             <button
               type="submit"
-              className="rounded-md bg-sky-600 px-4 py-2 text-white"
+              disabled={loading}
+              className="rounded-md bg-sky-600 px-4 py-2 text-white disabled:opacity-50"
             >
-              Criar chamada
+              {loading ? "Criando..." : "Criar chamada"}
             </button>
           </div>
         </form>
