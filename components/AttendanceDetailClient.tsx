@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import AddStudentModal from "./AddStudentModal";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type PresenceItem = {
   id: string;
@@ -28,18 +28,11 @@ export default function AttendanceDetailClient({
   initialLessonDate,
   initialPresences,
 }: Props) {
+  const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [lessonDate, setLessonDate] = useState(initialLessonDate);
   const [presences, setPresences] = useState<PresenceItem[]>(initialPresences);
   const [loading, setLoading] = useState(false);
-  const [addingStudent, setAddingStudent] = useState(false);
-  const [openStudentModal, setOpenStudentModal] = useState(false);
-
-  const summary = useMemo(() => {
-    const total = presences.length;
-    const presents = presences.filter((item) => item.present).length;
-    return { total, presents };
-  }, [presences]);
 
   function togglePresence(id: string) {
     setPresences((current) =>
@@ -56,38 +49,6 @@ export default function AttendanceDetailClient({
         present: value,
       }))
     );
-  }
-
-  async function handleAddStudent(name: string) {
-    setAddingStudent(true);
-
-    try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          attendanceId,
-        }),
-      });
-
-      if (!res.ok) {
-        console.error("Erro ao adicionar aluno");
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data.presence) {
-        setPresences((current) => [...current, data.presence]);
-      }
-
-      setOpenStudentModal(false);
-    } catch (error) {
-      console.error("Erro ao adicionar aluno", error);
-    } finally {
-      setAddingStudent(false);
-    }
   }
 
   async function handleSave() {
@@ -108,11 +69,13 @@ export default function AttendanceDetailClient({
       });
 
       if (!res.ok) {
-        console.error("Erro ao salvar chamada");
+        alert("Erro ao salvar chamada");
         return;
       }
 
-      window.location.reload();
+      alert("Alterações salvas com sucesso!");
+      router.push(`/classes/${classId}/chamadas`);
+      router.refresh();
     } catch (error) {
       console.error("Erro ao salvar chamada", error);
     } finally {
@@ -121,130 +84,82 @@ export default function AttendanceDetailClient({
   }
 
   return (
-    <>
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="space-y-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="grid flex-1 gap-4 md:grid-cols-[1fr_220px]">
-              <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Nome da aula
-                </label>
-                <input
-                  type="text"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-slate-700">
+            Título
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">Data</label>
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  value={lessonDate}
-                  onChange={(e) => setLessonDate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setOpenStudentModal(true)}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
-              Adicionar aluno
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-sky-600 px-4 py-4 text-white">
-            <h1 className="text-lg font-semibold">Lista de chamada</h1>
-            <p className="text-sm font-medium">
-              Presentes: {summary.presents} / {summary.total}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => markAll(true)}
-              className="rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
-            >
-              Marcar todos
-            </button>
-
-            <button
-              type="button"
-              onClick={() => markAll(false)}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Desmarcar todos
-            </button>
-          </div>
-
-          {presences.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Ainda não há alunos cadastrados nesta turma.
-            </p>
-          ) : (
-            <ul className="overflow-hidden rounded-md border border-slate-200">
-              <li className="grid grid-cols-[48px_1fr_80px] items-center gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                <span>Nº</span>
-                <span>Aluno</span>
-                <span className="text-center">✓</span>
-              </li>
-
-              {presences.map((item, index) => (
-                <li
-                  key={item.id}
-                  className="grid grid-cols-[48px_1fr_80px] items-center gap-3 border-t border-slate-200 px-4 py-3"
-                >
-                  <span className="text-sm text-slate-500">{index + 1}</span>
-
-                  <span className="text-sm font-medium text-slate-900">
-                    {item.student.name}
-                  </span>
-
-                  <div className="flex justify-center">
-                    <input
-                      type="checkbox"
-                      checked={item.present}
-                      onChange={() => togglePresence(item.id)}
-                      className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex justify-between gap-3">
-            <Link
-              href={`/classes/${classId}/chamadas`}
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
-              Voltar
-            </Link>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={loading}
-              className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
-            >
-              {loading ? "Salvando..." : "Salvar chamada"}
-            </button>
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">
+            Data
+          </label>
+          <input
+            type="date"
+            value={lessonDate}
+            onChange={(e) => setLessonDate(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
         </div>
       </div>
 
-      <AddStudentModal
-        open={openStudentModal}
-        onClose={() => setOpenStudentModal(false)}
-        onSubmit={handleAddStudent}
-        loading={addingStudent}
-      />
-    </>
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => markAll(true)}
+          className="rounded-md border px-3 py-1 text-sm"
+        >
+          Marcar todos
+        </button>
+        <button
+          type="button"
+          onClick={() => markAll(false)}
+          className="rounded-md border px-3 py-1 text-sm"
+        >
+          Desmarcar todos
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {presences.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center justify-between rounded-md border px-3 py-2"
+          >
+            <span>{item.student.name}</span>
+            <input
+              type="checkbox"
+              checked={item.present}
+              onChange={() => togglePresence(item.id)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 flex justify-between">
+        <Link
+          href={`/classes/${classId}/chamadas`}
+          className="rounded-md border px-4 py-2 text-sm"
+        >
+          Voltar
+        </Link>
+
+        <button
+          type="button"
+          onClick={handleSave}
+          className="rounded-md bg-sky-600 px-4 py-2 text-white"
+        >
+          Salvar chamada
+        </button>
+      </div>
+    </div>
   );
 }
