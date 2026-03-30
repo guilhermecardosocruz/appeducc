@@ -32,6 +32,16 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function sanitize(input: string) {
+  return String(input)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+}
+
 export async function GET(_request: Request, context: RouteContext) {
   const user = await getSessionUser();
 
@@ -184,12 +194,26 @@ export async function POST(request: Request, context: RouteContext) {
     })
   );
 
+  // ===== NOVO NOME DO ARQUIVO =====
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10);
+  const timePart = now.toTimeString().slice(0, 5).replace(":", "-");
+
+  const schoolSafe = sanitize(foundClass.school.name);
+  const classSafe = sanitize(foundClass.name);
+
+  const ext = file.name.includes(".")
+    ? file.name.split(".").pop()
+    : "jpg";
+
+  const displayFileName = `${schoolSafe}_${classSafe}_${datePart}_${timePart}.${ext}`;
+
   const created = await prisma.classGalleryImage.create({
     data: {
       classId: foundClass.id,
       uploadedById: user.id,
       objectKey,
-      fileName: file.name,
+      fileName: displayFileName,
       mimeType: file.type,
       sizeBytes: file.size,
     },
