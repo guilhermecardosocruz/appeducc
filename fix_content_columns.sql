@@ -1,0 +1,8 @@
+ALTER TABLE "Content"
+ADD COLUMN IF NOT EXISTS "isCustomized" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "Content"
+ADD COLUMN IF NOT EXISTS "sourceContentPlanId" TEXT;
+
+ALTER TABLE "Content"
+ADD COLUMN IF NOT EXISTS "sourceContentPlanLessonId" TEXT;
