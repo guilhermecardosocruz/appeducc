@@ -33,6 +33,11 @@ const actions = [
     href: (classId: string) => `/classes/${classId}/ai-help`,
     primary: false,
   },
+  {
+    title: "Galeria",
+    href: (classId: string) => `/classes/${classId}/gallery`,
+    primary: false,
+  },
 ];
 
 export default function ClassDetailClient({

@@ -136,3 +136,62 @@ export async function isGroupManager(userId: string, groupId: string) {
 
   return isGroupManagerRole(groupMembership.role);
 }
+
+export async function canAccessClassGallery(userId: string, classId: string) {
+  const foundClass = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      school: true,
+    },
+  });
+
+  if (!foundClass) return false;
+
+  if (foundClass.teacherId === userId) {
+    return true;
+  }
+
+  const groupMembership = await prisma.groupMember.findUnique({
+    where: {
+      userId_groupId: {
+        userId,
+        groupId: foundClass.school.groupId,
+      },
+    },
+  });
+
+  if (!groupMembership) return false;
+
+  return isGroupManagerRole(groupMembership.role);
+}
+
+export async function canManageAllClassGalleryImages(
+  userId: string,
+  classId: string
+) {
+  const foundClass = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      school: true,
+    },
+  });
+
+  if (!foundClass) return false;
+
+  const groupMembership = await prisma.groupMember.findUnique({
+    where: {
+      userId_groupId: {
+        userId,
+        groupId: foundClass.school.groupId,
+      },
+    },
+  });
+
+  if (!groupMembership) return false;
+
+  return isGroupManagerRole(groupMembership.role);
+}
+
+export async function canUploadToClassGallery(userId: string, classId: string) {
+  return canAccessClassGallery(userId, classId);
+}

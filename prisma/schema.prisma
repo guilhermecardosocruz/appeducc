@@ -8,24 +8,25 @@ datasource db {
 }
 
 model User {
-  id              String         @id @default(cuid())
-  name            String
-  email           String         @unique
-  cpf             String?        @unique
-  passwordHash    String
-  isTeacher       Boolean        @default(false)
-  createdById     String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id                   String              @id @default(cuid())
+  name                 String
+  email                String              @unique
+  cpf                  String?             @unique
+  passwordHash         String
+  isTeacher            Boolean             @default(false)
+  createdById          String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  createdBy       User?          @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
-  createdUsers    User[]         @relation("CreatedUsers")
-  sessions        Session[]
-  groupMembers    GroupMember[]
-  schoolMembers   SchoolMember[]
-  classes         Class[]        @relation("ClassTeacher")
+  createdBy            User?               @relation("CreatedUsers", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers         User[]              @relation("CreatedUsers")
+  sessions             Session[]
+  groupMembers         GroupMember[]
+  schoolMembers        SchoolMember[]
+  classes              Class[]             @relation("ClassTeacher")
+  galleryImagesUploaded ClassGalleryImage[] @relation("GalleryImageUploadedBy")
 
-  deletedStudents Student[]      @relation("DeletedByUser")
+  deletedStudents      Student[]           @relation("DeletedByUser")
 }
 
 model Session {
@@ -107,6 +108,7 @@ model Class {
   attendances      Attendance[]
   contents         Content[]
   contentPlanLinks ContentPlanClass[]
+  galleryImages    ClassGalleryImage[]
 }
 
 model Content {
@@ -248,4 +250,22 @@ model ContentPlanClass {
   updatedAt     DateTime    @updatedAt
 
   @@unique([contentPlanId, classId])
+}
+
+model ClassGalleryImage {
+  id           String   @id @default(cuid())
+  classId      String
+  class        Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User     @relation("GalleryImageUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  objectKey    String   @unique
+  fileName     String
+  mimeType     String?
+  sizeBytes    Int?
+  createdAt    DateTime @default(now())
+
+  @@index([classId, createdAt])
+  @@index([uploadedById, createdAt])
 }
