@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, hashPassword } from "@/lib/auth";
 
 function normalizeRole(value: string | null | undefined) {
   return String(value ?? "").trim().toUpperCase();
@@ -164,13 +164,14 @@ export async function POST(req: Request) {
   }
 
   const generatedPassword = Math.random().toString(36).slice(-8);
+  const passwordHash = await hashPassword(generatedPassword);
 
   const teacher = await prisma.user.create({
     data: {
       name,
       email,
       cpf,
-      passwordHash: generatedPassword,
+      passwordHash,
       isTeacher: true,
       createdById: user.id,
     },
@@ -186,6 +187,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     teacher,
-    generatedPassword,
+    temporaryPassword: generatedPassword,
   });
 }
