@@ -62,10 +62,13 @@ export default async function ClassChamadasPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === user.id;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
   const canManage =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   if (!hasAccess) {
     notFound();

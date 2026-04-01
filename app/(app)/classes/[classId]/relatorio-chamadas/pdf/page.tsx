@@ -51,7 +51,9 @@ export default async function ClassRelatorioChamadasPdfPage({
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === user.id;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
 
   if (!hasAccess) {
     notFound();

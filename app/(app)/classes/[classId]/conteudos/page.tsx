@@ -55,7 +55,9 @@ export default async function ClassConteudosPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === user.id;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
 
   if (!hasAccess) {
     notFound();
@@ -63,7 +65,8 @@ export default async function ClassConteudosPage({ params }: PageProps) {
 
   const canManageClass =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   const initialContents = foundClass.contents.map((content) => ({
     id: content.id,

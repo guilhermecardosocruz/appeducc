@@ -36,10 +36,13 @@ async function ensureClassAccess(userId: string, classId: string) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === userId;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
   const canManage =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && isManagerRole(groupMembership.role));
+    Boolean(groupMembership && isManagerRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   if (!hasAccess) return null;
 

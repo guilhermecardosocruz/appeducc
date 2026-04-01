@@ -54,10 +54,13 @@ export default async function ClassStudentsPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === user.id;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
   const canManageStudents =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && isManagerRole(groupMembership.role));
+    Boolean(groupMembership && isManagerRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   if (!hasAccess) {
     notFound();

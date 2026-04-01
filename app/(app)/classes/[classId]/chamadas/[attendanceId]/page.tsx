@@ -82,10 +82,13 @@ export default async function AttendanceDetailPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = attendanceBase.class.teacherId === user.id;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
   const canManage =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   if (!hasAccess) {
     notFound();

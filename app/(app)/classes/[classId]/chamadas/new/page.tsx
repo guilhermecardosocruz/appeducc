@@ -69,9 +69,11 @@ export default async function NewAttendancePage({ params }: PageProps) {
     }),
   ]);
 
+  const isTeacherOfClass = foundClass.teacherId === user.id;
   const canManage =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   if (!canManage) {
     notFound();
