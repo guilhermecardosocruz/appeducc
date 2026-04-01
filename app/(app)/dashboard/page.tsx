@@ -21,38 +21,57 @@ export default async function DashboardPage() {
     );
   }
 
-  const [groupMemberships, schoolMemberships] = await Promise.all([
-    prisma.groupMember.findMany({
-      where: {
-        userId: user.id,
-      },
-      include: {
-        group: {
-          include: {
-            _count: { select: { schools: true } },
+  const [groupMemberships, schoolMemberships, teacherClasses] = await Promise.all(
+    [
+      prisma.groupMember.findMany({
+        where: {
+          userId: user.id,
+        },
+        include: {
+          group: {
+            include: {
+              _count: { select: { schools: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.schoolMember.findMany({
-      where: {
-        userId: user.id,
-      },
-      include: {
-        school: {
-          include: {
-            group: {
-              include: {
-                _count: { select: { schools: true } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.schoolMember.findMany({
+        where: {
+          userId: user.id,
+        },
+        include: {
+          school: {
+            include: {
+              group: {
+                include: {
+                  _count: { select: { schools: true } },
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.class.findMany({
+        where: {
+          teacherId: user.id,
+        },
+        include: {
+          school: {
+            include: {
+              group: {
+                include: {
+                  _count: { select: { schools: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]
+  );
 
   const groupsMap = new Map<
     string,
@@ -75,6 +94,19 @@ export default async function DashboardPage() {
 
   for (const membership of schoolMemberships) {
     const group = membership.school.group;
+
+    if (!groupsMap.has(group.id)) {
+      groupsMap.set(group.id, {
+        id: group.id,
+        name: group.name,
+        createdAt: group.createdAt.toISOString(),
+        _count: { schools: group._count.schools },
+      });
+    }
+  }
+
+  for (const item of teacherClasses) {
+    const group = item.school.group;
 
     if (!groupsMap.has(group.id)) {
       groupsMap.set(group.id, {

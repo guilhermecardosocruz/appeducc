@@ -17,29 +17,43 @@ async function getSchoolAccess(userId: string, schoolId: string) {
 
   if (!school) return null;
 
-  const [schoolMembership, groupMembership] = await Promise.all([
-    prisma.schoolMember.findUnique({
-      where: {
-        userId_schoolId: {
-          userId,
+  const [schoolMembership, groupMembership, teacherClassInSchool] =
+    await Promise.all([
+      prisma.schoolMember.findUnique({
+        where: {
+          userId_schoolId: {
+            userId,
+            schoolId,
+          },
+        },
+        include: {
+          school: true,
+        },
+      }),
+      prisma.groupMember.findUnique({
+        where: {
+          userId_groupId: {
+            userId,
+            groupId: school.groupId,
+          },
+        },
+      }),
+      prisma.class.findFirst({
+        where: {
           schoolId,
+          teacherId: userId,
         },
-      },
-      include: {
-        school: true,
-      },
-    }),
-    prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: {
-          userId,
-          groupId: school.groupId,
+        select: {
+          id: true,
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership) ||
+    Boolean(teacherClassInSchool);
+
   const canManage =
     Boolean(schoolMembership) ||
     Boolean(groupMembership && canManageGroupRole(groupMembership.role));
@@ -48,6 +62,7 @@ async function getSchoolAccess(userId: string, schoolId: string) {
     school,
     schoolMembership,
     groupMembership,
+    teacherClassInSchool,
     hasAccess,
     canManage,
   };
@@ -70,7 +85,12 @@ export async function GET(
   }
 
   const classes = await prisma.class.findMany({
-    where: { schoolId },
+    where: user.isTeacher
+      ? {
+          schoolId,
+          teacherId: user.id,
+        }
+      : { schoolId },
     include: {
       teacher: {
         select: {

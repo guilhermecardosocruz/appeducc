@@ -16,63 +16,77 @@ export default async function GroupPage({ params }: PageProps) {
 
   const { groupId } = await params;
 
-  const [groupMembership, schoolMembershipsInGroup, group] = await Promise.all([
-    prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: {
-          userId: user.id,
-          groupId,
-        },
-      },
-    }),
-    prisma.schoolMember.findMany({
-      where: {
-        userId: user.id,
-        school: {
-          groupId,
-        },
-      },
-      select: {
-        schoolId: true,
-        role: true,
-      },
-    }),
-    prisma.group.findUnique({
-      where: { id: groupId },
-      include: {
-        schools: {
-          include: {
-            _count: {
-              select: { classes: true },
-            },
+  const [groupMembership, schoolMembershipsInGroup, teacherClassesInGroup, group] =
+    await Promise.all([
+      prisma.groupMember.findUnique({
+        where: {
+          userId_groupId: {
+            userId: user.id,
+            groupId,
           },
-          orderBy: { name: "asc" },
         },
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                cpf: true,
-                isTeacher: true,
-                createdAt: true,
+      }),
+      prisma.schoolMember.findMany({
+        where: {
+          userId: user.id,
+          school: {
+            groupId,
+          },
+        },
+        select: {
+          schoolId: true,
+          role: true,
+        },
+      }),
+      prisma.class.findMany({
+        where: {
+          teacherId: user.id,
+          school: {
+            groupId,
+          },
+        },
+        select: {
+          schoolId: true,
+        },
+      }),
+      prisma.group.findUnique({
+        where: { id: groupId },
+        include: {
+          schools: {
+            include: {
+              _count: {
+                select: { classes: true },
               },
             },
+            orderBy: { name: "asc" },
           },
-          orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  cpf: true,
+                  isTeacher: true,
+                  createdAt: true,
+                },
+              },
+            },
+            orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+          },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
   if (!group) {
     notFound();
   }
 
   const hasAccess =
-    Boolean(groupMembership) || schoolMembershipsInGroup.length > 0;
+    Boolean(groupMembership) ||
+    schoolMembershipsInGroup.length > 0 ||
+    teacherClassesInGroup.length > 0;
 
   if (!hasAccess) {
     notFound();
@@ -83,7 +97,10 @@ export default async function GroupPage({ params }: PageProps) {
 
   const allowedSchoolIds = groupMembership
     ? null
-    : new Set(schoolMembershipsInGroup.map((item) => item.schoolId));
+    : new Set([
+        ...schoolMembershipsInGroup.map((item) => item.schoolId),
+        ...teacherClassesInGroup.map((item) => item.schoolId),
+      ]);
 
   const schools = group.schools
     .filter((school) => {

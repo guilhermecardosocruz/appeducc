@@ -17,24 +17,32 @@ export async function canAccessSchool(userId: string, schoolId: string) {
 
   if (!school) return false;
 
-  const [schoolMembership, groupMembership] = await Promise.all([
-    prisma.schoolMember.findUnique({
-      where: {
-        userId_schoolId: {
-          userId,
+  const [schoolMembership, groupMembership, teacherClassInSchool] =
+    await Promise.all([
+      prisma.schoolMember.findUnique({
+        where: {
+          userId_schoolId: {
+            userId,
+            schoolId,
+          },
+        },
+      }),
+      prisma.groupMember.findUnique({
+        where: {
+          userId_groupId: {
+            userId,
+            groupId: school.groupId,
+          },
+        },
+      }),
+      prisma.class.findFirst({
+        where: {
           schoolId,
+          teacherId: userId,
         },
-      },
-    }),
-    prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: {
-          userId,
-          groupId: school.groupId,
-        },
-      },
-    }),
-  ]);
+        select: { id: true },
+      }),
+    ]);
 
   if (schoolMembership) return true;
 
@@ -45,6 +53,8 @@ export async function canAccessSchool(userId: string, schoolId: string) {
   ) {
     return true;
   }
+
+  if (teacherClassInSchool) return true;
 
   return false;
 }
@@ -99,6 +109,10 @@ export async function canAccessClass(userId: string, classId: string) {
 
   if (!foundClass) return false;
 
+  if (foundClass.teacherId === userId) {
+    return true;
+  }
+
   return canAccessSchool(userId, foundClass.schoolId);
 }
 
@@ -118,6 +132,10 @@ export async function canAccessAttendance(
   });
 
   if (!attendance) return false;
+
+  if (attendance.class.teacherId === userId) {
+    return true;
+  }
 
   return canAccessSchool(userId, attendance.class.schoolId);
 }

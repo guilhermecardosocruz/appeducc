@@ -37,26 +37,39 @@ export default async function SchoolPage({ params }: PageProps) {
     notFound();
   }
 
-  const [schoolMembership, groupMembership] = await Promise.all([
-    prisma.schoolMember.findUnique({
-      where: {
-        userId_schoolId: {
-          userId: user.id,
+  const [schoolMembership, groupMembership, teacherClassInSchool] =
+    await Promise.all([
+      prisma.schoolMember.findUnique({
+        where: {
+          userId_schoolId: {
+            userId: user.id,
+            schoolId,
+          },
+        },
+      }),
+      prisma.groupMember.findUnique({
+        where: {
+          userId_groupId: {
+            userId: user.id,
+            groupId: school.groupId,
+          },
+        },
+      }),
+      prisma.class.findFirst({
+        where: {
           schoolId,
+          teacherId: user.id,
         },
-      },
-    }),
-    prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: {
-          userId: user.id,
-          groupId: school.groupId,
+        select: {
+          id: true,
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const hasAccess =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership) ||
+    Boolean(teacherClassInSchool);
 
   if (!hasAccess) {
     notFound();
@@ -123,6 +136,14 @@ export default async function SchoolPage({ params }: PageProps) {
               role: "TEACHER",
             },
           },
+        },
+        {
+          classes: {
+            some: {
+              schoolId,
+            },
+          },
+          isTeacher: true,
         },
       ],
     },
