@@ -76,8 +76,32 @@ export default function AttendanceDetailClient({
       alert("Alterações salvas com sucesso!");
       router.push(`/classes/${classId}/chamadas`);
       router.refresh();
-    } catch (error) {
-      console.error("Erro ao salvar chamada", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete() {
+    const confirmDelete = confirm(
+      "Tem certeza que deseja excluir esta chamada? Todas as presenças serão apagadas."
+    );
+
+    if (!confirmDelete) return;
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`/api/attendances/${attendanceId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        alert("Erro ao excluir chamada");
+        return;
+      }
+
+      router.push(`/classes/${classId}/chamadas`);
+      router.refresh();
     } finally {
       setLoading(false);
     }
@@ -160,14 +184,24 @@ export default function AttendanceDetailClient({
           Voltar
         </Link>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={loading}
-          className="rounded-md bg-sky-600 px-4 py-2 text-white disabled:opacity-50"
-        >
-          {loading ? "Salvando..." : "Salvar chamada"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="rounded-md bg-red-600 px-4 py-2 text-white"
+          >
+            Excluir chamada
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={loading}
+            className="rounded-md bg-sky-600 px-4 py-2 text-white disabled:opacity-50"
+          >
+            {loading ? "Salvando..." : "Salvar chamada"}
+          </button>
+        </div>
       </div>
     </div>
   );

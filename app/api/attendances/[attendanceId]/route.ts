@@ -160,39 +160,32 @@ export async function PATCH(
     ),
   ]);
 
-  const updated = await prisma.attendance.findUnique({
-    where: { id: attendanceId },
-    include: {
-      class: {
-        include: {
-          school: true,
-        },
-      },
-      presences: {
-        include: {
-          student: {
-            select: {
-              id: true,
-              name: true,
-              deletedAt: true,
-              status: true,
-            },
-          },
-        },
-        orderBy: {
-          student: {
-            name: "asc",
-          },
-        },
-      },
-    },
-  });
+  return NextResponse.json({ success: true });
+}
 
-  if (updated) {
-    updated.presences = updated.presences.filter(
-      (p) => !p.student.deletedAt && p.student.status === "ACTIVE"
-    );
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ attendanceId: string }> }
+) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(updated);
+  const { attendanceId } = await params;
+  const access = await ensureAttendanceAccess(user.id, attendanceId);
+
+  if (!access) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!access.canManage) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  await prisma.attendance.delete({
+    where: { id: attendanceId },
+  });
+
+  return NextResponse.json({ success: true });
 }
