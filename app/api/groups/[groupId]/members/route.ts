@@ -12,19 +12,18 @@ function isGroupManagerRole(role: string | null | undefined) {
 }
 
 function generateTemporaryPassword(name: string, cpf: string) {
-  const cleanName = name.trim().replace(/\s+/g, "");
   const cleanCpf = normalizeCpf(cpf);
+  const trimmedName = name.trim();
 
-  if (cleanName.length < 3 || cleanCpf.length < 6) {
+  if (cleanCpf.length < 6 || trimmedName.length < 2) {
     return null;
   }
 
-  const first = cleanName[0].toUpperCase();
-  const second = cleanName[1].toLowerCase();
-  const third = cleanName[2].toUpperCase();
   const cpfPart = cleanCpf.slice(0, 6);
+  const firstLetter = trimmedName.charAt(0).toUpperCase();
+  const secondLetter = trimmedName.charAt(1).toLowerCase();
 
-  return `${first}${second}${third}@${cpfPart}.`;
+  return `${cpfPart}@${firstLetter}${secondLetter}.`;
 }
 
 async function getGroupMembership(userId: string, groupId: string) {

@@ -11,6 +11,16 @@ function isManagerRole(value: string | null | undefined) {
   return role === "OWNER" || role === "MANAGER";
 }
 
+function generateTeacherPassword(name: string, cpf: string) {
+  const cpfDigits = cpf.replace(/\D/g, "").slice(0, 6);
+  const trimmedName = name.trim();
+
+  const firstLetter = trimmedName.charAt(0).toUpperCase();
+  const secondLetter = trimmedName.charAt(1).toLowerCase();
+
+  return `${cpfDigits}@${firstLetter}${secondLetter}.`;
+}
+
 export async function GET(req: Request) {
   const user = await getSessionUser();
 
@@ -163,7 +173,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const generatedPassword = Math.random().toString(36).slice(-8);
+  const generatedPassword = generateTeacherPassword(name, cpf);
   const passwordHash = await hashPassword(generatedPassword);
 
   const teacher = await prisma.user.create({
