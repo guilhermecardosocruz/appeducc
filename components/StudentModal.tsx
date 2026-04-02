@@ -105,36 +105,26 @@ export default function StudentModal({
     }
   }
 
-  async function approveDelete() {
+  async function permanentDelete() {
     if (!studentId) return;
+
+    const confirmDelete = confirm(
+      "Tem certeza que deseja EXCLUIR PERMANENTEMENTE este aluno? Esta ação não pode ser desfeita."
+    );
+
+    if (!confirmDelete) return;
 
     setLoading(true);
 
     try {
-      await fetch(`/api/classes/${classId}/students/${studentId}/approve`, {
-        method: "POST",
-      });
+      await fetch(
+        `/api/classes/${classId}/students/${studentId}/permanent`,
+        {
+          method: "DELETE",
+        }
+      );
 
       await onUpdated();
-      await reloadStudent();
-      onClose();
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function rejectDelete() {
-    if (!studentId) return;
-
-    setLoading(true);
-
-    try {
-      await fetch(`/api/classes/${classId}/students/${studentId}/reject`, {
-        method: "POST",
-      });
-
-      await onUpdated();
-      await reloadStudent();
       onClose();
     } finally {
       setLoading(false);
@@ -144,8 +134,6 @@ export default function StudentModal({
   if (!open || !student) return null;
 
   const inactive = student.status !== "ACTIVE";
-  const pendingDelete = student.status === "PENDING_DELETE";
-  const deleted = student.status === "DELETED";
   const canManage = student.canManageClass;
 
   return (
@@ -163,28 +151,8 @@ export default function StudentModal({
           />
         </div>
 
-        {!canManage ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Você está com acesso somente de visualização neste aluno.
-          </div>
-        ) : null}
-
         {inactive ? (
           <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {pendingDelete ? (
-              <p className="font-medium">Aguardando aprovação da gestão.</p>
-            ) : null}
-
-            {deleted ? (
-              <p className="font-medium">Aluno excluído com aprovação.</p>
-            ) : null}
-
-            {student.deletedReason ? (
-              <p>
-                <strong>Motivo:</strong> {student.deletedReason}
-              </p>
-            ) : null}
-
             <p>Presenças: {student.stats.presents}</p>
             <p>Faltas: {student.stats.absents}</p>
             <p>Frequência: {student.stats.percentage}%</p>
@@ -199,26 +167,6 @@ export default function StudentModal({
 
         {canManage ? (
           <div className="flex flex-wrap gap-2">
-            {pendingDelete && student.canApproveDelete ? (
-              <>
-                <button
-                  onClick={approveDelete}
-                  disabled={loading}
-                  className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
-                >
-                  Aprovar exclusão
-                </button>
-
-                <button
-                  onClick={rejectDelete}
-                  disabled={loading}
-                  className="rounded bg-amber-500 px-3 py-2 text-sm text-white disabled:opacity-50"
-                >
-                  Rejeitar exclusão
-                </button>
-              </>
-            ) : null}
-
             {inactive ? (
               <button
                 onClick={restoreStudent}
@@ -228,6 +176,14 @@ export default function StudentModal({
                 Reativar aluno
               </button>
             ) : null}
+
+            <button
+              onClick={permanentDelete}
+              disabled={loading}
+              className="rounded bg-red-700 px-3 py-2 text-sm text-white disabled:opacity-50"
+            >
+              Excluir permanentemente
+            </button>
           </div>
         ) : null}
 
