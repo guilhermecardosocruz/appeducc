@@ -28,6 +28,7 @@ model User {
   galleryImagesUploaded ClassGalleryImage[] @relation("GalleryImageUploadedBy")
 
   deletedStudents      Student[]           @relation("DeletedByUser")
+  deletedArchives      DeletedStudentArchive[]
 }
 
 model Session {
@@ -110,30 +111,7 @@ model Class {
   contents         Content[]
   contentPlanLinks ContentPlanClass[]
   galleryImages    ClassGalleryImage[]
-}
-
-model Content {
-  id                        String              @id @default(cuid())
-  title                     String
-  objectives                String?
-  methodology               String?
-  resources                 String?
-  bncc                      String?
-  isCustomized              Boolean             @default(false)
-
-  class                     Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId                   String
-
-  sourceContentPlan         ContentPlan?        @relation("SourceContentPlan", fields: [sourceContentPlanId], references: [id], onDelete: SetNull)
-  sourceContentPlanId       String?
-
-  sourceContentPlanLesson   ContentPlanLesson?  @relation("SourceContentPlanLesson", fields: [sourceContentPlanLessonId], references: [id], onDelete: SetNull)
-  sourceContentPlanLessonId String?
-
-  attendances               Attendance[]
-
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  deletedArchives  DeletedStudentArchive[]
 }
 
 model Student {
@@ -152,6 +130,22 @@ model Student {
   deletedReason String?
   deletedById   String?
   deletedBy     User?                @relation("DeletedByUser", fields: [deletedById], references: [id])
+}
+
+model DeletedStudentArchive {
+  id                   String   @id @default(cuid())
+  name                 String
+  classId              String
+  class                Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  entryDate            DateTime?
+  exitDate             DateTime
+  attendancePercentage Float?
+  exitReason           String?
+  deletedById          String?
+  deletedBy            User?    @relation(fields: [deletedById], references: [id])
+
+  createdAt            DateTime @default(now())
 }
 
 model Attendance {
@@ -185,6 +179,24 @@ model AttendancePresence {
   @@unique([attendanceId, studentId])
 }
 
+model Content {
+  id                        String              @id @default(cuid())
+  title                     String
+  objectives                String?
+  methodology               String?
+  resources                 String?
+  bncc                      String?
+  isCustomized              Boolean             @default(false)
+
+  class                     Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId                   String
+
+  attendances               Attendance[]
+
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+}
+
 model GroupContent {
   id          String   @id @default(cuid())
   title       String
@@ -211,7 +223,6 @@ model ContentPlan {
 
   lessons         ContentPlanLesson[]
   classLinks      ContentPlanClass[]
-  appliedContents Content[]           @relation("SourceContentPlan")
 
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -228,8 +239,6 @@ model ContentPlanLesson {
 
   contentPlanId    String
   contentPlan      ContentPlan  @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
-
-  derivedContents  Content[]    @relation("SourceContentPlanLesson")
 
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -266,7 +275,4 @@ model ClassGalleryImage {
   mimeType     String?
   sizeBytes    Int?
   createdAt    DateTime @default(now())
-
-  @@index([classId, createdAt])
-  @@index([uploadedById, createdAt])
 }
