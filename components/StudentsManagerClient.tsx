@@ -53,29 +53,6 @@ export default function StudentsManagerClient({
     setStudents(data);
   }
 
-  async function handleImport(file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const res = await fetch(
-      `/api/classes/${classId}/students/import`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error || "Erro ao importar planilha");
-      return;
-    }
-
-    alert(`Importados: ${data.imported} | Ignorados: ${data.skipped}`);
-    await refreshStudents();
-  }
-
   async function handleDeleteStudent(studentId: string) {
     const reason = prompt("Motivo da exclusão:");
     if (!reason) return;
@@ -87,50 +64,31 @@ export default function StudentsManagerClient({
     });
 
     if (!res.ok) {
-      alert("Não foi possível excluir/solicitar exclusão do aluno.");
+      alert("Erro ao excluir aluno");
       return;
-    }
-
-    const data = await res.json();
-
-    if (data?.mode === "deleted_directly") {
-      alert("Aluno excluído diretamente pela gestão.");
-    } else if (data?.mode === "requested_delete") {
-      alert("Solicitação de exclusão enviada para aprovação da gestão.");
     }
 
     await refreshStudents();
   }
 
   function getItemClasses(student: StudentItem) {
-    if (student.status === "ACTIVE") {
-      return "bg-white";
-    }
-
+    if (student.status === "ACTIVE") return "bg-white";
     return "bg-amber-50 text-amber-800";
   }
 
   function getStatusBadge(student: StudentItem) {
     if (student.status === "PENDING_ENTRY") {
       return (
-        <span className="ml-2 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800">
-          Aguardando autorização
+        <span className="ml-2 text-xs text-blue-600">
+          (Aguardando autorização)
         </span>
       );
     }
 
     if (student.status === "PENDING_DELETE") {
       return (
-        <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-          Aguardando exclusão
-        </span>
-      );
-    }
-
-    if (student.status === "DELETED") {
-      return (
-        <span className="ml-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800">
-          Excluído
+        <span className="ml-2 text-xs text-amber-600">
+          (Aguardando exclusão)
         </span>
       );
     }
@@ -149,37 +107,19 @@ export default function StudentsManagerClient({
           </div>
 
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-semibold">
-                  Alunos — {className}
-                </h1>
-              </div>
+            <div className="flex justify-between">
+              <h1 className="text-xl font-semibold">
+                Alunos — {className}
+              </h1>
 
-              {isManager ? (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setOpenAddModal(true)}
-                    className="rounded-md bg-sky-600 px-4 py-2 text-white"
-                  >
-                    + Adicionar aluno
-                  </button>
-
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-md border border-slate-300 px-4 py-2"
-                  >
-                    Importar XLSX
-                  </button>
-
-                  <a
-                    href="/templates/students-template.xlsx"
-                    className="rounded-md border border-slate-300 px-4 py-2"
-                  >
-                    Baixar template
-                  </a>
-                </div>
-              ) : null}
+              {isManager && (
+                <button
+                  onClick={() => setOpenAddModal(true)}
+                  className="rounded-md bg-sky-600 px-4 py-2 text-white"
+                >
+                  + Adicionar aluno
+                </button>
+              )}
             </div>
 
             <ul className="mt-6 overflow-hidden rounded-md border">
@@ -187,59 +127,38 @@ export default function StudentsManagerClient({
                 Lista de alunos
               </li>
 
-              {students.map((s, i) => {
-                const inactive = s.status !== "ACTIVE";
+              {students.map((s, i) => (
+                <li
+                  key={s.id}
+                  onClick={() => setSelectedStudent(s.id)}
+                  className={`cursor-pointer border-t px-4 py-3 text-sm flex justify-between ${getItemClasses(
+                    s
+                  )}`}
+                >
+                  <span>
+                    {i + 1}. {s.name}
+                    {getStatusBadge(s)}
+                  </span>
 
-                return (
-                  <li
-                    key={s.id}
-                    onClick={() => setSelectedStudent(s.id)}
-                    className={`cursor-pointer border-t px-4 py-3 text-sm ${getItemClasses(s)}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className={inactive ? "line-through" : ""}>
-                        {i + 1}. {s.name}
-                        {getStatusBadge(s)}
-                      </span>
-
-                      {canManageStudents && s.status === "ACTIVE" ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStudent(s.id);
-                          }}
-                          className="text-xs text-red-600"
-                        >
-                          Excluir
-                        </button>
-                      ) : null}
-                    </div>
-
-                    {s.status === "PENDING_DELETE" && s.deletedReason ? (
-                      <p className="mt-1 text-xs text-amber-800">
-                        Motivo informado: {s.deletedReason}
-                      </p>
-                    ) : null}
-                  </li>
-                );
-              })}
+                  {canManageStudents && s.status === "ACTIVE" && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteStudent(s.id);
+                      }}
+                      className="text-red-600 text-xs"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         </div>
       </main>
 
-      <input
-        type="file"
-        accept=".xlsx,.csv"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleImport(file);
-        }}
-      />
-
-      {isManager ? (
+      {isManager && (
         <AddStudentModal
           open={openAddModal}
           onClose={() => setOpenAddModal(false)}
@@ -249,7 +168,7 @@ export default function StudentsManagerClient({
           }}
           loading={false}
         />
-      ) : null}
+      )}
 
       <StudentModal
         open={!!selectedStudent}
