@@ -53,6 +53,26 @@ export default function StudentsManagerClient({
     setStudents(data);
   }
 
+  async function handleImport(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`/api/classes/${classId}/students/import`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Erro ao importar planilha");
+      return;
+    }
+
+    alert(`Importados: ${data.imported} | Ignorados: ${data.skipped}`);
+    await refreshStudents();
+  }
+
   async function handleDeleteStudent(studentId: string) {
     const reason = prompt("Motivo da exclusão:");
     if (!reason) return;
@@ -66,6 +86,14 @@ export default function StudentsManagerClient({
     if (!res.ok) {
       alert("Erro ao excluir aluno");
       return;
+    }
+
+    const data = await res.json();
+
+    if (data?.mode === "deleted_directly") {
+      alert("Aluno excluído diretamente pela gestão.");
+    } else if (data?.mode === "requested_delete") {
+      alert("Solicitação de exclusão enviada para aprovação da gestão.");
     }
 
     await refreshStudents();
@@ -93,6 +121,14 @@ export default function StudentsManagerClient({
       );
     }
 
+    if (student.status === "DELETED") {
+      return (
+        <span className="ml-2 text-xs text-red-600">
+          (Excluído)
+        </span>
+      );
+    }
+
     return null;
   }
 
@@ -107,19 +143,39 @@ export default function StudentsManagerClient({
           </div>
 
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="flex justify-between">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <h1 className="text-xl font-semibold">
                 Alunos — {className}
               </h1>
 
-              {isManager && (
-                <button
-                  onClick={() => setOpenAddModal(true)}
-                  className="rounded-md bg-sky-600 px-4 py-2 text-white"
-                >
-                  + Adicionar aluno
-                </button>
-              )}
+              {isManager ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setOpenAddModal(true)}
+                    className="rounded-md bg-sky-600 px-4 py-2 text-white"
+                  >
+                    + Adicionar aluno
+                  </button>
+
+                  {canImportSpreadsheet ? (
+                    <>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-md border border-slate-300 px-4 py-2"
+                      >
+                        Importar XLSX
+                      </button>
+
+                      <a
+                        href="/templates/students-template.xlsx"
+                        className="rounded-md border border-slate-300 px-4 py-2"
+                      >
+                        Baixar template
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <ul className="mt-6 overflow-hidden rounded-md border">
@@ -140,7 +196,7 @@ export default function StudentsManagerClient({
                     {getStatusBadge(s)}
                   </span>
 
-                  {canManageStudents && s.status === "ACTIVE" && (
+                  {canManageStudents && s.status === "ACTIVE" ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -150,7 +206,7 @@ export default function StudentsManagerClient({
                     >
                       Excluir
                     </button>
-                  )}
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -158,7 +214,21 @@ export default function StudentsManagerClient({
         </div>
       </main>
 
-      {isManager && (
+      <input
+        type="file"
+        accept=".xlsx,.csv"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            void handleImport(file);
+          }
+          e.currentTarget.value = "";
+        }}
+      />
+
+      {isManager ? (
         <AddStudentModal
           open={openAddModal}
           onClose={() => setOpenAddModal(false)}
@@ -168,7 +238,7 @@ export default function StudentsManagerClient({
           }}
           loading={false}
         />
-      )}
+      ) : null}
 
       <StudentModal
         open={!!selectedStudent}
