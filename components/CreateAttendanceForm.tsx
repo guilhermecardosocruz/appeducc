@@ -128,6 +128,7 @@ export default function CreateAttendanceForm({
 
     if (!lessonDate) {
       setDateError("Informe a data da aula");
+      dateRef.current?.focus();
       hasError = true;
     }
 
@@ -200,6 +201,9 @@ export default function CreateAttendanceForm({
                 onChange={(e) => setLessonDate(e.target.value)}
                 className="mt-1 w-full rounded-md border px-3 py-2 text-base border-slate-300"
               />
+              {dateError && (
+                <p className="text-red-600 text-sm mt-1">{dateError}</p>
+              )}
             </div>
           </div>
 
@@ -214,28 +218,19 @@ export default function CreateAttendanceForm({
               onChange={(e) => setTitle(e.target.value)}
               className="mt-1 w-full rounded-md border px-3 py-2 text-base border-slate-300"
             />
+            {titleError && (
+              <p className="text-red-600 text-sm mt-1">{titleError}</p>
+            )}
           </div>
 
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => markAll(true)}
-              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
-            >
+            <button type="button" onClick={() => markAll(true)} className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100">
               Marcar todos
             </button>
-            <button
-              type="button"
-              onClick={() => markAll(false)}
-              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
-            >
+            <button type="button" onClick={() => markAll(false)} className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100">
               Desmarcar todos
             </button>
-            <button
-              type="button"
-              onClick={() => setOpenStudentModal(true)}
-              className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100"
-            >
+            <button type="button" onClick={() => setOpenStudentModal(true)} className="rounded-md border px-3 py-2 text-sm bg-white hover:bg-slate-100">
               Adicionar aluno
             </button>
           </div>
