@@ -132,7 +132,7 @@ export async function POST(
     data: {
       name,
       classId,
-      status: "ACTIVE",
+      status: "PENDING_ENTRY",
     },
   });
 
@@ -155,17 +155,6 @@ export async function POST(
   let createdPresence = null;
 
   if (attendanceId) {
-    const attendance = await prisma.attendance.findUnique({
-      where: { id: attendanceId },
-    });
-
-    if (!attendance || attendance.classId !== classId) {
-      return NextResponse.json(
-        { error: "Attendance not found for this class" },
-        { status: 400 }
-      );
-    }
-
     createdPresence = await prisma.attendancePresence.findFirst({
       where: {
         attendanceId,

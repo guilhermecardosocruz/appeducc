@@ -5,7 +5,11 @@ import { useRef, useState } from "react";
 import AddStudentModal from "./AddStudentModal";
 import StudentModal from "./StudentModal";
 
-type StudentStatus = "ACTIVE" | "PENDING_DELETE" | "DELETED";
+type StudentStatus =
+  | "ACTIVE"
+  | "PENDING_ENTRY"
+  | "PENDING_DELETE"
+  | "DELETED";
 
 type StudentItem = {
   id: string;
@@ -21,6 +25,7 @@ type Props = {
   className: string;
   canImportSpreadsheet: boolean;
   canManageStudents: boolean;
+  isManager: boolean;
   initialStudents: StudentItem[];
 };
 
@@ -29,6 +34,8 @@ export default function StudentsManagerClient({
   className,
   initialStudents,
   canManageStudents,
+  canImportSpreadsheet,
+  isManager,
 }: Props) {
   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
   const [openAddModal, setOpenAddModal] = useState(false);
@@ -100,14 +107,22 @@ export default function StudentsManagerClient({
       return "bg-white";
     }
 
-    return "bg-red-50 text-red-700";
+    return "bg-amber-50 text-amber-800";
   }
 
   function getStatusBadge(student: StudentItem) {
+    if (student.status === "PENDING_ENTRY") {
+      return (
+        <span className="ml-2 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800">
+          Aguardando autorização
+        </span>
+      );
+    }
+
     if (student.status === "PENDING_DELETE") {
       return (
         <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-          Aguardando aprovação da gestão
+          Aguardando exclusão
         </span>
       );
     }
@@ -141,7 +156,7 @@ export default function StudentsManagerClient({
                 </h1>
               </div>
 
-              {canManageStudents ? (
+              {isManager ? (
                 <div className="flex gap-2">
                   <button
                     onClick={() => setOpenAddModal(true)}
@@ -187,7 +202,7 @@ export default function StudentsManagerClient({
                         {getStatusBadge(s)}
                       </span>
 
-                      {canManageStudents && s.status === "ACTIVE" ? (
+                      {isManager && s.status === "ACTIVE" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -224,7 +239,7 @@ export default function StudentsManagerClient({
         }}
       />
 
-      {canManageStudents ? (
+      {isManager ? (
         <AddStudentModal
           open={openAddModal}
           onClose={() => setOpenAddModal(false)}

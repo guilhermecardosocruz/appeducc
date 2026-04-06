@@ -93,7 +93,17 @@ export default function CreateAttendanceForm({
         return;
       }
 
-      router.refresh();
+      const data = await res.json();
+
+      setPresences((current) => [
+        ...current,
+        {
+          studentId: data.student.id,
+          studentName: data.student.name,
+          present: true,
+        },
+      ]);
+
       setOpenStudentModal(false);
     } catch (error) {
       console.error(error);
@@ -112,17 +122,12 @@ export default function CreateAttendanceForm({
 
     if (!title.trim()) {
       setTitleError("Informe o nome da aula");
-      titleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       titleRef.current?.focus();
       hasError = true;
     }
 
     if (!lessonDate) {
       setDateError("Informe a data da aula");
-      if (!hasError) {
-        dateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        dateRef.current?.focus();
-      }
       hasError = true;
     }
 
@@ -164,7 +169,7 @@ export default function CreateAttendanceForm({
     <>
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Conteúdo + Data */}
+
           <div className="grid gap-4 md:grid-cols-3">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700">
@@ -193,17 +198,11 @@ export default function CreateAttendanceForm({
                 type="date"
                 value={lessonDate}
                 onChange={(e) => setLessonDate(e.target.value)}
-                className={`mt-1 w-full rounded-md border px-3 py-2 text-base ${
-                  dateError ? "border-red-500" : "border-slate-300"
-                }`}
+                className="mt-1 w-full rounded-md border px-3 py-2 text-base border-slate-300"
               />
-              {dateError && (
-                <p className="mt-1 text-sm text-red-600">{dateError}</p>
-              )}
             </div>
           </div>
 
-          {/* Título */}
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Título da chamada
@@ -213,16 +212,10 @@ export default function CreateAttendanceForm({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`mt-1 w-full rounded-md border px-3 py-2 text-base ${
-                titleError ? "border-red-500" : "border-slate-300"
-              }`}
+              className="mt-1 w-full rounded-md border px-3 py-2 text-base border-slate-300"
             />
-            {titleError && (
-              <p className="mt-1 text-sm text-red-600">{titleError}</p>
-            )}
           </div>
 
-          {/* Botões */}
           <div className="flex gap-2">
             <button
               type="button"
@@ -247,7 +240,6 @@ export default function CreateAttendanceForm({
             </button>
           </div>
 
-          {/* Lista de alunos */}
           <div className="overflow-hidden rounded-md border">
             {presences.map((item, index) => (
               <div
@@ -272,7 +264,6 @@ export default function CreateAttendanceForm({
             ))}
           </div>
 
-          {/* Botão criar */}
           <div className="flex justify-end">
             <button
               type="submit"
