@@ -10,9 +10,7 @@ function isManagerRole(role: string | null | undefined) {
 async function getAccessContext(userId: string, classId: string) {
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
-    include: {
-      school: true,
-    },
+    include: { school: true },
   });
 
   if (!foundClass) return null;
@@ -65,9 +63,8 @@ export async function DELETE(
 
   const student = await prisma.student.findUnique({
     where: { id: studentId },
-    select: {
-      id: true,
-      classId: true,
+    include: {
+      presences: true,
     },
   });
 
@@ -75,6 +72,26 @@ export async function DELETE(
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
+  // calcular frequência
+  const total = student.presences.length;
+  const present = student.presences.filter((p) => p.present).length;
+  const attendancePercentage =
+    total > 0 ? (present / total) * 100 : null;
+
+  // salvar no histórico
+  await prisma.deletedStudentArchive.create({
+    data: {
+      name: student.name,
+      classId: classId,
+      entryDate: student.createdAt,
+      exitDate: new Date(),
+      attendancePercentage: attendancePercentage,
+      exitReason: student.deletedReason || null,
+      deletedById: user.id,
+    },
+  });
+
+  // deletar aluno
   await prisma.student.delete({
     where: { id: studentId },
   });
