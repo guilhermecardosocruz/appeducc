@@ -66,7 +66,7 @@ export async function POST(
 
   if (!access.canApprove) {
     return NextResponse.json(
-      { error: "Only management can reject deletion" },
+      { error: "Only management can reject" },
       { status: 403 }
     );
   }
@@ -84,22 +84,30 @@ export async function POST(
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
-  if (student.status !== "PENDING_DELETE") {
-    return NextResponse.json(
-      { error: "Student is not awaiting approval" },
-      { status: 400 }
-    );
+  if (student.status === "PENDING_DELETE") {
+    await prisma.student.update({
+      where: { id: studentId },
+      data: {
+        status: "ACTIVE",
+        deletedAt: null,
+        deletedReason: null,
+        deletedById: null,
+      },
+    });
+
+    return NextResponse.json({ success: true, mode: "rejected_delete" });
   }
 
-  await prisma.student.update({
-    where: { id: studentId },
-    data: {
-      status: "ACTIVE",
-      deletedAt: null,
-      deletedReason: null,
-      deletedById: null,
-    },
-  });
+  if (student.status === "PENDING_ENTRY") {
+    await prisma.student.delete({
+      where: { id: studentId },
+    });
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, mode: "rejected_entry" });
+  }
+
+  return NextResponse.json(
+    { error: "Student is not awaiting approval" },
+    { status: 400 }
+  );
 }

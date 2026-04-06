@@ -9,7 +9,7 @@ type StudentStats = {
   percentage: number;
 };
 
-type StudentStatus = "ACTIVE" | "PENDING_DELETE" | "DELETED";
+type StudentStatus = "ACTIVE" | "PENDING_ENTRY" | "PENDING_DELETE" | "DELETED";
 
 type StudentData = {
   id: string;
@@ -110,6 +110,47 @@ export default function StudentModal({
     }
   }
 
+  async function approveEntry() {
+    if (!studentId) return;
+
+    setLoading(true);
+
+    try {
+      await fetch(`/api/classes/${classId}/students/${studentId}/approve`, {
+        method: "POST",
+      });
+
+      await onUpdated();
+      await reloadStudent();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function rejectEntry() {
+    if (!studentId) return;
+
+    const confirmReject = confirm(
+      "Tem certeza que deseja rejeitar a entrada deste aluno?"
+    );
+
+    if (!confirmReject) return;
+
+    setLoading(true);
+
+    try {
+      await fetch(`/api/classes/${classId}/students/${studentId}/reject`, {
+        method: "POST",
+      });
+
+      await onUpdated();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function restoreStudent() {
     if (!studentId) return;
 
@@ -161,6 +202,8 @@ export default function StudentModal({
   const canRestore = canManage && student.status === "PENDING_DELETE";
   const canRequestDelete = canManage && student.status === "ACTIVE";
   const canPermanentDelete = student.canApproveDelete;
+  const canApproveEntry = student.canApproveDelete && student.status === "PENDING_ENTRY";
+  const canRejectEntry = student.canApproveDelete && student.status === "PENDING_ENTRY";
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4">
@@ -182,8 +225,9 @@ export default function StudentModal({
             <p>Presenças: {student.stats.presents}</p>
             <p>Faltas: {student.stats.absents}</p>
             <p>Frequência: {student.stats.percentage}%</p>
-            {student.deletedReason ? (
-              <p>Motivo: {student.deletedReason}</p>
+            {student.deletedReason ? <p>Motivo: {student.deletedReason}</p> : null}
+            {student.status === "PENDING_ENTRY" ? (
+              <p>Aguardando autorização da gestão.</p>
             ) : null}
           </div>
         ) : (
@@ -194,8 +238,28 @@ export default function StudentModal({
           </div>
         )}
 
-        {(canRestore || canRequestDelete || canPermanentDelete) ? (
+        {canApproveEntry || canRejectEntry || canRestore || canRequestDelete || canPermanentDelete ? (
           <div className="flex flex-wrap gap-2">
+            {canApproveEntry ? (
+              <button
+                onClick={approveEntry}
+                disabled={loading}
+                className="rounded bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              >
+                Aprovar entrada
+              </button>
+            ) : null}
+
+            {canRejectEntry ? (
+              <button
+                onClick={rejectEntry}
+                disabled={loading}
+                className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              >
+                Rejeitar entrada
+              </button>
+            ) : null}
+
             {canRestore ? (
               <button
                 onClick={restoreStudent}
