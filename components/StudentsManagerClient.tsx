@@ -174,6 +174,13 @@ export default function StudentsManagerClient({
                       </a>
                     </>
                   ) : null}
+
+                  <Link
+                    href={`/classes/${classId}/students/deleted`}
+                    className="rounded-md border border-red-300 px-4 py-2 text-red-600"
+                  >
+                    Alunos excluídos
+                  </Link>
                 </div>
               ) : null}
             </div>
