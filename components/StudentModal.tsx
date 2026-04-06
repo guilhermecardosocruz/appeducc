@@ -74,11 +74,17 @@ export default function StudentModal({
     setLoading(true);
 
     try {
-      await fetch(`/api/classes/${classId}/students/${studentId}`, {
+      const res = await fetch(`/api/classes/${classId}/students/${studentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erro ao salvar aluno");
+        return;
+      }
 
       await onUpdated();
       onClose();
@@ -96,11 +102,17 @@ export default function StudentModal({
     setLoading(true);
 
     try {
-      await fetch(`/api/classes/${classId}/students/${studentId}`, {
+      const res = await fetch(`/api/classes/${classId}/students/${studentId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erro ao solicitar exclusão");
+        return;
+      }
 
       await onUpdated();
       await reloadStudent();
@@ -116,9 +128,15 @@ export default function StudentModal({
     setLoading(true);
 
     try {
-      await fetch(`/api/classes/${classId}/students/${studentId}/approve`, {
+      const res = await fetch(`/api/classes/${classId}/students/${studentId}/approve`, {
         method: "POST",
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erro ao aprovar aluno");
+        return;
+      }
 
       await onUpdated();
       await reloadStudent();
@@ -140,9 +158,15 @@ export default function StudentModal({
     setLoading(true);
 
     try {
-      await fetch(`/api/classes/${classId}/students/${studentId}/reject`, {
+      const res = await fetch(`/api/classes/${classId}/students/${studentId}/reject`, {
         method: "POST",
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erro ao rejeitar entrada");
+        return;
+      }
 
       await onUpdated();
       onClose();
@@ -157,9 +181,15 @@ export default function StudentModal({
     setLoading(true);
 
     try {
-      await fetch(`/api/classes/${classId}/students/${studentId}/restore`, {
+      const res = await fetch(`/api/classes/${classId}/students/${studentId}/restore`, {
         method: "POST",
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erro ao restaurar aluno");
+        return;
+      }
 
       await onUpdated();
       await reloadStudent();
@@ -181,12 +211,18 @@ export default function StudentModal({
     setLoading(true);
 
     try {
-      await fetch(
+      const res = await fetch(
         `/api/classes/${classId}/students/${studentId}/permanent`,
         {
           method: "DELETE",
         }
       );
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erro ao excluir permanentemente");
+        return;
+      }
 
       await onUpdated();
       onClose();

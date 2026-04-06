@@ -36,7 +36,7 @@ async function getApprovalContext(userId: string, classId: string) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership);
+  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
   const canApprove =
     isManagerRole(schoolMembership?.role) || isManagerRole(groupMembership?.role);
 
