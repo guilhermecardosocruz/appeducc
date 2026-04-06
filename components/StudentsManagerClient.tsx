@@ -202,7 +202,7 @@ export default function StudentsManagerClient({
                         {getStatusBadge(s)}
                       </span>
 
-                      {isManager && s.status === "ACTIVE" ? (
+                      {canManageStudents && s.status === "ACTIVE" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
