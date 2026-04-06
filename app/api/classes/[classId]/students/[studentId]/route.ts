@@ -36,9 +36,15 @@ async function getAccessContext(userId: string, classId: string) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === userId;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
+
   const canManageClass =
-    Boolean(schoolMembership) || isManagerRole(groupMembership?.role);
+    Boolean(schoolMembership) ||
+    isManagerRole(groupMembership?.role) ||
+    isTeacherOfClass;
+
   const canManageDelete =
     isManagerRole(schoolMembership?.role) || isManagerRole(groupMembership?.role);
 

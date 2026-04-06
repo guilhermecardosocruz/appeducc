@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 function isManagerRole(role: string | null | undefined) {
   const normalized = String(role ?? "").trim().toUpperCase();
-  return ["OWNER", "MANAGER"].includes(normalized);
+  return ["OWNER", "MANAGER", "ADMIN", "GESTOR"].includes(normalized);
 }
 
 async function ensureClassAccess(userId: string, classId: string) {
@@ -36,10 +36,14 @@ async function ensureClassAccess(userId: string, classId: string) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
+  const isTeacherOfClass = foundClass.teacherId === userId;
+  const hasAccess =
+    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
+
   const canManage =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && isManagerRole(groupMembership.role));
+    Boolean(groupMembership && isManagerRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   if (!hasAccess) return null;
 

@@ -87,6 +87,29 @@ export default function StudentModal({
     }
   }
 
+  async function requestDelete() {
+    if (!studentId) return;
+
+    const reason = prompt("Motivo da exclusão:");
+    if (!reason) return;
+
+    setLoading(true);
+
+    try {
+      await fetch(`/api/classes/${classId}/students/${studentId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+
+      await onUpdated();
+      await reloadStudent();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function restoreStudent() {
     if (!studentId) return;
 
@@ -135,6 +158,9 @@ export default function StudentModal({
 
   const inactive = student.status !== "ACTIVE";
   const canManage = student.canManageClass;
+  const canRestore = canManage && student.status === "PENDING_DELETE";
+  const canRequestDelete = canManage && student.status === "ACTIVE";
+  const canPermanentDelete = student.canApproveDelete;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4">
@@ -156,6 +182,9 @@ export default function StudentModal({
             <p>Presenças: {student.stats.presents}</p>
             <p>Faltas: {student.stats.absents}</p>
             <p>Frequência: {student.stats.percentage}%</p>
+            {student.deletedReason ? (
+              <p>Motivo: {student.deletedReason}</p>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
@@ -165,25 +194,37 @@ export default function StudentModal({
           </div>
         )}
 
-        {canManage ? (
+        {(canRestore || canRequestDelete || canPermanentDelete) ? (
           <div className="flex flex-wrap gap-2">
-            {inactive ? (
+            {canRestore ? (
               <button
                 onClick={restoreStudent}
                 disabled={loading}
                 className="rounded bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
               >
-                Reativar aluno
+                Restaurar aluno
               </button>
             ) : null}
 
-            <button
-              onClick={permanentDelete}
-              disabled={loading}
-              className="rounded bg-red-700 px-3 py-2 text-sm text-white disabled:opacity-50"
-            >
-              Excluir permanentemente
-            </button>
+            {canRequestDelete ? (
+              <button
+                onClick={requestDelete}
+                disabled={loading}
+                className="rounded bg-amber-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              >
+                Solicitar exclusão
+              </button>
+            ) : null}
+
+            {canPermanentDelete ? (
+              <button
+                onClick={permanentDelete}
+                disabled={loading}
+                className="rounded bg-red-700 px-3 py-2 text-sm text-white disabled:opacity-50"
+              >
+                Excluir permanentemente
+              </button>
+            ) : null}
           </div>
         ) : null}
 
