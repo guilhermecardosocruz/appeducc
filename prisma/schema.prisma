@@ -8,6 +8,19 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model ClassSchedule {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int
+  period    String
+  startTime String
+  endTime   String
+
+  createdAt DateTime @default(now())
+}
+
 model User {
   id                   String              @id @default(cuid())
   name                 String
@@ -112,6 +125,7 @@ model Class {
   contentPlanLinks ContentPlanClass[]
   galleryImages    ClassGalleryImage[]
   deletedArchives  DeletedStudentArchive[]
+  schedules        ClassSchedule[]
 }
 
 model Student {

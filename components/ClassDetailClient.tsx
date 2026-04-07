@@ -24,6 +24,11 @@ const actions = [
     primary: false,
   },
   {
+    title: "Horários",
+    href: (classId: string) => `/classes/${classId}/horarios`,
+    primary: false,
+  },
+  {
     title: "Relatório Chamadas",
     href: (classId: string) => `/classes/${classId}/relatorio-chamadas`,
     primary: false,
@@ -60,34 +65,20 @@ export default function ClassDetailClient({
 
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{className}</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Gerencie a turma acessando alunos, chamadas, conteúdos, relatórios e
-            ações de apoio.
-          </p>
-          {!canManageClass ? (
+          {!canManageClass && (
             <p className="mt-2 text-sm text-amber-700">
               Você está com acesso somente de visualização nesta turma.
             </p>
-          ) : null}
+          )}
         </div>
 
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Ações</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Use os atalhos abaixo para acessar a turma.
-          </p>
-
           <div className="mt-6 space-y-3">
             {actions.map((action) => (
               <Link
                 key={action.title}
                 href={action.href(classId)}
-                className={[
-                  "block rounded-md border px-4 py-4 text-center text-base font-medium transition focus:outline-none focus:ring-2 focus:ring-sky-500",
-                  action.primary
-                    ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700"
-                    : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
-                ].join(" ")}
+                className="block rounded-md border px-4 py-4 text-center"
               >
                 {action.title}
               </Link>
