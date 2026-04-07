@@ -27,12 +27,10 @@ export default function AppTopbar({ userName, userEmail }: Props) {
 
   useEffect(() => {
     const fetchAlerts = async () => {
-      try {
-        const res = await fetch("/api/alerts", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        setAlerts(data);
-      } catch {}
+      const res = await fetch("/api/alerts", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setAlerts(data);
     };
 
     fetchAlerts();
@@ -40,7 +38,7 @@ export default function AppTopbar({ userName, userEmail }: Props) {
 
   return (
     <header className="border-b bg-white/90 backdrop-blur relative">
-      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 py-3">
+      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between px-4 py-3">
         <div>
           <Link href="/dashboard" className="text-sm font-semibold text-sky-700">
             EDUCC
@@ -59,7 +57,6 @@ export default function AppTopbar({ userName, userEmail }: Props) {
               className="relative inline-flex items-center rounded-md border px-3 py-2 text-sm"
             >
               🔔 Avisos
-
               {alerts.length > 0 && (
                 <span className="ml-2 rounded-full bg-red-600 px-2 text-xs text-white">
                   {alerts.length}
@@ -68,28 +65,32 @@ export default function AppTopbar({ userName, userEmail }: Props) {
             </button>
 
             {open && (
-              <div className="absolute right-0 mt-2 w-[90vw] max-w-sm rounded-md border bg-white shadow-lg z-50">
-                <div className="border-b px-3 py-2 font-semibold text-sm">
-                  Avisos
+              <div className="absolute right-0 mt-2 w-[95vw] max-w-md rounded-lg border bg-white shadow-xl z-50">
+                <div className="border-b px-4 py-3 font-semibold text-sm">
+                  Avisos importantes
                 </div>
 
                 {alerts.length === 0 && (
-                  <p className="px-3 py-3 text-sm text-slate-500">
+                  <p className="px-4 py-4 text-sm text-slate-500">
                     Nenhum aviso no momento.
                   </p>
                 )}
 
-                <div className="max-h-80 overflow-auto">
+                <div className="max-h-[70vh] overflow-auto">
                   {alerts.map((a, i) => (
                     <button
                       key={i}
                       onClick={() => setSelected(a)}
-                      className="w-full text-left border-b px-3 py-3 hover:bg-slate-50"
+                      className="w-full text-left px-4 py-3 border-b hover:bg-slate-50"
                     >
-                      <p className="font-medium text-sm">{a.schoolName}</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {a.schoolName}
+                      </p>
+
                       <p className="text-xs text-slate-500">
                         {a.className}
                       </p>
+
                       <p className="text-xs text-red-600 mt-1">
                         {a.students.length} aluno(s) com faltas consecutivas
                       </p>
