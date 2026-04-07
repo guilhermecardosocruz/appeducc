@@ -40,9 +40,6 @@ export async function GET() {
             },
           },
         },
-        orderBy: {
-          lessonDate: "desc",
-        },
       },
     },
   });
@@ -50,43 +47,46 @@ export async function GET() {
   const alerts: AlertItem[] = [];
 
   for (const cls of classes) {
-    const attendances = cls.attendances;
-
-    // map de aluno → últimas presenças
+    // map aluno -> presenças
     const studentMap = new Map<
       string,
       {
         name: string;
-        last: boolean[];
+        records: { present: boolean; date: Date }[];
       }
     >();
 
-    for (const attendance of attendances) {
+    for (const attendance of cls.attendances) {
       for (const presence of attendance.presences) {
         if (!presence.student) continue;
         if (presence.student.status !== "ACTIVE") continue;
 
-        const current = studentMap.get(presence.studentId);
-
-        if (!current) {
+        if (!studentMap.has(presence.studentId)) {
           studentMap.set(presence.studentId, {
             name: presence.student.name,
-            last: [presence.present],
+            records: [],
           });
-        } else {
-          if (current.last.length < 2) {
-            current.last.push(presence.present);
-          }
         }
+
+        studentMap.get(presence.studentId)!.records.push({
+          present: presence.present,
+          date: attendance.lessonDate,
+        });
       }
     }
 
+    // agora sim: análise por aluno
     for (const [, student] of studentMap) {
-      if (student.last.length < 2) continue;
+      const sorted = student.records.sort(
+        (a, b) => b.date.getTime() - a.date.getTime()
+      );
 
-      const [last, previous] = student.last;
+      if (sorted.length < 2) continue;
 
-      if (!last && !previous) {
+      const last = sorted[0];
+      const previous = sorted[1];
+
+      if (!last.present && !previous.present) {
         alerts.push({
           type: "ABSENCE_STREAK",
           studentName: student.name,
