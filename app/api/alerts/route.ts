@@ -31,28 +31,17 @@ export async function GET() {
         },
       ],
     },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  const classIds = classes.map((c) => c.id);
-
-  if (classIds.length === 0) {
-    return NextResponse.json([]);
-  }
-
-  const students = await prisma.student.findMany({
-    where: {
-      classId: { in: classIds },
-      status: "ACTIVE",
-    },
     include: {
-      class: true,
-      presences: {
+      attendances: {
         include: {
-          attendance: true,
+          presences: {
+            include: {
+              student: true,
+            },
+          },
+        },
+        orderBy: {
+          lessonDate: "desc",
         },
       },
     },
@@ -60,33 +49,52 @@ export async function GET() {
 
   const alerts: AlertItem[] = [];
 
-  for (const student of students) {
-    // pega apenas presenças válidas (com aula)
-    const validPresences = student.presences.filter(
-      (p) => p.attendance?.lessonDate
-    );
+  for (const cls of classes) {
+    const attendances = cls.attendances;
 
-    if (validPresences.length < 2) continue;
+    // map de aluno → últimas presenças
+    const studentMap = new Map<
+      string,
+      {
+        name: string;
+        last: boolean[];
+      }
+    >();
 
-    // ordena por data da aula
-    const sorted = validPresences.sort(
-      (a, b) =>
-        new Date(b.attendance.lessonDate).getTime() -
-        new Date(a.attendance.lessonDate).getTime()
-    );
+    for (const attendance of attendances) {
+      for (const presence of attendance.presences) {
+        if (!presence.student) continue;
+        if (presence.student.status !== "ACTIVE") continue;
 
-    const last = sorted[0];
-    const previous = sorted[1];
+        const current = studentMap.get(presence.studentId);
 
-    // REGRA EXATA QUE VOCÊ DESCREVEU
-    if (!last.present && !previous.present) {
-      alerts.push({
-        type: "ABSENCE_STREAK",
-        studentName: student.name,
-        className: student.class.name,
-        message: "2 faltas consecutivas",
-        severity: "high",
-      });
+        if (!current) {
+          studentMap.set(presence.studentId, {
+            name: presence.student.name,
+            last: [presence.present],
+          });
+        } else {
+          if (current.last.length < 2) {
+            current.last.push(presence.present);
+          }
+        }
+      }
+    }
+
+    for (const [, student] of studentMap) {
+      if (student.last.length < 2) continue;
+
+      const [last, previous] = student.last;
+
+      if (!last && !previous) {
+        alerts.push({
+          type: "ABSENCE_STREAK",
+          studentName: student.name,
+          className: cls.name,
+          message: "2 faltas consecutivas",
+          severity: "high",
+        });
+      }
     }
   }
 
