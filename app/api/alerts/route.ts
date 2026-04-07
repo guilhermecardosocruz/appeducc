@@ -21,7 +21,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // 🔥 FILTRO CORRETO AQUI
   const classes = await prisma.class.findMany({
+    where: user.isTeacher
+      ? {
+          teacherId: user.id, // professor só vê suas turmas
+        }
+      : undefined, // gestor vê todas
     include: {
       school: true,
       students: {
@@ -58,7 +64,6 @@ export async function GET() {
       const previous = records[1];
 
       if (!last.present && !previous.present) {
-        // calcular frequência
         const total = records.length;
         const presentCount = records.filter((r) => r.present).length;
         const frequency =
