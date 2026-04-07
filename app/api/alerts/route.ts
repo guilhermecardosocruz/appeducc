@@ -61,20 +61,25 @@ export async function GET() {
   const alerts: AlertItem[] = [];
 
   for (const student of students) {
-    // ordenar manualmente por data da aula
-    const sorted = student.presences
-      .filter(p => p.attendance?.lessonDate)
-      .sort(
-        (a, b) =>
-          new Date(b.attendance.lessonDate).getTime() -
-          new Date(a.attendance.lessonDate).getTime()
-      );
+    // pega apenas presenças válidas (com aula)
+    const validPresences = student.presences.filter(
+      (p) => p.attendance?.lessonDate
+    );
 
-    if (sorted.length < 2) continue;
+    if (validPresences.length < 2) continue;
 
-    const lastTwo = sorted.slice(0, 2);
+    // ordena por data da aula
+    const sorted = validPresences.sort(
+      (a, b) =>
+        new Date(b.attendance.lessonDate).getTime() -
+        new Date(a.attendance.lessonDate).getTime()
+    );
 
-    if (!lastTwo[0].present && !lastTwo[1].present) {
+    const last = sorted[0];
+    const previous = sorted[1];
+
+    // REGRA EXATA QUE VOCÊ DESCREVEU
+    if (!last.present && !previous.present) {
       alerts.push({
         type: "ABSENCE_STREAK",
         studentName: student.name,
