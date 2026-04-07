@@ -54,12 +54,6 @@ export async function GET() {
         include: {
           attendance: true,
         },
-        orderBy: {
-          attendance: {
-            lessonDate: "desc",
-          },
-        },
-        take: 2,
       },
     },
   });
@@ -67,11 +61,20 @@ export async function GET() {
   const alerts: AlertItem[] = [];
 
   for (const student of students) {
-    if (student.presences.length < 2) continue;
+    // ordenar manualmente por data da aula
+    const sorted = student.presences
+      .filter(p => p.attendance?.lessonDate)
+      .sort(
+        (a, b) =>
+          new Date(b.attendance.lessonDate).getTime() -
+          new Date(a.attendance.lessonDate).getTime()
+      );
 
-    const [p1, p2] = student.presences;
+    if (sorted.length < 2) continue;
 
-    if (!p1.present && !p2.present) {
+    const lastTwo = sorted.slice(0, 2);
+
+    if (!lastTwo[0].present && !lastTwo[1].present) {
       alerts.push({
         type: "ABSENCE_STREAK",
         studentName: student.name,
