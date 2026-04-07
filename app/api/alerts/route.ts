@@ -16,23 +16,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 🔥 pega todas as turmas via schoolMember (garantido)
-  const schoolMembers = await prisma.schoolMember.findMany({
-    where: { userId: user.id },
+  // 🔥 SEM filtro (apenas para validar funcionamento)
+  const classes = await prisma.class.findMany({
     include: {
-      school: {
+      attendances: {
         include: {
-          classes: {
+          presences: {
             include: {
-              attendances: {
-                include: {
-                  presences: {
-                    include: {
-                      student: true,
-                    },
-                  },
-                },
-              },
+              student: true,
             },
           },
         },
@@ -42,54 +33,52 @@ export async function GET() {
 
   const alerts: AlertItem[] = [];
 
-  for (const sm of schoolMembers) {
-    for (const cls of sm.school.classes) {
-      const studentMap = new Map<
-        string,
-        {
-          name: string;
-          records: { present: boolean; date: Date }[];
-        }
-      >();
-
-      for (const attendance of cls.attendances) {
-        for (const presence of attendance.presences) {
-          if (!presence.student) continue;
-          if (presence.student.status !== "ACTIVE") continue;
-
-          if (!studentMap.has(presence.studentId)) {
-            studentMap.set(presence.studentId, {
-              name: presence.student.name,
-              records: [],
-            });
-          }
-
-          studentMap.get(presence.studentId)!.records.push({
-            present: presence.present,
-            date: attendance.lessonDate,
-          });
-        }
+  for (const cls of classes) {
+    const studentMap = new Map<
+      string,
+      {
+        name: string;
+        records: { present: boolean; date: Date }[];
       }
+    >();
 
-      for (const [, student] of studentMap) {
-        const sorted = student.records.sort(
-          (a, b) => b.date.getTime() - a.date.getTime()
-        );
+    for (const attendance of cls.attendances) {
+      for (const presence of attendance.presences) {
+        if (!presence.student) continue;
+        if (presence.student.status !== "ACTIVE") continue;
 
-        if (sorted.length < 2) continue;
-
-        const last = sorted[0];
-        const previous = sorted[1];
-
-        if (!last.present && !previous.present) {
-          alerts.push({
-            type: "ABSENCE_STREAK",
-            studentName: student.name,
-            className: cls.name,
-            message: "2 faltas consecutivas",
-            severity: "high",
+        if (!studentMap.has(presence.studentId)) {
+          studentMap.set(presence.studentId, {
+            name: presence.student.name,
+            records: [],
           });
         }
+
+        studentMap.get(presence.studentId)!.records.push({
+          present: presence.present,
+          date: attendance.lessonDate,
+        });
+      }
+    }
+
+    for (const [, student] of studentMap) {
+      const sorted = student.records.sort(
+        (a, b) => b.date.getTime() - a.date.getTime()
+      );
+
+      if (sorted.length < 2) continue;
+
+      const last = sorted[0];
+      const previous = sorted[1];
+
+      if (!last.present && !previous.present) {
+        alerts.push({
+          type: "ABSENCE_STREAK",
+          studentName: student.name,
+          className: cls.name,
+          message: "2 faltas consecutivas",
+          severity: "high",
+        });
       }
     }
   }
