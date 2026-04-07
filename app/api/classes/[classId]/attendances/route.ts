@@ -186,7 +186,8 @@ export async function POST(
       presences: {
         create: activeStudents.map((student) => ({
           studentId: student.id,
-          present: presentByStudentId.get(student.id) ?? true,
+          // 🔥 CORREÇÃO AQUI
+          present: presentByStudentId.get(student.id) ?? false,
         })),
       },
     },
