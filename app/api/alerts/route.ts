@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
-type AlertItem = {
-  type: "ABSENCE_STREAK";
+type AlertStudent = {
+  studentId: string;
   studentName: string;
+  frequency: number;
+};
+
+type AlertItem = {
+  classId: string;
   className: string;
-  message: string;
-  severity: "high" | "medium" | "low";
+  schoolName: string;
+  students: AlertStudent[];
 };
 
 export async function GET() {
@@ -16,14 +21,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 🔥 SEM filtro (apenas para validar funcionamento)
   const classes = await prisma.class.findMany({
     include: {
-      attendances: {
+      school: true,
+      students: {
         include: {
           presences: {
             include: {
-              student: true,
+              attendance: true,
             },
           },
         },
@@ -34,52 +39,46 @@ export async function GET() {
   const alerts: AlertItem[] = [];
 
   for (const cls of classes) {
-    const studentMap = new Map<
-      string,
-      {
-        name: string;
-        records: { present: boolean; date: Date }[];
-      }
-    >();
+    const alertStudents: AlertStudent[] = [];
 
-    for (const attendance of cls.attendances) {
-      for (const presence of attendance.presences) {
-        if (!presence.student) continue;
-        if (presence.student.status !== "ACTIVE") continue;
+    for (const student of cls.students) {
+      if (student.status !== "ACTIVE") continue;
 
-        if (!studentMap.has(presence.studentId)) {
-          studentMap.set(presence.studentId, {
-            name: presence.student.name,
-            records: [],
-          });
-        }
+      const records = student.presences
+        .filter((p) => p.attendance?.lessonDate)
+        .sort(
+          (a, b) =>
+            new Date(b.attendance.lessonDate).getTime() -
+            new Date(a.attendance.lessonDate).getTime()
+        );
 
-        studentMap.get(presence.studentId)!.records.push({
-          present: presence.present,
-          date: attendance.lessonDate,
+      if (records.length < 2) continue;
+
+      const last = records[0];
+      const previous = records[1];
+
+      if (!last.present && !previous.present) {
+        // calcular frequência
+        const total = records.length;
+        const presentCount = records.filter((r) => r.present).length;
+        const frequency =
+          total > 0 ? Math.round((presentCount / total) * 100) : 0;
+
+        alertStudents.push({
+          studentId: student.id,
+          studentName: student.name,
+          frequency,
         });
       }
     }
 
-    for (const [, student] of studentMap) {
-      const sorted = student.records.sort(
-        (a, b) => b.date.getTime() - a.date.getTime()
-      );
-
-      if (sorted.length < 2) continue;
-
-      const last = sorted[0];
-      const previous = sorted[1];
-
-      if (!last.present && !previous.present) {
-        alerts.push({
-          type: "ABSENCE_STREAK",
-          studentName: student.name,
-          className: cls.name,
-          message: "2 faltas consecutivas",
-          severity: "high",
-        });
-      }
+    if (alertStudents.length > 0) {
+      alerts.push({
+        classId: cls.id,
+        className: cls.name,
+        schoolName: cls.school.name,
+        students: alertStudents,
+      });
     }
   }
 
