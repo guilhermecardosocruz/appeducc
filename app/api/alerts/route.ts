@@ -16,7 +16,6 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // buscar turmas do usuário
   const classes = await prisma.class.findMany({
     where: {
       OR: [
@@ -44,7 +43,6 @@ export async function GET() {
     return NextResponse.json([]);
   }
 
-  // buscar alunos
   const students = await prisma.student.findMany({
     where: {
       classId: { in: classIds },
@@ -53,8 +51,13 @@ export async function GET() {
     include: {
       class: true,
       presences: {
+        include: {
+          attendance: true,
+        },
         orderBy: {
-          createdAt: "desc",
+          attendance: {
+            lessonDate: "desc",
+          },
         },
         take: 2,
       },
