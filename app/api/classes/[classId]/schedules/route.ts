@@ -22,19 +22,12 @@ export async function GET(
     where: { id: classId },
     include: {
       school: true,
+      teacher: true,
     },
   });
 
   if (!classItem) {
     return NextResponse.json({ error: "Class not found" }, { status: 404 });
-  }
-
-  // 🔐 Permissão básica (pode ajustar depois)
-  if (
-    user.isTeacher &&
-    classItem.teacherId !== user.id
-  ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const schedules = await prisma.classSchedule.findMany({
@@ -56,6 +49,8 @@ export async function GET(
       period: item.period,
       startTime: item.startTime,
       endTime: item.endTime,
+      schoolName: classItem.school.name,
+      teacherName: classItem.teacher?.name ?? null,
     }))
   );
 }
