@@ -45,22 +45,16 @@ export default function SchoolDetailClient({
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
   const [openModal, setOpenModal] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassItem | null>(null);
-  const [loadingList, setLoadingList] = useState(false);
 
   async function refreshClasses() {
-    setLoadingList(true);
-    try {
-      const res = await fetch(`/api/schools/${schoolId}/classes`, {
-        method: "GET",
-        cache: "no-store",
-      });
+    const res = await fetch(`/api/schools/${schoolId}/classes`, {
+      method: "GET",
+      cache: "no-store",
+    });
 
-      if (res.ok) {
-        const data = (await res.json()) as ClassItem[];
-        setClasses(data);
-      }
-    } finally {
-      setLoadingList(false);
+    if (res.ok) {
+      const data = (await res.json()) as ClassItem[];
+      setClasses(data);
     }
   }
 
@@ -83,7 +77,10 @@ export default function SchoolDetailClient({
 
           {canManageSchool && (
             <button
-              onClick={() => setOpenModal(true)}
+              onClick={() => {
+                setEditingClass(null);
+                setOpenModal(true);
+              }}
               className="bg-sky-600 text-white px-4 py-2 rounded"
             >
               + Criar turma
@@ -91,36 +88,45 @@ export default function SchoolDetailClient({
           )}
         </div>
 
-        <div className="mt-8 bg-white p-4 border rounded">
+        <div className="mt-8 bg-white p-4 border rounded space-y-3">
           {classes.map((item) => (
             <div
               key={item.id}
-              className="flex justify-between items-center border p-4 rounded mb-3"
+              className="group flex items-center justify-between border rounded p-4 hover:bg-slate-50 transition"
             >
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-gray-500">
+              {/* CARD CLICÁVEL */}
+              <Link
+                href={`/classes/${item.id}`}
+                className="flex-1"
+              >
+                <p className="font-medium text-slate-900">
+                  {item.name}
+                </p>
+
+                <p className="text-xs text-slate-500 mt-1">
                   {item.teacher
                     ? `Professor: ${item.teacher.name}`
                     : "Sem professor"}
                 </p>
-              </div>
+              </Link>
 
-              <div className="flex gap-2">
+              {/* AÇÕES */}
+              <div className="ml-4 flex items-center gap-3">
                 <Link
                   href={`/classes/${item.id}`}
-                  className="text-sky-700"
+                  className="text-sm text-sky-700 hover:text-sky-800"
                 >
                   Abrir
                 </Link>
 
                 {canManageSchool && (
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setEditingClass(item);
                       setOpenModal(true);
                     }}
-                    className="text-amber-600"
+                    className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
                   >
                     Editar
                   </button>
