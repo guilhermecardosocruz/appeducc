@@ -17,6 +17,14 @@ type ClassItem = {
   } | null;
 };
 
+type Schedule = {
+  id: string;
+  dayOfWeek: number;
+  period: string;
+  startTime: string;
+  endTime: string;
+};
+
 type Props = {
   schoolId: string;
   teachers: TeacherOption[];
@@ -52,6 +60,19 @@ export default function CreateClassModal({
       setName(editingClass.name);
       setYear(editingClass.year ? String(editingClass.year) : "");
       setTeacherId(editingClass.teacher?.id ?? "");
+
+      // 🔥 BUSCAR HORÁRIO DA TURMA
+      fetch(`/api/classes/${editingClass.id}/schedules`)
+        .then((r) => r.json())
+        .then((data: Schedule[]) => {
+          if (data && data.length > 0) {
+            const s = data[0];
+            setDayOfWeek(String(s.dayOfWeek));
+            setPeriod(s.period);
+            setStartTime(s.startTime);
+            setEndTime(s.endTime);
+          }
+        });
     } else {
       setName("");
       setYear("");
@@ -140,7 +161,6 @@ export default function CreateClassModal({
             ))}
           </select>
 
-          {/* HORÁRIOS */}
           <div className="border-t pt-4 space-y-2">
             <p className="text-sm font-medium">Horário</p>
 
