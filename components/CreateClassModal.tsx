@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type TeacherOption = {
   id: string;
   name: string;
   email: string;
+};
+
+type ClassItem = {
+  id: string;
+  name: string;
+  year: number | null;
+  teacher: {
+    id: string;
+  } | null;
 };
 
 type Props = {
@@ -14,6 +23,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  editingClass?: ClassItem | null;
 };
 
 export default function CreateClassModal({
@@ -22,11 +32,26 @@ export default function CreateClassModal({
   open,
   onClose,
   onCreated,
+  editingClass,
 }: Props) {
   const [name, setName] = useState("");
   const [year, setYear] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const isEdit = !!editingClass;
+
+  useEffect(() => {
+    if (editingClass) {
+      setName(editingClass.name);
+      setYear(editingClass.year ? String(editingClass.year) : "");
+      setTeacherId(editingClass.teacher?.id ?? "");
+    } else {
+      setName("");
+      setYear("");
+      setTeacherId("");
+    }
+  }, [editingClass, open]);
 
   if (!open) return null;
 
@@ -37,27 +62,29 @@ export default function CreateClassModal({
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/schools/${schoolId}/classes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          year: year.trim() ? Number(year) : null,
-          teacherId: teacherId || null,
-        }),
-      });
+      const res = await fetch(
+        isEdit
+          ? `/api/schools/${schoolId}/classes/${editingClass!.id}`
+          : `/api/schools/${schoolId}/classes`,
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            year: year.trim() ? Number(year) : null,
+            teacherId: teacherId || null,
+          }),
+        }
+      );
 
       if (res.ok) {
-        setName("");
-        setYear("");
-        setTeacherId("");
         onCreated();
         onClose();
       } else {
-        console.error("Erro ao criar turma");
+        console.error("Erro ao salvar turma");
       }
     } catch (error) {
-      console.error("Erro ao criar turma", error);
+      console.error("Erro ao salvar turma", error);
     } finally {
       setLoading(false);
     }
@@ -67,7 +94,7 @@ export default function CreateClassModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">
-          Criar nova Turma
+          {isEdit ? "Editar Turma" : "Criar nova Turma"}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -77,8 +104,7 @@ export default function CreateClassModal({
             </label>
             <input
               type="text"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-              placeholder="Ex: 6º Ano A"
+              className="mt-1 w-full rounded-md border px-3 py-2"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -90,8 +116,7 @@ export default function CreateClassModal({
             </label>
             <input
               type="number"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-              placeholder="Ex: 2026"
+              className="mt-1 w-full rounded-md border px-3 py-2"
               value={year}
               onChange={(e) => setYear(e.target.value)}
             />
@@ -99,17 +124,17 @@ export default function CreateClassModal({
 
           <div>
             <label className="text-sm font-medium text-slate-700">
-              Professor responsável
+              Professor
             </label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+              className="mt-1 w-full rounded-md border px-3 py-2"
               value={teacherId}
               onChange={(e) => setTeacherId(e.target.value)}
             >
               <option value="">Selecionar depois</option>
               {teachers.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
-                  {teacher.name} — {teacher.email}
+                  {teacher.name}
                 </option>
               ))}
             </select>
@@ -119,7 +144,7 @@ export default function CreateClassModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-slate-200 px-4 py-2 text-sm hover:bg-slate-300"
+              className="bg-slate-200 px-4 py-2 rounded"
               disabled={loading}
             >
               Cancelar
@@ -128,9 +153,15 @@ export default function CreateClassModal({
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+              className="bg-sky-600 text-white px-4 py-2 rounded"
             >
-              {loading ? "Criando..." : "Criar turma"}
+              {loading
+                ? isEdit
+                  ? "Salvando..."
+                  : "Criando..."
+                : isEdit
+                ? "Salvar"
+                : "Criar"}
             </button>
           </div>
         </form>
