@@ -68,7 +68,11 @@ export default function ClassDetailClient({
               <Link
                 key={action.title}
                 href={action.href(classId)}
-                className="block rounded-md border px-4 py-4 text-center"
+                className={
+                  action.primary
+                    ? "block rounded-md px-4 py-4 text-center bg-sky-600 text-white font-semibold shadow hover:bg-sky-700"
+                    : "block rounded-md border px-4 py-4 text-center hover:bg-slate-50"
+                }
               >
                 {action.title}
               </Link>
