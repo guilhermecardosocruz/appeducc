@@ -10,9 +10,7 @@ function canManageGroupRole(role: string | null | undefined) {
 async function getSchoolAccess(userId: string, schoolId: string) {
   const school = await prisma.school.findUnique({
     where: { id: schoolId },
-    include: {
-      group: true,
-    },
+    include: { group: true },
   });
 
   if (!school) return null;
@@ -21,13 +19,7 @@ async function getSchoolAccess(userId: string, schoolId: string) {
     await Promise.all([
       prisma.schoolMember.findUnique({
         where: {
-          userId_schoolId: {
-            userId,
-            schoolId,
-          },
-        },
-        include: {
-          school: true,
+          userId_schoolId: { userId, schoolId },
         },
       }),
       prisma.groupMember.findUnique({
@@ -43,9 +35,6 @@ async function getSchoolAccess(userId: string, schoolId: string) {
           schoolId,
           teacherId: userId,
         },
-        select: {
-          id: true,
-        },
       }),
     ]);
 
@@ -58,55 +47,7 @@ async function getSchoolAccess(userId: string, schoolId: string) {
     Boolean(schoolMembership) ||
     Boolean(groupMembership && canManageGroupRole(groupMembership.role));
 
-  return {
-    school,
-    schoolMembership,
-    groupMembership,
-    teacherClassInSchool,
-    hasAccess,
-    canManage,
-  };
-}
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ schoolId: string }> }
-) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { schoolId } = await params;
-  const access = await getSchoolAccess(user.id, schoolId);
-
-  if (!access?.hasAccess) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const classes = await prisma.class.findMany({
-    where: user.isTeacher
-      ? {
-          schoolId,
-          teacherId: user.id,
-        }
-      : { schoolId },
-    include: {
-      teacher: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      _count: {
-        select: { students: true },
-      },
-    },
-    orderBy: { name: "asc" },
-  });
-
-  return NextResponse.json(classes);
+  return { hasAccess, canManage };
 }
 
 export async function POST(
@@ -126,55 +67,23 @@ export async function POST(
   }
 
   const data = await req.json();
-  const name = String(data.name ?? "").trim();
-  const yearRaw = data.year;
-  const teacherIdRaw = String(data.teacherId ?? "").trim();
-
-  if (!name) {
-    return NextResponse.json({ error: "Missing class name" }, { status: 400 });
-  }
-
-  const year =
-    typeof yearRaw === "number" && Number.isFinite(yearRaw) ? yearRaw : null;
-
-  let teacherId: string | null = null;
-
-  if (teacherIdRaw) {
-    const teacher = await prisma.user.findFirst({
-      where: {
-        id: teacherIdRaw,
-        isTeacher: true,
-      },
-    });
-
-    if (!teacher) {
-      return NextResponse.json(
-        { error: "Invalid teacher for this school" },
-        { status: 400 }
-      );
-    }
-
-    teacherId = teacher.id;
-  }
 
   const createdClass = await prisma.class.create({
     data: {
-      name,
-      year,
+      name: data.name,
+      year: data.year,
       schoolId,
-      teacherId,
-    },
-    include: {
-      teacher: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      _count: {
-        select: { students: true },
-      },
+      teacherId: data.teacherId,
+      schedules: data.schedule
+        ? {
+            create: {
+              dayOfWeek: data.schedule.dayOfWeek,
+              period: data.schedule.period,
+              startTime: data.schedule.startTime,
+              endTime: data.schedule.endTime,
+            },
+          }
+        : undefined,
     },
   });
 

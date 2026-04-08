@@ -37,6 +37,12 @@ export default function CreateClassModal({
   const [name, setName] = useState("");
   const [year, setYear] = useState("");
   const [teacherId, setTeacherId] = useState("");
+
+  const [dayOfWeek, setDayOfWeek] = useState("1");
+  const [period, setPeriod] = useState("MANHA");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+
   const [loading, setLoading] = useState(false);
 
   const isEdit = !!editingClass;
@@ -50,6 +56,10 @@ export default function CreateClassModal({
       setName("");
       setYear("");
       setTeacherId("");
+      setDayOfWeek("1");
+      setPeriod("MANHA");
+      setStartTime("");
+      setEndTime("");
     }
   }, [editingClass, open]);
 
@@ -73,6 +83,12 @@ export default function CreateClassModal({
             name,
             year: year.trim() ? Number(year) : null,
             teacherId: teacherId || null,
+            schedule: {
+              dayOfWeek: Number(dayOfWeek),
+              period,
+              startTime,
+              endTime,
+            },
           }),
         }
       );
@@ -83,8 +99,6 @@ export default function CreateClassModal({
       } else {
         console.error("Erro ao salvar turma");
       }
-    } catch (error) {
-      console.error("Erro ao salvar turma", error);
     } finally {
       setLoading(false);
     }
@@ -93,75 +107,87 @@ export default function CreateClassModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">
-          {isEdit ? "Editar Turma" : "Criar nova Turma"}
+        <h2 className="mb-4 text-lg font-semibold">
+          {isEdit ? "Editar Turma" : "Criar Turma"}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Nome da turma
-            </label>
-            <input
-              type="text"
-              className="mt-1 w-full rounded-md border px-3 py-2"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Ano letivo
-            </label>
-            <input
-              type="number"
-              className="mt-1 w-full rounded-md border px-3 py-2"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-            />
-          </div>
+          <input
+            placeholder="Nome"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+          />
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Professor
-            </label>
+          <input
+            placeholder="Ano"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+          />
+
+          <select
+            value={teacherId}
+            onChange={(e) => setTeacherId(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+          >
+            <option value="">Professor</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+
+          {/* HORÁRIOS */}
+          <div className="border-t pt-4 space-y-2">
+            <p className="text-sm font-medium">Horário</p>
+
             <select
-              className="mt-1 w-full rounded-md border px-3 py-2"
-              value={teacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
+              value={dayOfWeek}
+              onChange={(e) => setDayOfWeek(e.target.value)}
+              className="w-full border px-3 py-2 rounded"
             >
-              <option value="">Selecionar depois</option>
-              {teachers.map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
-                  {teacher.name}
-                </option>
-              ))}
+              <option value="1">Segunda</option>
+              <option value="2">Terça</option>
+              <option value="3">Quarta</option>
+              <option value="4">Quinta</option>
+              <option value="5">Sexta</option>
             </select>
+
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="w-full border px-3 py-2 rounded"
+            >
+              <option value="MANHA">Manhã</option>
+              <option value="TARDE">Tarde</option>
+              <option value="NOITE">Noite</option>
+            </select>
+
+            <div className="flex gap-2">
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border px-3 py-2 rounded"
+              />
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full border px-3 py-2 rounded"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="bg-slate-200 px-4 py-2 rounded"
-              disabled={loading}
-            >
+            <button type="button" onClick={onClose}>
               Cancelar
             </button>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-sky-600 text-white px-4 py-2 rounded"
-            >
-              {loading
-                ? isEdit
-                  ? "Salvando..."
-                  : "Criando..."
-                : isEdit
-                ? "Salvar"
-                : "Criar"}
+            <button type="submit" disabled={loading}>
+              {isEdit ? "Salvar" : "Criar"}
             </button>
           </div>
         </form>
