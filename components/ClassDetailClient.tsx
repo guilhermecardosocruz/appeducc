@@ -9,11 +9,6 @@ type Props = {
 
 const actions = [
   {
-    title: "Alunos",
-    href: (classId: string) => `/classes/${classId}/students`,
-    primary: false,
-  },
-  {
     title: "Chamadas",
     href: (classId: string) => `/classes/${classId}/chamadas`,
     primary: true,
@@ -26,11 +21,6 @@ const actions = [
   {
     title: "Horários",
     href: (classId: string) => `/classes/${classId}/horarios`,
-    primary: false,
-  },
-  {
-    title: "Relatório Chamadas",
-    href: (classId: string) => `/classes/${classId}/relatorio-chamadas`,
     primary: false,
   },
   {
