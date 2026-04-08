@@ -26,7 +26,7 @@ export default function HorariosClient({ classId }: { classId: string }) {
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto w-full max-w-6xl">
+      <div className="mx-auto w-full max-w-7xl">
 
         {/* BOTÃO VOLTAR */}
         <div className="mb-6">
@@ -38,44 +38,63 @@ export default function HorariosClient({ classId }: { classId: string }) {
           </Link>
         </div>
 
-        <h1 className="text-2xl font-semibold text-slate-900">Horários</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">
+          Horários
+        </h1>
 
-        <div className="grid grid-cols-5 gap-4 mt-6">
-          {days.map((day, i) => (
-            <div key={day} className="bg-white p-4 border rounded">
-              <h2 className="font-semibold mb-2">{day}</h2>
+        {/* 🔥 FIX RESPONSIVO (igual grupo) */}
+        <div className="mt-8 overflow-x-auto">
+          <div className="grid min-w-[980px] grid-cols-5 gap-4">
 
-              {data
-                .filter((d) => d.dayOfWeek === i + 1)
-                .map((item) => (
-                  <div key={item.id} className="mb-2 p-3 bg-sky-100 rounded">
+            {days.map((day, i) => (
+              <div
+                key={day}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="mb-4 text-lg font-semibold text-slate-900">
+                  {day}
+                </div>
 
-                    {/* ESCOLA */}
-                    <div className="text-xs text-slate-500">
-                      {item.schoolName}
-                    </div>
-
-                    {/* PERÍODO */}
-                    <div className="text-sm font-semibold">
-                      {item.period}
-                    </div>
-
-                    {/* HORÁRIO */}
-                    <div className="text-xs">
-                      {item.startTime} - {item.endTime}
-                    </div>
-
-                    {/* PROFESSOR */}
-                    {item.teacherName && (
-                      <div className="text-xs text-slate-500 mt-1">
-                        Professor: {item.teacherName}
+                {data
+                  .filter((d) => d.dayOfWeek === i + 1)
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className="mb-3 rounded-md bg-sky-100 px-4 py-3"
+                    >
+                      {/* ESCOLA */}
+                      <div className="text-xs text-slate-500">
+                        {item.schoolName}
                       </div>
-                    )}
 
+                      {/* PERÍODO */}
+                      <div className="text-sm font-semibold text-slate-900">
+                        {item.period}
+                      </div>
+
+                      {/* HORÁRIO */}
+                      <div className="text-xs text-slate-700">
+                        {item.startTime} - {item.endTime}
+                      </div>
+
+                      {/* PROFESSOR */}
+                      {item.teacherName && (
+                        <div className="mt-1 text-xs text-slate-500">
+                          Professor: {item.teacherName}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                {data.filter((d) => d.dayOfWeek === i + 1).length === 0 && (
+                  <div className="text-xs text-slate-400">
+                    Sem horários
                   </div>
-                ))}
-            </div>
-          ))}
+                )}
+              </div>
+            ))}
+
+          </div>
         </div>
       </div>
     </main>
