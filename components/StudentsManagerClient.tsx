@@ -137,8 +137,8 @@ export default function StudentsManagerClient({
       <main className="min-h-screen bg-slate-50 px-4 py-10">
         <div className="mx-auto w-full max-w-4xl">
           <div className="mb-6">
-            <Link href={`/classes/${classId}`} className="text-sky-700">
-              ← Voltar
+            <Link href={`/classes/${classId}/chamadas`} className="text-sky-700">
+              ← Voltar para chamadas
             </Link>
           </div>
 

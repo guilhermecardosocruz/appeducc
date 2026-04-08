@@ -102,10 +102,10 @@ export default function ClassAttendanceReportClient({
       <div className="mx-auto w-full max-w-6xl">
         <div className="mb-6">
           <Link
-            href={`/classes/${classId}`}
+            href={`/classes/${classId}/chamadas`}
             className="text-sm font-medium text-sky-700 hover:text-sky-800"
           >
-            ← Voltar para turma
+            ← Voltar para chamadas
           </Link>
         </div>
 
