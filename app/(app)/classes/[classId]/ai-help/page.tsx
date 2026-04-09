@@ -1,17 +1,68 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+
+type Content = {
+  id: string;
+  title: string;
+  objectives: string | null;
+  methodology: string | null;
+  resources: string | null;
+  bncc: string | null;
+};
 
 export default function ClassAiHelpPage() {
   const params = useParams();
   const classId = params.classId as string;
 
+  const [contents, setContents] = useState<Content[]>([]);
+  const [selectedContentId, setSelectedContentId] = useState("");
   const [content, setContent] = useState("");
   const [action, setAction] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
+
+  async function loadContents() {
+    const res = await fetch(`/api/classes/${classId}/contents`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    setContents(data);
+  }
+
+  useEffect(() => {
+    void loadContents();
+  }, []);
+
+  function handleSelectContent(id: string) {
+    setSelectedContentId(id);
+
+    const selected = contents.find((c) => c.id === id);
+    if (!selected) return;
+
+    const fullText = `
+Título: ${selected.title}
+
+Objetivos:
+${selected.objectives ?? "-"}
+
+Metodologia:
+${selected.methodology ?? "-"}
+
+Recursos:
+${selected.resources ?? "-"}
+
+BNCC:
+${selected.bncc ?? "-"}
+`;
+
+    setContent(fullText);
+  }
 
   async function handleGenerate() {
     if (!content || !action) {
@@ -59,13 +110,29 @@ export default function ClassAiHelpPage() {
             Ajuda com IA
           </h1>
 
+          {/* SELECT CONTEÚDOS */}
+          <select
+            value={selectedContentId}
+            onChange={(e) => handleSelectContent(e.target.value)}
+            className="w-full rounded border p-3"
+          >
+            <option value="">Selecionar conteúdo existente</option>
+            {contents.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+
+          {/* TEXTAREA */}
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Cole ou escreva o conteúdo aqui..."
-            className="w-full rounded border p-3 min-h-[120px]"
+            placeholder="Ou escreva manualmente..."
+            className="w-full rounded border p-3 min-h-[180px]"
           />
 
+          {/* AÇÕES */}
           <select
             value={action}
             onChange={(e) => setAction(e.target.value)}
