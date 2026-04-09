@@ -26,6 +26,7 @@ export default function ClassAiHelpPage() {
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
+  const [rawResult, setRawResult] = useState("");
 
   useEffect(() => {
     async function loadContents() {
@@ -79,6 +80,7 @@ ${selected.bncc ?? "-"}
 
     setLoading(true);
     setResult("");
+    setRawResult("");
 
     try {
       const res = await fetch("/api/ai/generate", {
@@ -96,15 +98,26 @@ ${selected.bncc ?? "-"}
         return;
       }
 
+      setRawResult(data.result);
       setResult(marked.parse(data.result) as string);
     } finally {
       setLoading(false);
     }
   }
 
+  function handleCopy() {
+    if (!rawResult) return;
+    navigator.clipboard.writeText(rawResult);
+    alert("Texto copiado!");
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl space-y-6">
         <Link
           href={`/classes/${classId}`}
           className="text-sm font-medium text-sky-700 hover:text-sky-800"
@@ -112,11 +125,12 @@ ${selected.bncc ?? "-"}
           ← Voltar para turma
         </Link>
 
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm space-y-6">
           <h1 className="text-2xl font-semibold text-slate-900">
             Ajuda com IA
           </h1>
 
+          {/* CONTEÚDOS */}
           <select
             value={selectedContentId}
             onChange={(e) => handleSelectContent(e.target.value)}
@@ -130,12 +144,14 @@ ${selected.bncc ?? "-"}
             ))}
           </select>
 
+          {/* TEXTO */}
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="w-full rounded border p-3 min-h-[180px]"
           />
 
+          {/* AÇÕES */}
           <select
             onChange={(e) => handleSelectAction(e.target.value)}
             className="w-full rounded border p-3"
@@ -158,6 +174,7 @@ ${selected.bncc ?? "-"}
             </option>
           </select>
 
+          {/* AÇÃO EDITÁVEL */}
           <textarea
             value={action}
             onChange={(e) => setAction(e.target.value)}
@@ -171,14 +188,36 @@ ${selected.bncc ?? "-"}
           >
             {loading ? "Gerando..." : "Gerar com IA"}
           </button>
+        </div>
 
-          {result && (
+        {/* RESULTADO */}
+        {result && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm space-y-6">
+            
+            {/* BOTÕES */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={handleCopy}
+                className="rounded bg-slate-700 px-4 py-2 text-white"
+              >
+                Copiar texto
+              </button>
+
+              <button
+                onClick={handlePrint}
+                className="rounded bg-green-600 px-4 py-2 text-white"
+              >
+                Gerar PDF
+              </button>
+            </div>
+
+            {/* TEXTO FORMATADO */}
             <div
-              className="prose mt-4 max-w-none"
+              className="prose max-w-none leading-relaxed space-y-4"
               dangerouslySetInnerHTML={{ __html: result }}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </main>
   );

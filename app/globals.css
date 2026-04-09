@@ -42,3 +42,22 @@ input[type="reset"] {
     font-size: 14px;
   }
 }
+
+@media print {
+  body {
+    background: white;
+  }
+
+  button, select, textarea {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  .prose {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
