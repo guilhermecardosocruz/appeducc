@@ -8,15 +8,15 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 function isIos() {
-  if (typeof window === "undefined") return false;
-  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  return typeof window !== "undefined" &&
+    /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 }
 
 function isMobileOrTablet() {
-  if (typeof window === "undefined") return false;
-  return /android|iphone|ipad|ipod|mobile|tablet/i.test(
-    window.navigator.userAgent
-  );
+  return typeof window !== "undefined" &&
+    /android|iphone|ipad|ipod|mobile|tablet/i.test(
+      window.navigator.userAgent
+    );
 }
 
 function isInStandaloneMode() {
@@ -35,13 +35,13 @@ function isInStandaloneMode() {
 export default function PwaInstallButton() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState<boolean>(() =>
-    isInStandaloneMode()
-  );
   const [showIosHelp, setShowIosHelp] = useState(false);
-  const [isMobileDevice] = useState<boolean>(() => isMobileOrTablet());
+
+  const isMobileDevice = isMobileOrTablet();
+  const installed = isInStandaloneMode();
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (!isMobileDevice) return;
 
     if ("serviceWorker" in navigator) {
@@ -56,7 +56,6 @@ export default function PwaInstallButton() {
     }
 
     function handleAppInstalled() {
-      setInstalled(true);
       setDeferredPrompt(null);
       setShowIosHelp(false);
     }
@@ -76,9 +75,10 @@ export default function PwaInstallButton() {
     };
   }, [isMobileDevice]);
 
-  async function handleInstall() {
-    if (installed || !isMobileDevice) return;
+  if (!isMobileDevice) return null;
+  if (installed) return null;
 
+  async function handleInstall() {
     if (deferredPrompt) {
       await deferredPrompt.prompt();
       await deferredPrompt.userChoice;
@@ -95,9 +95,6 @@ export default function PwaInstallButton() {
       "A instalação automática ainda não está disponível neste navegador. No menu do navegador, procure por 'Instalar app' ou 'Adicionar à tela inicial'."
     );
   }
-
-  if (!isMobileDevice) return null;
-  if (installed) return null;
 
   return (
     <div className="space-y-3">
