@@ -19,25 +19,27 @@ export default function ClassAiHelpPage() {
 
   const [contents, setContents] = useState<Content[]>([]);
   const [selectedContentId, setSelectedContentId] = useState("");
+
   const [content, setContent] = useState("");
   const [action, setAction] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
 
-  async function loadContents() {
-    const res = await fetch(`/api/classes/${classId}/contents`, {
-      cache: "no-store",
-    });
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    setContents(data);
-  }
-
   useEffect(() => {
+    async function loadContents() {
+      const res = await fetch(`/api/classes/${classId}/contents`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setContents(data);
+    }
+
     void loadContents();
-  }, []);
+  }, [classId]);
 
   function handleSelectContent(id: string) {
     setSelectedContentId(id);
@@ -64,9 +66,13 @@ ${selected.bncc ?? "-"}
     setContent(fullText);
   }
 
+  function handleSelectAction(value: string) {
+    setAction(value);
+  }
+
   async function handleGenerate() {
     if (!content || !action) {
-      alert("Preencha o conteúdo e selecione a ação.");
+      alert("Preencha o conteúdo e a ação.");
       return;
     }
 
@@ -124,7 +130,7 @@ ${selected.bncc ?? "-"}
             ))}
           </select>
 
-          {/* TEXTAREA */}
+          {/* CONTEÚDO */}
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -132,13 +138,12 @@ ${selected.bncc ?? "-"}
             className="w-full rounded border p-3 min-h-[180px]"
           />
 
-          {/* AÇÕES */}
+          {/* SELECT AÇÕES */}
           <select
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
+            onChange={(e) => handleSelectAction(e.target.value)}
             className="w-full rounded border p-3"
           >
-            <option value="">Selecione uma ação</option>
+            <option value="">Sugestões de ação</option>
             <option value="Crie 3 atividades lúdicas para ensinar esse conteúdo">
               3 atividades lúdicas
             </option>
@@ -155,6 +160,14 @@ ${selected.bncc ?? "-"}
               Avaliação
             </option>
           </select>
+
+          {/* AÇÃO EDITÁVEL */}
+          <textarea
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            placeholder="Descreva a ação que deseja que a IA execute..."
+            className="w-full rounded border p-3 min-h-[120px]"
+          />
 
           <button
             onClick={handleGenerate}
