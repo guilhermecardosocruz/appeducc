@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type AlertItem = {
   classId: string;
@@ -16,6 +17,7 @@ type AlertItem = {
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchAlerts = async () => {
@@ -47,6 +49,18 @@ ${item.students.map(s => `- ${s.studentName} (${s.frequency}%)`).join("\n")}
 
   return (
     <div className="mx-auto max-w-4xl p-4">
+
+      {/* BOTÃO VOLTAR */}
+      <button
+        onClick={() => {
+          if (window.history.length > 1) router.back();
+          else router.push("/dashboard");
+        }}
+        className="mb-4 text-sm text-sky-700"
+      >
+        ← Voltar
+      </button>
+
       <h1 className="text-lg font-semibold mb-4">
         ⚠️ Avisos importantes
       </h1>

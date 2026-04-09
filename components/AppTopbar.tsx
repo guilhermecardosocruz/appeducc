@@ -49,7 +49,6 @@ export default function AppTopbar({ userName, userEmail }: Props) {
             >
               ☰
 
-              {/* 🔴 BADGE SOBREPOSTO (CORRETO) */}
               {count > 0 && (
                 <span className="absolute top-[55%] left-[5%] h-3 w-3 rounded-full bg-red-600 shadow" />
               )}
@@ -57,6 +56,12 @@ export default function AppTopbar({ userName, userEmail }: Props) {
 
             {/* DESKTOP */}
             <div className="hidden md:flex items-center gap-2">
+
+              {/* NOVO: DASHBOARD PRIMEIRO */}
+              <Link href="/dashboard" className="border px-3 py-2 text-sm rounded-md">
+                🏠 Início
+              </Link>
+
               <Link
                 href="/alerts"
                 className="relative inline-flex items-center rounded-md border px-3 py-2 text-sm"
@@ -88,19 +93,26 @@ export default function AppTopbar({ userName, userEmail }: Props) {
       {open && (
         <div className="fixed inset-0 z-50 flex items-start">
 
-          {/* OVERLAY */}
           <div
             className="flex-1 bg-black/40"
             onClick={() => setOpen(false)}
           />
 
-          {/* MENU */}
           <div className="w-64 bg-white shadow-xl p-4 flex flex-col gap-3 mt-2 mr-2 rounded-lg">
 
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold">Menu</span>
               <button onClick={() => setOpen(false)}>✕</button>
             </div>
+
+            {/* NOVO: DASHBOARD PRIMEIRO */}
+            <Link
+              href="/dashboard"
+              onClick={() => setOpen(false)}
+              className="rounded-md border px-3 py-2"
+            >
+              🏠 Início
+            </Link>
 
             <Link
               href="/alerts"
