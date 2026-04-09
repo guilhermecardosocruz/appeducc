@@ -2,17 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
-type AlertStudent = {
-  studentId: string;
-  studentName: string;
-  frequency: number;
-};
-
 type AlertItem = {
+  id: string;
   classId: string;
   className: string;
   schoolName: string;
-  students: AlertStudent[];
+  studentId: string;
+  studentName: string;
+  frequency: number;
+  isRead: boolean;
 };
 
 export async function GET() {
@@ -21,13 +19,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 🔥 FILTRO CORRETO AQUI
   const classes = await prisma.class.findMany({
-    where: user.isTeacher
-      ? {
-          teacherId: user.id, // professor só vê suas turmas
-        }
-      : undefined, // gestor vê todas
+    where: user.isTeacher ? { teacherId: user.id } : undefined,
     include: {
       school: true,
       students: {
@@ -42,11 +35,20 @@ export async function GET() {
     },
   });
 
+  const seenRecords = await prisma.alertSeen.findMany({
+    where: { userId: user.id },
+  });
+
+  const seenMap = new Map(
+    seenRecords.map((r) => [
+      `${r.classId}-${r.studentId}`,
+      r,
+    ])
+  );
+
   const alerts: AlertItem[] = [];
 
   for (const cls of classes) {
-    const alertStudents: AlertStudent[] = [];
-
     for (const student of cls.students) {
       if (student.status !== "ACTIVE") continue;
 
@@ -69,21 +71,22 @@ export async function GET() {
         const frequency =
           total > 0 ? Math.round((presentCount / total) * 100) : 0;
 
-        alertStudents.push({
+        const key = `${cls.id}-${student.id}`;
+        const seen = seenMap.get(key);
+
+        if (seen?.dismissedAt) continue;
+
+        alerts.push({
+          id: key,
+          classId: cls.id,
+          className: cls.name,
+          schoolName: cls.school.name,
           studentId: student.id,
           studentName: student.name,
           frequency,
+          isRead: !!seen?.seenAt,
         });
       }
-    }
-
-    if (alertStudents.length > 0) {
-      alerts.push({
-        classId: cls.id,
-        className: cls.name,
-        schoolName: cls.school.name,
-        students: alertStudents,
-      });
     }
   }
 
