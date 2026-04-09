@@ -44,36 +44,6 @@ export default function AlertsPage() {
     setAlerts(data);
   }
 
-  async function markAsRead(a: AlertItem) {
-    await fetch("/api/alerts/read", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        classId: a.classId,
-        studentId: a.studentId,
-      }),
-    });
-
-    await reload();
-  }
-
-  async function dismiss(a: AlertItem) {
-    await fetch("/api/alerts/dismiss", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        classId: a.classId,
-        studentId: a.studentId,
-      }),
-    });
-
-    await reload();
-  }
-
   const grouped: Grouped[] = useMemo(() => {
     const map = new Map<string, Grouped>();
 
@@ -93,9 +63,44 @@ export default function AlertsPage() {
     return Array.from(map.values());
   }, [alerts]);
 
-  const filtered = selectedClass === "ALL"
-    ? grouped
-    : grouped.filter((g) => g.classId === selectedClass);
+  const filtered =
+    selectedClass === "ALL"
+      ? grouped
+      : grouped.filter((g) => g.classId === selectedClass);
+
+  async function markGroupAsRead(g: Grouped) {
+    for (const s of g.students) {
+      await fetch("/api/alerts/read", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          classId: s.classId,
+          studentId: s.studentId,
+        }),
+      });
+    }
+
+    await reload();
+  }
+
+  async function dismissGroup(g: Grouped) {
+    for (const s of g.students) {
+      await fetch("/api/alerts/dismiss", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          classId: s.classId,
+          studentId: s.studentId,
+        }),
+      });
+    }
+
+    await reload();
+  }
 
   function copyGroup(g: Grouped) {
     const text = `Escola: ${g.schoolName}
@@ -126,50 +131,54 @@ ${g.students
         ))}
       </select>
 
-      {filtered.map((g) => (
-        <div key={g.classId} className="border p-4 rounded space-y-2">
-          <p className="font-semibold">{g.schoolName}</p>
-          <p className="text-sm">{g.className}</p>
+      {filtered.map((g) => {
+        const allRead = g.students.every((s) => s.isRead);
 
-          <button
-            onClick={() => copyGroup(g)}
-            className="border px-3 py-1 text-sm"
+        return (
+          <div
+            key={g.classId}
+            className={`border p-4 rounded space-y-2 ${
+              allRead ? "bg-gray-100" : ""
+            }`}
           >
-            Copiar lista
-          </button>
+            <p className="font-semibold">{g.schoolName}</p>
+            <p className="text-sm">{g.className}</p>
 
-          {g.students.map((s) => (
-            <div
-              key={s.id}
-              className={`border p-2 rounded ${
-                s.isRead ? "bg-gray-100" : ""
-              }`}
+            <button
+              onClick={() => copyGroup(g)}
+              className="border px-3 py-1 text-sm"
             >
-              <p className="text-sm">
-                {s.studentName} ({s.frequency}%)
-              </p>
+              Copiar lista
+            </button>
 
-              <div className="flex gap-2 mt-2">
-                {!s.isRead && (
-                  <button
-                    onClick={() => markAsRead(s)}
-                    className="border px-2 py-1 text-xs"
-                  >
-                    Lido
-                  </button>
-                )}
-
-                <button
-                  onClick={() => dismiss(s)}
-                  className="border px-2 py-1 text-xs text-red-600"
-                >
-                  Excluir
-                </button>
-              </div>
+            <div className="text-sm text-red-600">
+              {g.students.map((s) => (
+                <div key={s.id}>
+                  - {s.studentName} ({s.frequency}%)
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ))}
+
+            <div className="flex gap-2 mt-2">
+              {!allRead && (
+                <button
+                  onClick={() => markGroupAsRead(g)}
+                  className="border px-3 py-1 text-sm"
+                >
+                  Marcar turma como lida
+                </button>
+              )}
+
+              <button
+                onClick={() => dismissGroup(g)}
+                className="border px-3 py-1 text-sm text-red-600"
+              >
+                Excluir turma
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
