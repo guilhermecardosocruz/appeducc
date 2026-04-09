@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { marked } from "marked";
 
 type Content = {
   id: string;
@@ -95,7 +96,7 @@ ${selected.bncc ?? "-"}
         return;
       }
 
-      setResult(data.result);
+      setResult(marked.parse(data.result) as string);
     } finally {
       setLoading(false);
     }
@@ -116,7 +117,6 @@ ${selected.bncc ?? "-"}
             Ajuda com IA
           </h1>
 
-          {/* SELECT CONTEÚDOS */}
           <select
             value={selectedContentId}
             onChange={(e) => handleSelectContent(e.target.value)}
@@ -130,15 +130,12 @@ ${selected.bncc ?? "-"}
             ))}
           </select>
 
-          {/* CONTEÚDO */}
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Ou escreva manualmente..."
             className="w-full rounded border p-3 min-h-[180px]"
           />
 
-          {/* SELECT AÇÕES */}
           <select
             onChange={(e) => handleSelectAction(e.target.value)}
             className="w-full rounded border p-3"
@@ -161,26 +158,25 @@ ${selected.bncc ?? "-"}
             </option>
           </select>
 
-          {/* AÇÃO EDITÁVEL */}
           <textarea
             value={action}
             onChange={(e) => setAction(e.target.value)}
-            placeholder="Descreva a ação que deseja que a IA execute..."
             className="w-full rounded border p-3 min-h-[120px]"
           />
 
           <button
             onClick={handleGenerate}
             disabled={loading}
-            className="w-full rounded bg-sky-600 px-4 py-3 text-white disabled:opacity-60"
+            className="w-full rounded bg-sky-600 px-4 py-3 text-white"
           >
             {loading ? "Gerando..." : "Gerar com IA"}
           </button>
 
           {result && (
-            <div className="mt-4 rounded border p-4 bg-slate-50 whitespace-pre-wrap">
-              {result}
-            </div>
+            <div
+              className="prose mt-4 max-w-none"
+              dangerouslySetInnerHTML={{ __html: result }}
+            />
           )}
         </div>
       </div>

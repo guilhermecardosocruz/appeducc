@@ -28,3 +28,17 @@ input[type="submit"],
 input[type="reset"] {
   min-height: 44px;
 }
+
+@media print {
+  body {
+    background: white;
+  }
+
+  button, select, textarea {
+    display: none !important;
+  }
+
+  .prose {
+    font-size: 14px;
+  }
+}
