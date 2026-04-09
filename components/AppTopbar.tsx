@@ -29,61 +29,62 @@ export default function AppTopbar({ userName, userEmail }: Props) {
         <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between px-4 py-3">
 
           {/* ESQUERDA */}
-          <div className="flex items-center gap-3">
+          <div>
+            <Link href="/dashboard" className="text-sm font-semibold text-sky-700">
+              EDUCC
+            </Link>
+            <p className="text-xs text-slate-500 hidden sm:block">
+              {userName ?? "Usuário"}
+              {userEmail ? ` • ${userEmail}` : ""}
+            </p>
+          </div>
 
-            {/* ☰ MOBILE */}
+          {/* DIREITA */}
+          <div className="flex items-center gap-2">
+
+            {/* ☰ MOBILE (AGORA À DIREITA) */}
             <button
               onClick={() => setOpen(true)}
               className="relative md:hidden text-xl"
             >
               ☰
 
-              {/* 🔴 BADGE */}
+              {/* 🔴 BADGE (inferior esquerda) */}
               {count > 0 && (
-                <span className="absolute -top-2 -right-2 h-3 w-3 rounded-full bg-red-600" />
+                <span className="absolute bottom-0 left-0 h-3 w-3 rounded-full bg-red-600" />
               )}
             </button>
 
-            <div>
-              <Link href="/dashboard" className="text-sm font-semibold text-sky-700">
-                EDUCC
+            {/* DESKTOP MENU */}
+            <div className="hidden md:flex items-center gap-2">
+              <Link
+                href="/alerts"
+                className="relative inline-flex items-center rounded-md border px-3 py-2 text-sm"
+              >
+                🔔 Avisos
+
+                {count > 0 && (
+                  <span className="ml-2 rounded-full bg-red-600 px-2 text-xs text-white">
+                    {count}
+                  </span>
+                )}
               </Link>
-              <p className="text-xs text-slate-500 hidden sm:block">
-                {userName ?? "Usuário"}
-                {userEmail ? ` • ${userEmail}` : ""}
-              </p>
+
+              <Link href="/perfil" className="border px-3 py-2 text-sm rounded-md">
+                Minha conta
+              </Link>
+
+              <form method="POST" action="/api/auth/logout">
+                <button className="border px-3 py-2 text-sm rounded-md">
+                  Sair
+                </button>
+              </form>
             </div>
-          </div>
-
-          {/* DESKTOP MENU */}
-          <div className="hidden md:flex items-center gap-2">
-            <Link
-              href="/alerts"
-              className="relative inline-flex items-center rounded-md border px-3 py-2 text-sm"
-            >
-              🔔 Avisos
-
-              {count > 0 && (
-                <span className="ml-2 rounded-full bg-red-600 px-2 text-xs text-white">
-                  {count}
-                </span>
-              )}
-            </Link>
-
-            <Link href="/perfil" className="border px-3 py-2 text-sm rounded-md">
-              Minha conta
-            </Link>
-
-            <form method="POST" action="/api/auth/logout">
-              <button className="border px-3 py-2 text-sm rounded-md">
-                Sair
-              </button>
-            </form>
           </div>
         </div>
       </header>
 
-      {/* 🔥 DRAWER MOBILE */}
+      {/* DRAWER */}
       {open && (
         <div className="fixed inset-0 z-50 flex">
 
