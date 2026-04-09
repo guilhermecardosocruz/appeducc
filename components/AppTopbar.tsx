@@ -28,7 +28,6 @@ export default function AppTopbar({ userName, userEmail }: Props) {
       <header className="border-b bg-white/90 backdrop-blur">
         <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between px-4 py-3">
 
-          {/* ESQUERDA */}
           <div>
             <Link href="/dashboard" className="text-sm font-semibold text-sky-700">
               EDUCC
@@ -39,23 +38,22 @@ export default function AppTopbar({ userName, userEmail }: Props) {
             </p>
           </div>
 
-          {/* DIREITA */}
           <div className="flex items-center gap-2">
 
-            {/* ☰ MOBILE (AGORA À DIREITA) */}
+            {/* ☰ MOBILE */}
             <button
               onClick={() => setOpen(true)}
               className="relative md:hidden text-xl"
             >
               ☰
 
-              {/* 🔴 BADGE (inferior esquerda) */}
+              {/* 🔴 BADGE AJUSTADO */}
               {count > 0 && (
-                <span className="absolute bottom-0 left-0 h-3 w-3 rounded-full bg-red-600" />
+                <span className="absolute -bottom-1 -left-1 h-3 w-3 rounded-full bg-red-600" />
               )}
             </button>
 
-            {/* DESKTOP MENU */}
+            {/* DESKTOP */}
             <div className="hidden md:flex items-center gap-2">
               <Link
                 href="/alerts"
@@ -84,19 +82,10 @@ export default function AppTopbar({ userName, userEmail }: Props) {
         </div>
       </header>
 
-      {/* DRAWER */}
       {open && (
         <div className="fixed inset-0 z-50 flex">
-
-          {/* OVERLAY */}
-          <div
-            className="flex-1 bg-black/40"
-            onClick={() => setOpen(false)}
-          />
-
-          {/* MENU */}
+          <div className="flex-1 bg-black/40" onClick={() => setOpen(false)} />
           <div className="w-64 bg-white shadow-xl p-4 flex flex-col gap-3">
-
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold">Menu</span>
               <button onClick={() => setOpen(false)}>✕</button>
