@@ -42,6 +42,8 @@ model User {
 
   deletedStudents      Student[]           @relation("DeletedByUser")
   deletedArchives      DeletedStudentArchive[]
+
+  alerts               Alert[]             // 🔥 CORREÇÃO AQUI
 }
 
 model Session {
@@ -289,4 +291,24 @@ model ClassGalleryImage {
   mimeType     String?
   sizeBytes    Int?
   createdAt    DateTime @default(now())
+}
+
+model Alert {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  classId    String
+  className  String
+  schoolName String
+
+  studentId  String
+  studentName String
+
+  isRead     Boolean  @default(false)
+  deletedAt  DateTime?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
 }
