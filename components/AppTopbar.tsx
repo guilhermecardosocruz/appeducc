@@ -45,13 +45,13 @@ export default function AppTopbar({ userName, userEmail }: Props) {
             {/* ☰ MOBILE */}
             <button
               onClick={() => setOpen(true)}
-              className="relative md:hidden text-xl w-8 h-8 flex items-center justify-center"
+              className="relative md:hidden text-xl w-9 h-9 flex items-center justify-center"
             >
               ☰
 
-              {/* 🔴 BADGE SOBREPOSTO */}
+              {/* 🔴 BADGE SOBREPOSTO (CORRETO) */}
               {count > 0 && (
-                <span className="absolute -bottom-2 -left-2 h-3 w-3 rounded-full bg-red-600 shadow" />
+                <span className="absolute top-[55%] left-[5%] h-3 w-3 rounded-full bg-red-600 shadow" />
               )}
             </button>
 
@@ -94,7 +94,7 @@ export default function AppTopbar({ userName, userEmail }: Props) {
             onClick={() => setOpen(false)}
           />
 
-          {/* MENU (ALTURA AUTOMÁTICA) */}
+          {/* MENU */}
           <div className="w-64 bg-white shadow-xl p-4 flex flex-col gap-3 mt-2 mr-2 rounded-lg">
 
             <div className="flex items-center justify-between mb-2">
