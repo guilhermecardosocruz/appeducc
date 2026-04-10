@@ -39,26 +39,6 @@ export default function AlertsPage() {
     void fetchData();
   }, []);
 
-  async function reload() {
-    const res = await fetch("/api/alerts", { cache: "no-store" });
-    if (!res.ok) return;
-
-    const data: AlertItem[] = await res.json();
-    setAlerts(data);
-  }
-
-  const unreadCount = useMemo(() => {
-    const unreadGroups = new Set<string>();
-
-    for (const a of alerts) {
-      if (!a.isRead) {
-        unreadGroups.add(`${a.classId}-${a.consecutiveAbsences}`);
-      }
-    }
-
-    return unreadGroups.size;
-  }, [alerts]);
-
   const grouped: Grouped[] = useMemo(() => {
     const map = new Map<string, Grouped>();
 
@@ -98,7 +78,9 @@ export default function AlertsPage() {
     for (const s of g.students) {
       await fetch("/api/alerts/read", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           classId: s.classId,
           studentId: s.studentId,
@@ -106,14 +88,16 @@ export default function AlertsPage() {
       });
     }
 
-    await reload();
+    window.location.reload();
   }
 
   async function dismissGroup(g: Grouped) {
     for (const s of g.students) {
       await fetch("/api/alerts/dismiss", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           classId: s.classId,
           studentId: s.studentId,
@@ -121,7 +105,7 @@ export default function AlertsPage() {
       });
     }
 
-    await reload();
+    window.location.reload();
   }
 
   function copyGroup(g: Grouped) {
@@ -138,12 +122,7 @@ ${g.students
 
   return (
     <div className="mx-auto max-w-4xl p-4 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">⚠️ Avisos</h1>
-        <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">
-          {unreadCount} não lida{unreadCount === 1 ? "" : "s"}
-        </span>
-      </div>
+      <h1 className="text-lg font-semibold">⚠️ Avisos</h1>
 
       {grouped.map((g) => {
         const allRead = g.students.every((s) => s.isRead);
@@ -155,7 +134,7 @@ ${g.students
               allRead ? "bg-gray-100" : "bg-white"
             }`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="font-semibold">{g.schoolName}</p>
                 <p className="text-sm">{g.className}</p>
