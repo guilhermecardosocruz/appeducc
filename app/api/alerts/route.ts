@@ -100,5 +100,11 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json(alerts);
+  // 🔥 NOVO: separar não lidos
+  const unreadCount = alerts.filter((a) => !a.isRead).length;
+
+  return NextResponse.json({
+    alerts,
+    unreadCount,
+  });
 }
