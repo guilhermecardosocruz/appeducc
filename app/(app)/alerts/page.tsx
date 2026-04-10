@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 type AlertItem = {
   id: string;
@@ -16,178 +16,132 @@ type AlertItem = {
 };
 
 type Grouped = {
-  classId: string;
+  key: string;
   className: string;
   schoolName: string;
-  consecutiveAbsences: number;
-  latestLessonDate: string;
+  count: number;
   students: AlertItem[];
 };
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // ✅ CORREÇÃO AQUI
   useEffect(() => {
     async function fetchData() {
       const res = await fetch("/api/alerts", { cache: "no-store" });
       if (!res.ok) return;
 
-      const data: AlertItem[] = await res.json();
-      setAlerts(data);
+      const data = await res.json();
+      setAlerts(data.alerts || []);
+      setLoading(false);
     }
 
-    void fetchData();
+    fetchData();
   }, []);
-
-  async function reload() {
-    const res = await fetch("/api/alerts", { cache: "no-store" });
-    if (!res.ok) return;
-
-    const data: AlertItem[] = await res.json();
-    setAlerts(data);
-  }
 
   const grouped: Grouped[] = useMemo(() => {
     const map = new Map<string, Grouped>();
 
-    for (const a of alerts) {
-      const key = `${a.classId}-${a.consecutiveAbsences}`;
+    for (const alert of alerts) {
+      const key = `${alert.classId}-${alert.consecutiveAbsences}`;
 
       if (!map.has(key)) {
         map.set(key, {
-          classId: a.classId,
-          className: a.className,
-          schoolName: a.schoolName,
-          consecutiveAbsences: a.consecutiveAbsences,
-          latestLessonDate: a.latestLessonDate,
+          key,
+          className: alert.className,
+          schoolName: alert.schoolName,
+          count: alert.consecutiveAbsences,
           students: [],
         });
       }
 
-      const current = map.get(key)!;
-      current.students.push(a);
-
-      if (
-        new Date(a.latestLessonDate).getTime() >
-        new Date(current.latestLessonDate).getTime()
-      ) {
-        current.latestLessonDate = a.latestLessonDate;
-      }
+      map.get(key)!.students.push(alert);
     }
 
     return Array.from(map.values()).sort(
-      (a, b) =>
-        new Date(b.latestLessonDate).getTime() -
-        new Date(a.latestLessonDate).getTime()
+      (a, b) => b.students.length - a.students.length
     );
   }, [alerts]);
 
-  async function markGroupAsRead(g: Grouped) {
-    for (const s of g.students) {
-      await fetch("/api/alerts/read", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          classId: s.classId,
-          studentId: s.studentId,
-        }),
-      });
-    }
+  async function markAsRead(group: Grouped) {
+    await Promise.all(
+      group.students.map((s) =>
+        fetch(`/api/alerts/${s.id}/read`, { method: "POST" })
+      )
+    );
 
-    await reload();
+    setAlerts((prev) =>
+      prev.map((a) =>
+        group.students.find((s) => s.id === a.id)
+          ? { ...a, isRead: true }
+          : a
+      )
+    );
   }
 
-  async function dismissGroup(g: Grouped) {
-    for (const s of g.students) {
-      await fetch("/api/alerts/dismiss", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          classId: s.classId,
-          studentId: s.studentId,
-        }),
-      });
-    }
+  async function remove(group: Grouped) {
+    await Promise.all(
+      group.students.map((s) =>
+        fetch(`/api/alerts/${s.id}`, { method: "DELETE" })
+      )
+    );
 
-    await reload();
+    setAlerts((prev) =>
+      prev.filter((a) => !group.students.find((s) => s.id === a.id))
+    );
   }
 
-  function copyGroup(g: Grouped) {
-    const text = `Escola: ${g.schoolName}
-Turma: ${g.className}
+  function copy(group: Grouped) {
+    const text = `Escola: ${group.schoolName}
+Turma: ${group.className}
 
-Alunos com faltas consecutivas:
-${g.students
+Alunos com ${group.count} faltas consecutivas:
+${group.students
   .map((s) => `- ${s.studentName} (${s.frequency}%)`)
   .join("\n")}`;
 
     navigator.clipboard.writeText(text);
   }
 
+  if (loading) return <div>Carregando...</div>;
+
   return (
-    <div className="mx-auto max-w-4xl p-4 space-y-4">
-      <h1 className="text-lg font-semibold">⚠️ Avisos</h1>
-
-      {grouped.map((g) => {
-        const allRead = g.students.every((s) => s.isRead);
-
-        return (
-          <div
-            key={`${g.classId}-${g.consecutiveAbsences}`}
-            className={`rounded border p-4 space-y-3 ${
-              allRead ? "bg-gray-100" : "bg-white"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold">{g.schoolName}</p>
-                <p className="text-sm">{g.className}</p>
+    <div className="p-4 space-y-4">
+      {grouped.map((group) => (
+        <div
+          key={group.key}
+          className="border rounded-xl p-4 space-y-2 bg-white shadow"
+        >
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="font-bold">{group.schoolName}</div>
+              <div className="text-sm text-gray-500">
+                {group.className}
               </div>
-
-              <button
-                onClick={() => copyGroup(g)}
-                className="rounded border px-3 py-1 text-sm"
-              >
-                Copiar lista
-              </button>
-            </div>
-
-            <p className="font-semibold text-red-600">
-              {g.consecutiveAbsences} faltas consecutivas
-            </p>
-
-            <div className="text-sm space-y-1">
-              {g.students.map((s) => (
-                <div key={s.id}>
-                  - {s.studentName} ({s.frequency}%)
-                </div>
-              ))}
             </div>
 
             <div className="flex gap-2">
-              {!allRead && (
-                <button
-                  onClick={() => markGroupAsRead(g)}
-                  className="rounded border px-3 py-1 text-sm"
-                >
-                  Marcar como lido
-                </button>
-              )}
-
-              <button
-                onClick={() => dismissGroup(g)}
-                className="rounded border px-3 py-1 text-sm text-red-600"
-              >
-                Excluir
-              </button>
+              <button onClick={() => copy(group)}>Copiar</button>
+              <button onClick={() => markAsRead(group)}>Lido</button>
+              <button onClick={() => remove(group)}>Excluir</button>
             </div>
           </div>
-        );
-      })}
+
+          <div className="text-sm">
+            Alunos com {group.count} faltas consecutivas:
+          </div>
+
+          <ul className="text-sm">
+            {group.students.map((s) => (
+              <li key={s.id}>
+                - {s.studentName} ({s.frequency}%)
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
