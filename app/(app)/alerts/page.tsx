@@ -27,7 +27,6 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ CORREÇÃO AQUI
   useEffect(() => {
     async function fetchData() {
       const res = await fetch("/api/alerts", { cache: "no-store" });
@@ -105,41 +104,63 @@ ${group.students
     navigator.clipboard.writeText(text);
   }
 
-  if (loading) return <div>Carregando...</div>;
+  if (loading) return <div className="p-4">Carregando...</div>;
 
   return (
     <div className="p-4 space-y-4">
       {grouped.map((group) => (
         <div
           key={group.key}
-          className="border rounded-xl p-4 space-y-2 bg-white shadow"
+          className="border rounded-2xl p-4 bg-white shadow-sm space-y-3"
         >
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="font-bold">{group.schoolName}</div>
-              <div className="text-sm text-gray-500">
-                {group.className}
-              </div>
+          {/* Header */}
+          <div>
+            <div className="font-semibold text-base">
+              {group.schoolName}
             </div>
-
-            <div className="flex gap-2">
-              <button onClick={() => copy(group)}>Copiar</button>
-              <button onClick={() => markAsRead(group)}>Lido</button>
-              <button onClick={() => remove(group)}>Excluir</button>
+            <div className="text-sm text-gray-500">
+              {group.className}
             </div>
           </div>
 
+          {/* Conteúdo */}
           <div className="text-sm">
-            Alunos com {group.count} faltas consecutivas:
+            <div className="font-medium text-red-600 mb-1">
+              {group.count} faltas consecutivas
+            </div>
+
+            <ul className="space-y-1">
+              {group.students.map((s) => (
+                <li key={s.id}>
+                  - {s.studentName} ({s.frequency}%)
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <ul className="text-sm">
-            {group.students.map((s) => (
-              <li key={s.id}>
-                - {s.studentName} ({s.frequency}%)
-              </li>
-            ))}
-          </ul>
+          {/* Botões */}
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+            <button
+              onClick={() => copy(group)}
+              className="w-full sm:w-auto px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm"
+            >
+              📋 Copiar
+            </button>
+
+            <button
+              onClick={() => markAsRead(group)}
+              className="w-full sm:w-auto px-3 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm"
+            >
+              ✔️ Marcar como lido
+            </button>
+
+            <button
+              onClick={() => remove(group)}
+              className="w-full sm:w-auto px-3 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-sm"
+            >
+              🗑️ Excluir
+            </button>
+          </div>
         </div>
       ))}
     </div>
