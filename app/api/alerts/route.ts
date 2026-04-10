@@ -12,6 +12,7 @@ type AlertItem = {
   frequency: number;
   consecutiveAbsences: number;
   isRead: boolean;
+  latestLessonDate: string;
 };
 
 export async function GET() {
@@ -41,10 +42,7 @@ export async function GET() {
   });
 
   const seenMap = new Map(
-    seenRecords.map((r) => [
-      `${r.classId}-${r.studentId}`,
-      r,
-    ])
+    seenRecords.map((r) => [`${r.classId}-${r.studentId}`, r])
   );
 
   const alerts: AlertItem[] = [];
@@ -63,7 +61,6 @@ export async function GET() {
 
       if (records.length < 2) continue;
 
-      // 🔥 NOVO: calcular sequência
       let consecutiveAbsences = 0;
 
       for (const r of records) {
@@ -77,6 +74,10 @@ export async function GET() {
       const presentCount = records.filter((r) => r.present).length;
       const frequency =
         total > 0 ? Math.round((presentCount / total) * 100) : 0;
+
+      const latestLessonDate = records[0]?.attendance?.lessonDate
+        ? new Date(records[0].attendance.lessonDate).toISOString()
+        : new Date(0).toISOString();
 
       const key = `${cls.id}-${student.id}`;
       const seen = seenMap.get(key);
@@ -93,6 +94,7 @@ export async function GET() {
         frequency,
         consecutiveAbsences,
         isRead: !!seen?.seenAt,
+        latestLessonDate,
       });
     }
   }
