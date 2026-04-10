@@ -1,148 +1,65 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Props = {
-  userName?: string | null;
-  userEmail?: string | null;
+  userName: string;
+  userEmail: string;
 };
 
 export default function AppTopbar({ userName, userEmail }: Props) {
   const [count, setCount] = useState(0);
-  const [open, setOpen] = useState(false);
+
+  async function loadAlertsCount() {
+    const res = await fetch("/api/alerts", { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    setCount(data.unreadCount || 0);
+  }
 
   useEffect(() => {
-    const fetchAlerts = async () => {
-      const res = await fetch("/api/alerts", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json();
-      setCount(data.length);
-    };
+    // evita erro do React
+    setTimeout(() => {
+      loadAlertsCount();
+    }, 0);
 
-    fetchAlerts();
+    function handleUpdate() {
+      loadAlertsCount();
+    }
+
+    window.addEventListener("alerts-updated", handleUpdate);
+
+    return () => {
+      window.removeEventListener("alerts-updated", handleUpdate);
+    };
   }, []);
 
   return (
-    <>
-      <header className="border-b bg-white/90 backdrop-blur">
-        <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between px-4 py-3">
-
-          {/* ESQUERDA */}
-          <div>
-            <Link href="/dashboard" className="text-sm font-semibold text-sky-700">
-              EDUCC
-            </Link>
-            <p className="text-xs text-slate-500 hidden sm:block">
-              {userName ?? "Usuário"}
-              {userEmail ? ` • ${userEmail}` : ""}
-            </p>
-          </div>
-
-          {/* DIREITA */}
-          <div className="flex items-center gap-2">
-
-            {/* ☰ MOBILE */}
-            <button
-              onClick={() => setOpen(true)}
-              className="relative md:hidden text-xl w-9 h-9 flex items-center justify-center"
-            >
-              ☰
-
-              {count > 0 && (
-                <span className="absolute top-[55%] left-[5%] h-3 w-3 rounded-full bg-red-600 shadow" />
-              )}
-            </button>
-
-            {/* DESKTOP */}
-            <div className="hidden md:flex items-center gap-2">
-
-              {/* NOVO: DASHBOARD PRIMEIRO */}
-              <Link href="/dashboard" className="border px-3 py-2 text-sm rounded-md">
-                🏠 Início
-              </Link>
-
-              <Link
-                href="/alerts"
-                className="relative inline-flex items-center rounded-md border px-3 py-2 text-sm"
-              >
-                🔔 Avisos
-
-                {count > 0 && (
-                  <span className="ml-2 rounded-full bg-red-600 px-2 text-xs text-white">
-                    {count}
-                  </span>
-                )}
-              </Link>
-
-              <Link href="/perfil" className="border px-3 py-2 text-sm rounded-md">
-                Minha conta
-              </Link>
-
-              <form method="POST" action="/api/auth/logout">
-                <button className="border px-3 py-2 text-sm rounded-md">
-                  Sair
-                </button>
-              </form>
-            </div>
-          </div>
+    <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
+      {/* ESQUERDA */}
+      <div>
+        <div className="font-bold text-sm">EDUCC</div>
+        <div className="text-xs text-gray-500">
+          {userName} • {userEmail}
         </div>
-      </header>
+      </div>
 
-      {/* DRAWER */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-start">
+      {/* DIREITA */}
+      <div className="flex items-center gap-4">
+        <a href="/dashboard">🏠 Início</a>
 
-          <div
-            className="flex-1 bg-black/40"
-            onClick={() => setOpen(false)}
-          />
+        <a href="/alerts" className="relative">
+          🔔 Avisos
+          {count > 0 && (
+            <span className="ml-1 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
+              {count}
+            </span>
+          )}
+        </a>
 
-          <div className="w-64 bg-white shadow-xl p-4 flex flex-col gap-3 mt-2 mr-2 rounded-lg">
-
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold">Menu</span>
-              <button onClick={() => setOpen(false)}>✕</button>
-            </div>
-
-            {/* NOVO: DASHBOARD PRIMEIRO */}
-            <Link
-              href="/dashboard"
-              onClick={() => setOpen(false)}
-              className="rounded-md border px-3 py-2"
-            >
-              🏠 Início
-            </Link>
-
-            <Link
-              href="/alerts"
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-between rounded-md border px-3 py-2"
-            >
-              <span>🔔 Avisos</span>
-              {count > 0 && (
-                <span className="rounded-full bg-red-600 px-2 text-xs text-white">
-                  {count}
-                </span>
-              )}
-            </Link>
-
-            <Link
-              href="/perfil"
-              onClick={() => setOpen(false)}
-              className="rounded-md border px-3 py-2"
-            >
-              Minha conta
-            </Link>
-
-            <form method="POST" action="/api/auth/logout">
-              <button className="w-full text-left rounded-md border px-3 py-2">
-                Sair
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+        <a href="/perfil">Minha conta</a>
+      </div>
+    </div>
   );
 }
