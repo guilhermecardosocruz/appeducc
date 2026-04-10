@@ -39,6 +39,14 @@ export default function AlertsPage() {
     void fetchData();
   }, []);
 
+  async function reload() {
+    const res = await fetch("/api/alerts", { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data: AlertItem[] = await res.json();
+    setAlerts(data);
+  }
+
   const grouped: Grouped[] = useMemo(() => {
     const map = new Map<string, Grouped>();
 
@@ -88,7 +96,7 @@ export default function AlertsPage() {
       });
     }
 
-    window.location.reload();
+    await reload();
   }
 
   async function dismissGroup(g: Grouped) {
@@ -105,7 +113,7 @@ export default function AlertsPage() {
       });
     }
 
-    window.location.reload();
+    await reload();
   }
 
   function copyGroup(g: Grouped) {
@@ -134,7 +142,7 @@ ${g.students
               allRead ? "bg-gray-100" : "bg-white"
             }`}
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold">{g.schoolName}</p>
                 <p className="text-sm">{g.className}</p>
@@ -160,7 +168,7 @@ ${g.students
               ))}
             </div>
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2">
               {!allRead && (
                 <button
                   onClick={() => markGroupAsRead(g)}

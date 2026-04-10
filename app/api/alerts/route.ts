@@ -82,6 +82,7 @@ export async function GET() {
       const key = `${cls.id}-${student.id}`;
       const seen = seenMap.get(key);
 
+      // ❌ EXCLUÍDO → não aparece
       if (seen?.dismissedAt) continue;
 
       alerts.push({
