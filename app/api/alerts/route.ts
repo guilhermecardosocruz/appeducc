@@ -10,6 +10,7 @@ type AlertItem = {
   studentId: string;
   studentName: string;
   frequency: number;
+  consecutiveAbsences: number;
   isRead: boolean;
 };
 
@@ -62,31 +63,37 @@ export async function GET() {
 
       if (records.length < 2) continue;
 
-      const last = records[0];
-      const previous = records[1];
+      // 🔥 NOVO: calcular sequência
+      let consecutiveAbsences = 0;
 
-      if (!last.present && !previous.present) {
-        const total = records.length;
-        const presentCount = records.filter((r) => r.present).length;
-        const frequency =
-          total > 0 ? Math.round((presentCount / total) * 100) : 0;
-
-        const key = `${cls.id}-${student.id}`;
-        const seen = seenMap.get(key);
-
-        if (seen?.dismissedAt) continue;
-
-        alerts.push({
-          id: key,
-          classId: cls.id,
-          className: cls.name,
-          schoolName: cls.school.name,
-          studentId: student.id,
-          studentName: student.name,
-          frequency,
-          isRead: !!seen?.seenAt,
-        });
+      for (const r of records) {
+        if (!r.present) consecutiveAbsences++;
+        else break;
       }
+
+      if (consecutiveAbsences < 2) continue;
+
+      const total = records.length;
+      const presentCount = records.filter((r) => r.present).length;
+      const frequency =
+        total > 0 ? Math.round((presentCount / total) * 100) : 0;
+
+      const key = `${cls.id}-${student.id}`;
+      const seen = seenMap.get(key);
+
+      if (seen?.dismissedAt) continue;
+
+      alerts.push({
+        id: key,
+        classId: cls.id,
+        className: cls.name,
+        schoolName: cls.school.name,
+        studentId: student.id,
+        studentName: student.name,
+        frequency,
+        consecutiveAbsences,
+        isRead: !!seen?.seenAt,
+      });
     }
   }
 
