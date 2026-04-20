@@ -9,6 +9,7 @@ type StudentReport = {
   presences: number;
   absences: number;
   presenceRate: number;
+  missedLessons: number[];
 };
 
 type Summary = {
@@ -28,6 +29,14 @@ type Summary = {
 function formatDate(value: string | null) {
   if (!value) return "Todo o período";
   return new Date(value).toLocaleDateString("pt-BR");
+}
+
+function formatMissedLessons(missedLessons: number[]) {
+  if (!Array.isArray(missedLessons) || missedLessons.length === 0) {
+    return "-";
+  }
+
+  return missedLessons.map((lesson) => `${lesson}°`).join(", ");
 }
 
 export default function ClassAttendanceReportPdfClient({
@@ -231,6 +240,7 @@ export default function ClassAttendanceReportPdfClient({
                         <th className="px-6 py-3 text-left">Aluno</th>
                         <th className="px-6 py-3 text-left">Presenças</th>
                         <th className="px-6 py-3 text-left">Faltas</th>
+                        <th className="px-6 py-3 text-left">Aulas que faltou</th>
                         <th className="px-6 py-3 text-left">% Presença</th>
                       </tr>
                     </thead>
@@ -243,6 +253,9 @@ export default function ClassAttendanceReportPdfClient({
                           <td className="px-6 py-3">{student.name}</td>
                           <td className="px-6 py-3">{student.presences}</td>
                           <td className="px-6 py-3">{student.absences}</td>
+                          <td className="px-6 py-3">
+                            {formatMissedLessons(student.missedLessons)}
+                          </td>
                           <td className="px-6 py-3 font-medium">
                             {student.presenceRate}%
                           </td>

@@ -111,7 +111,7 @@ export async function GET(req: Request, { params }: Params) {
             },
           },
         },
-        orderBy: [{ lessonDate: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ lessonDate: "asc" }, { createdAt: "asc" }],
       },
     },
   });
@@ -131,6 +131,7 @@ export async function GET(req: Request, { params }: Params) {
         presences: 0,
         absences: 0,
         presenceRate: 0,
+        missedLessons: [] as number[],
       },
     ])
   );
@@ -151,6 +152,7 @@ export async function GET(req: Request, { params }: Params) {
     }
 
     totalAttendances += 1;
+    const lessonNumber = totalAttendances;
 
     for (const presence of attendance.presences) {
       if (!presence.student) continue;
@@ -166,6 +168,7 @@ export async function GET(req: Request, { params }: Params) {
         totalPresences += 1;
       } else {
         current.absences += 1;
+        current.missedLessons.push(lessonNumber);
         totalAbsences += 1;
       }
     }
