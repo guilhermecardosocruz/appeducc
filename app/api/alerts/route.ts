@@ -15,6 +15,17 @@ type AlertItem = {
   latestLessonDate: string;
 };
 
+type GroupedAlert = {
+  key: string;
+  classId: string;
+  className: string;
+  schoolName: string;
+  consecutiveAbsences: number;
+  students: AlertItem[];
+  isRead: boolean;
+  latestLessonDate: string;
+};
+
 export async function GET() {
   const user = await getSessionUser();
   if (!user) {
@@ -45,7 +56,7 @@ export async function GET() {
     seenRecords.map((r) => [`${r.classId}-${r.studentId}`, r])
   );
 
-  const alerts: AlertItem[] = [];
+  const rawAlerts: AlertItem[] = [];
 
   for (const cls of classes) {
     for (const student of cls.students) {
@@ -82,10 +93,10 @@ export async function GET() {
       const key = `${cls.id}-${student.id}`;
       const seen = seenMap.get(key);
 
-      // ❌ EXCLUÍDO → não aparece
+      // ignorar dismiss
       if (seen?.dismissedAt) continue;
 
-      alerts.push({
+      rawAlerts.push({
         id: key,
         classId: cls.id,
         className: cls.name,
@@ -100,11 +111,53 @@ export async function GET() {
     }
   }
 
-  // 🔥 NOVO: separar não lidos
-  const unreadCount = alerts.filter((a) => !a.isRead).length;
+  // 🔥 AGRUPAMENTO REAL
+  const map = new Map<string, GroupedAlert>();
+
+  for (const alert of rawAlerts) {
+    const key = `${alert.classId}-${alert.schoolName}-${alert.consecutiveAbsences}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        classId: alert.classId,
+        className: alert.className,
+        schoolName: alert.schoolName,
+        consecutiveAbsences: alert.consecutiveAbsences,
+        students: [],
+        isRead: true,
+        latestLessonDate: alert.latestLessonDate,
+      });
+    }
+
+    const group = map.get(key)!;
+    group.students.push(alert);
+
+    // se algum não foi lido → grupo não é lido
+    if (!alert.isRead) {
+      group.isRead = false;
+    }
+
+    // pegar data mais recente
+    if (
+      new Date(alert.latestLessonDate) >
+      new Date(group.latestLessonDate)
+    ) {
+      group.latestLessonDate = alert.latestLessonDate;
+    }
+  }
+
+  const groups = Array.from(map.values()).sort(
+    (a, b) =>
+      new Date(b.latestLessonDate).getTime() -
+      new Date(a.latestLessonDate).getTime()
+  );
+
+  // 🔥 CONTAGEM CORRETA (por grupo)
+  const unreadCount = groups.filter((g) => !g.isRead).length;
 
   return NextResponse.json({
-    alerts,
+    groups,
     unreadCount,
   });
 }
