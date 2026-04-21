@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getSessionUser } from "@/lib/auth";
 
 type GroupReport = {
@@ -29,9 +30,13 @@ export default async function DashboardGroupsReportPage({
   if (startDate) query.set("startDate", startDate);
   if (endDate) query.set("endDate", endDate);
 
-  // ✅ FIX (sem base URL)
+  // ✅ FIX FINAL (Next 15 correto)
+  const headersList = await headers();
+  const host = headersList.get("host");
+  const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+
   const res = await fetch(
-    `/api/dashboard/reports/groups?${query.toString()}`,
+    `${protocol}://${host}/api/dashboard/reports/groups?${query.toString()}`,
     { cache: "no-store" }
   );
 
@@ -100,7 +105,6 @@ export default async function DashboardGroupsReportPage({
           </Link>
         </form>
 
-        {/* CARDS */}
         <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
 
           <div className="rounded-lg border bg-white p-4">
@@ -128,7 +132,6 @@ export default async function DashboardGroupsReportPage({
             <p className="text-xl font-semibold">{presenceRate}%</p>
           </div>
 
-          {/* ✅ NOVOS */}
           <div className="rounded-lg border bg-white p-4">
             <p className="text-xs text-slate-500">Média Presença</p>
             <p className="text-xl font-semibold">{avgPresence}</p>
@@ -141,7 +144,6 @@ export default async function DashboardGroupsReportPage({
 
         </div>
 
-        {/* TABELA */}
         <div className="mt-8 overflow-x-auto rounded-lg border bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-slate-100">
