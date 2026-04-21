@@ -48,14 +48,11 @@ export async function GET(req: Request, { params }: Params) {
                   student: {
                     select: {
                       id: true,
-                      status: true,
-                      deletedAt: true,
                     },
                   },
                 },
               },
             },
-            orderBy: [{ lessonDate: "desc" }, { createdAt: "desc" }],
           },
         },
       },
@@ -63,13 +60,16 @@ export async function GET(req: Request, { params }: Params) {
     orderBy: { name: "asc" },
   });
 
-  const totalSchools = schools.length;
   let totalClasses = 0;
   let totalStudents = 0;
   let totalAttendances = 0;
 
   const schoolReports = schools.map((school) => {
     const classReports = school.classes.map((cls) => {
+      const validStudentIds = new Set(
+        cls.students.map((s) => s.id)
+      );
+
       let presences = 0;
       let absences = 0;
       let attendancesCount = 0;
@@ -83,12 +83,7 @@ export async function GET(req: Request, { params }: Params) {
         attendancesCount += 1;
 
         attendance.presences.forEach((presence) => {
-          if (
-            presence.student?.deletedAt ||
-            presence.student?.status !== "ACTIVE"
-          ) {
-            return;
-          }
+          if (!validStudentIds.has(presence.studentId)) return;
 
           if (presence.present) presences += 1;
           else absences += 1;
@@ -128,12 +123,10 @@ export async function GET(req: Request, { params }: Params) {
 
   return NextResponse.json({
     summary: {
-      schools: totalSchools,
+      schools: schools.length,
       classes: totalClasses,
       students: totalStudents,
       totalAttendances,
-      startDate: startDate ? startDate.toISOString() : null,
-      endDate: endDate ? endDate.toISOString() : null,
     },
     schools: schoolReports,
   });
