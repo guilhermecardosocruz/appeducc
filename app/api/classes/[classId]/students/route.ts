@@ -136,22 +136,6 @@ export async function POST(
     },
   });
 
-  const classAttendances = await prisma.attendance.findMany({
-    where: { classId },
-    select: { id: true },
-  });
-
-  if (classAttendances.length > 0) {
-    await prisma.attendancePresence.createMany({
-      data: classAttendances.map((attendance) => ({
-        attendanceId: attendance.id,
-        studentId: createdStudent.id,
-        present: false,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
   let createdPresence = null;
 
   if (attendanceId) {
