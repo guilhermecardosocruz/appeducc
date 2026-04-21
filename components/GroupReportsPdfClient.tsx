@@ -1,39 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+
+type ClassReport = {
+  classId: string;
+  className: string;
+  students: number;
+  totalAttendances: number;
+  presenceRate: number;
+  avgPresencesPerAttendance: number;
+  avgAbsencesPerAttendance: number;
+};
 
 type SchoolReport = {
   schoolId: string;
   schoolName: string;
-  classes: number;
-  students: number;
-  totalAttendances: number;
-  presences: number;
-  absences: number;
-  presenceRate: number;
-  avgPresencesPerAttendance: number;
-  avgAbsencesPerAttendance: number;
+  classes: ClassReport[];
 };
-
-type Summary = {
-  schools: number;
-  classes: number;
-  students: number;
-  totalAttendances: number;
-  presences: number;
-  absences: number;
-  presenceRate: number;
-  avgPresencesPerAttendance: number;
-  avgAbsencesPerAttendance: number;
-  startDate: string | null;
-  endDate: string | null;
-};
-
-function formatDate(value: string | null) {
-  if (!value) return "Todo o período";
-  return new Date(value).toLocaleDateString("pt-BR");
-}
 
 export default function GroupReportsPdfClient({
   groupId,
@@ -45,172 +28,67 @@ export default function GroupReportsPdfClient({
   endDate: string;
 }) {
   const [data, setData] = useState<SchoolReport[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
 
   useEffect(() => {
-    let active = true;
-
     async function load() {
       const params = new URLSearchParams();
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
       const query = params.toString();
+
       const res = await fetch(
         `/api/groups/${groupId}/reports/schools${query ? `?${query}` : ""}`,
         { cache: "no-store" }
       );
 
       const json = await res.json();
-
-      if (!active) return;
-
-      setData(Array.isArray(json.schools) ? json.schools : []);
-      setSummary(json.summary ?? null);
+      setData(json.schools ?? []);
     }
 
     void load();
-
-    return () => {
-      active = false;
-    };
   }, [groupId, startDate, endDate]);
 
-  const backHref = `/groups/${groupId}/reports${
-    startDate || endDate
-      ? `?${new URLSearchParams({
-          ...(startDate ? { startDate } : {}),
-          ...(endDate ? { endDate } : {}),
-        }).toString()}`
-      : ""
-  }`;
-
   return (
-    <>
-      <style jsx global>{`
-        @media print {
-          .no-print {
-            display: none;
-          }
-          body {
-            background: #fff !important;
-          }
-        }
-      `}</style>
+    <main className="p-6">
+      <h1 className="text-xl font-bold">
+        Relatório por Turma (Agrupado por Escola)
+      </h1>
 
-      <main className="min-h-screen bg-white px-8 py-8">
-        <div className="no-print mb-6 flex justify-between">
-          <Link
-            href={backHref}
-            className="text-sm font-medium text-sky-700 hover:text-sky-800"
-          >
-            ← Voltar para relatório
-          </Link>
+      {data.map((school) => (
+        <div key={school.schoolId} className="mt-6">
+          <h2 className="font-bold">{school.schoolName}</h2>
 
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="rounded bg-sky-600 px-4 py-2 text-white"
-          >
-            Imprimir / Salvar em PDF
-          </button>
-        </div>
-
-        <h1 className="text-2xl font-semibold">
-          Relatório de Presença do Grupo
-        </h1>
-
-        {summary && (
-          <>
-            <p className="mt-2 text-sm text-slate-600">
-              Período: {formatDate(summary.startDate)} até{" "}
-              {formatDate(summary.endDate)}
-            </p>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <div className="border p-3">
-                <p className="text-xs">Escolas</p>
-                <p className="text-lg font-semibold">{summary.schools}</p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Turmas</p>
-                <p className="text-lg font-semibold">{summary.classes}</p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Alunos</p>
-                <p className="text-lg font-semibold">{summary.students}</p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Chamadas</p>
-                <p className="text-lg font-semibold">
-                  {summary.totalAttendances}
-                </p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Presenças</p>
-                <p className="text-lg font-semibold">{summary.presences}</p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Faltas</p>
-                <p className="text-lg font-semibold">{summary.absences}</p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">% Presença</p>
-                <p className="text-lg font-semibold">
-                  {summary.presenceRate}%
-                </p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Média presenças/chamada</p>
-                <p className="text-lg font-semibold">
-                  {summary.avgPresencesPerAttendance}
-                </p>
-              </div>
-
-              <div className="border p-3">
-                <p className="text-xs">Média faltas/chamada</p>
-                <p className="text-lg font-semibold">
-                  {summary.avgAbsencesPerAttendance}
-                </p>
-              </div>
-            </div>
-          </>
-        )}
-
-        <table className="mt-8 w-full border text-sm">
-          <thead>
-            <tr>
-              <th className="border px-2 py-1">Escola</th>
-              <th className="border px-2 py-1">Turmas</th>
-              <th className="border px-2 py-1">Alunos</th>
-              <th className="border px-2 py-1">Chamadas</th>
-              <th className="border px-2 py-1">Presenças</th>
-              <th className="border px-2 py-1">Faltas</th>
-              <th className="border px-2 py-1">% Presença</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row) => (
-              <tr key={row.schoolId}>
-                <td className="border px-2 py-1">{row.schoolName}</td>
-                <td className="border px-2 py-1">{row.classes}</td>
-                <td className="border px-2 py-1">{row.students}</td>
-                <td className="border px-2 py-1">{row.totalAttendances}</td>
-                <td className="border px-2 py-1">{row.presences}</td>
-                <td className="border px-2 py-1">{row.absences}</td>
-                <td className="border px-2 py-1">{row.presenceRate}%</td>
+          <table className="w-full border mt-2 text-sm">
+            <thead>
+              <tr>
+                <th className="border px-2">Turma</th>
+                <th className="border px-2">Alunos</th>
+                <th className="border px-2">Chamadas</th>
+                <th className="border px-2">% Presença</th>
+                <th className="border px-2">Média P</th>
+                <th className="border px-2">Média F</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </main>
-    </>
+            </thead>
+            <tbody>
+              {school.classes.map((cls) => (
+                <tr key={cls.classId}>
+                  <td className="border px-2">{cls.className}</td>
+                  <td className="border px-2">{cls.students}</td>
+                  <td className="border px-2">{cls.totalAttendances}</td>
+                  <td className="border px-2">{cls.presenceRate}%</td>
+                  <td className="border px-2">
+                    {cls.avgPresencesPerAttendance}
+                  </td>
+                  <td className="border px-2">
+                    {cls.avgAbsencesPerAttendance}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </main>
   );
 }
