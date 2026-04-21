@@ -29,8 +29,9 @@ export default async function DashboardGroupsReportPage({
   if (startDate) query.set("startDate", startDate);
   if (endDate) query.set("endDate", endDate);
 
+  // ✅ FIX (sem base URL)
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL}/api/dashboard/reports/groups?${query.toString()}`,
+    `/api/dashboard/reports/groups?${query.toString()}`,
     { cache: "no-store" }
   );
 
@@ -62,6 +63,16 @@ export default async function DashboardGroupsReportPage({
   const presenceRate =
     total > 0 ? ((summary.presences / total) * 100).toFixed(2) : "0";
 
+  const avgPresence =
+    summary.attendances > 0
+      ? (summary.presences / summary.attendances).toFixed(2)
+      : "0";
+
+  const avgAbsence =
+    summary.attendances > 0
+      ? (summary.absences / summary.attendances).toFixed(2)
+      : "0";
+
   const pdfLink = `/dashboard/reports/groups/pdf?startDate=${startDate}&endDate=${endDate}`;
 
   return (
@@ -76,7 +87,6 @@ export default async function DashboardGroupsReportPage({
           Relatório Geral (Grupos)
         </h1>
 
-        {/* FILTRO */}
         <form className="mt-4 flex gap-2">
           <input name="startDate" type="date" defaultValue={startDate} />
           <input name="endDate" type="date" defaultValue={endDate} />
@@ -113,10 +123,20 @@ export default async function DashboardGroupsReportPage({
             <p className="text-xl font-semibold">{summary.students}</p>
           </div>
 
-          {/* 🔥 NOVO USO DO presenceRate */}
           <div className="rounded-lg border bg-white p-4">
             <p className="text-xs text-slate-500">% Presença</p>
             <p className="text-xl font-semibold">{presenceRate}%</p>
+          </div>
+
+          {/* ✅ NOVOS */}
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs text-slate-500">Média Presença</p>
+            <p className="text-xl font-semibold">{avgPresence}</p>
+          </div>
+
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs text-slate-500">Média Faltas</p>
+            <p className="text-xl font-semibold">{avgAbsence}</p>
           </div>
 
         </div>
@@ -131,18 +151,34 @@ export default async function DashboardGroupsReportPage({
                 <th className="px-4 py-3 text-left">Turmas</th>
                 <th className="px-4 py-3 text-left">Alunos</th>
                 <th className="px-4 py-3 text-left">% Presença</th>
+                <th className="px-4 py-3 text-left">Média Presença</th>
+                <th className="px-4 py-3 text-left">Média Faltas</th>
               </tr>
             </thead>
             <tbody>
-              {data.map((g) => (
-                <tr key={g.groupId} className="border-t">
-                  <td className="px-4 py-3 font-medium">{g.groupName}</td>
-                  <td className="px-4 py-3">{g.schools}</td>
-                  <td className="px-4 py-3">{g.classes}</td>
-                  <td className="px-4 py-3">{g.students}</td>
-                  <td className="px-4 py-3">{g.presenceRate}%</td>
-                </tr>
-              ))}
+              {data.map((g) => {
+                const avgP =
+                  g.totalAttendances > 0
+                    ? (g.presences / g.totalAttendances).toFixed(2)
+                    : "0";
+
+                const avgA =
+                  g.totalAttendances > 0
+                    ? (g.absences / g.totalAttendances).toFixed(2)
+                    : "0";
+
+                return (
+                  <tr key={g.groupId} className="border-t">
+                    <td className="px-4 py-3 font-medium">{g.groupName}</td>
+                    <td className="px-4 py-3">{g.schools}</td>
+                    <td className="px-4 py-3">{g.classes}</td>
+                    <td className="px-4 py-3">{g.students}</td>
+                    <td className="px-4 py-3">{g.presenceRate}%</td>
+                    <td className="px-4 py-3">{avgP}</td>
+                    <td className="px-4 py-3">{avgA}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
