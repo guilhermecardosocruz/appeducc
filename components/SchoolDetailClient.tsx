@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import CreateClassModal from "./CreateClassModal";
 
 type TeacherOption = {
@@ -42,9 +43,12 @@ export default function SchoolDetailClient({
   initialClasses,
   canManageSchool,
 }: Props) {
+  const router = useRouter();
+
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
   const [openModal, setOpenModal] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassItem | null>(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
 
   async function refreshClasses() {
     const res = await fetch(`/api/schools/${schoolId}/classes`, {
@@ -58,6 +62,34 @@ export default function SchoolDetailClient({
     }
   }
 
+  async function handleDeleteSchool() {
+    const confirmDelete = confirm(
+      `Tem certeza que deseja excluir a escola "${schoolName}"?\n\nEssa ação não pode ser desfeita.`
+    );
+
+    if (!confirmDelete) return;
+
+    setLoadingDelete(true);
+
+    try {
+      const res = await fetch(`/api/schools/${schoolId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        alert("Erro ao excluir escola");
+        return;
+      }
+
+      alert("Escola excluída com sucesso");
+
+      router.push(`/groups/${groupId}`);
+      router.refresh();
+    } finally {
+      setLoadingDelete(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-4xl">
@@ -67,7 +99,7 @@ export default function SchoolDetailClient({
           </Link>
         </div>
 
-        <div className="flex justify-between">
+        <div className="flex justify-between items-start gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{schoolName}</h1>
             <p className="text-sm text-slate-500">
@@ -76,15 +108,25 @@ export default function SchoolDetailClient({
           </div>
 
           {canManageSchool && (
-            <button
-              onClick={() => {
-                setEditingClass(null);
-                setOpenModal(true);
-              }}
-              className="bg-sky-600 text-white px-4 py-2 rounded"
-            >
-              + Criar turma
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEditingClass(null);
+                  setOpenModal(true);
+                }}
+                className="bg-sky-600 text-white px-4 py-2 rounded"
+              >
+                + Criar turma
+              </button>
+
+              <button
+                onClick={handleDeleteSchool}
+                disabled={loadingDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50"
+              >
+                {loadingDelete ? "Excluindo..." : "Excluir escola"}
+              </button>
+            </div>
           )}
         </div>
 
@@ -94,11 +136,7 @@ export default function SchoolDetailClient({
               key={item.id}
               className="group flex items-center justify-between border rounded p-4 hover:bg-slate-50 transition"
             >
-              {/* CARD CLICÁVEL */}
-              <Link
-                href={`/classes/${item.id}`}
-                className="flex-1"
-              >
+              <Link href={`/classes/${item.id}`} className="flex-1">
                 <p className="font-medium text-slate-900">
                   {item.name}
                 </p>
@@ -110,7 +148,6 @@ export default function SchoolDetailClient({
                 </p>
               </Link>
 
-              {/* AÇÕES */}
               <div className="ml-4 flex items-center gap-3">
                 <Link
                   href={`/classes/${item.id}`}
