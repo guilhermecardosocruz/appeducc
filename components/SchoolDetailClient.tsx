@@ -63,8 +63,15 @@ export default function SchoolDetailClient({
   }
 
   async function handleDeleteSchool() {
+    const infoRes = await fetch(`/api/schools/${schoolId}`);
+    const info = await infoRes.json();
+
     const confirmDelete = confirm(
-      `Tem certeza que deseja excluir a escola "${schoolName}"?\n\nEssa ação não pode ser desfeita.`
+      `Essa escola possui:\n\n` +
+        `- ${info.classes} turmas\n` +
+        `- ${info.students} alunos\n` +
+        `- ${info.attendances} chamadas\n\n` +
+        `Deseja realmente excluir?`
     );
 
     if (!confirmDelete) return;
