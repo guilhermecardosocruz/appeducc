@@ -73,13 +73,23 @@ export default function GroupsDashboardClient({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setOpenGroupModal(true)}
-            className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-          >
-            + Criar grupo
-          </button>
+          <div className="flex items-center gap-2">
+            {/* 🔥 NOVO BOTÃO RELATÓRIO */}
+            <Link
+              href="/dashboard/reports/groups"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Relatório geral
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setOpenGroupModal(true)}
+              className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+            >
+              + Criar grupo
+            </button>
+          </div>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -107,8 +117,8 @@ export default function GroupsDashboardClient({
                         {group._count.schools === 0
                           ? "Nenhuma escola cadastrada ainda"
                           : group._count.schools === 1
-                            ? "1 escola cadastrada"
-                            : `${group._count.schools} escolas cadastradas`}
+                          ? "1 escola cadastrada"
+                          : `${group._count.schools} escolas cadastradas`}
                       </p>
                     </div>
 
