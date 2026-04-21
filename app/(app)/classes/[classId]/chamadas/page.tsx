@@ -25,12 +25,22 @@ export default async function ClassChamadasPage({ params }: PageProps) {
     where: { id: classId },
     include: {
       school: true,
+      students: {
+        where: {
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+        },
+      },
       attendances: {
         include: {
           presences: {
             select: {
               id: true,
               present: true,
+              studentId: true,
             },
           },
         },
@@ -42,6 +52,8 @@ export default async function ClassChamadasPage({ params }: PageProps) {
   if (!foundClass) {
     notFound();
   }
+
+  const validStudentIds = new Set(foundClass.students.map((s) => s.id));
 
   const [schoolMembership, groupMembership] = await Promise.all([
     prisma.schoolMember.findUnique({
@@ -102,7 +114,6 @@ export default async function ClassChamadasPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* 🔥 NOVOS BOTÕES */}
         <div className="mt-6 flex flex-wrap gap-2">
           {canManage && (
             <Link
@@ -147,8 +158,13 @@ export default async function ClassChamadasPage({ params }: PageProps) {
           ) : (
             <ul className="space-y-3">
               {foundClass.attendances.map((attendance) => {
-                const total = attendance.presences.length;
-                const presents = attendance.presences.filter(
+                const filtered = attendance.presences.filter((p) =>
+                  validStudentIds.has(p.studentId)
+                );
+
+                const total = filtered.length;
+
+                const presents = filtered.filter(
                   (item) => item.present
                 ).length;
 
