@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import ClassContentsClient from "@/components/ClassContentsClient";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canAccessClass } from "@/lib/permissions";
 
 type PageProps = {
   params: Promise<{ classId: string }>;
@@ -36,6 +37,13 @@ export default async function ClassConteudosPage({ params }: PageProps) {
     notFound();
   }
 
+  // 🔥 CORREÇÃO PRINCIPAL
+  const hasAccess = await canAccessClass(user.id, classId);
+
+  if (!hasAccess) {
+    notFound();
+  }
+
   const [schoolMembership, groupMembership] = await Promise.all([
     prisma.schoolMember.findUnique({
       where: {
@@ -56,12 +64,6 @@ export default async function ClassConteudosPage({ params }: PageProps) {
   ]);
 
   const isTeacherOfClass = foundClass.teacherId === user.id;
-  const hasAccess =
-    Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
-
-  if (!hasAccess) {
-    notFound();
-  }
 
   const canManageClass =
     Boolean(schoolMembership) ||
