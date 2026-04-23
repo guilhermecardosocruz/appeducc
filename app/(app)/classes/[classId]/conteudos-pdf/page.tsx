@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import ClassContentsPdfSelectorClient from "@/components/ClassContentsPdfSelectorClient";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canAccessClass } from "@/lib/permissions";
 
 type PageProps = {
   params: Promise<{ classId: string }>;
@@ -35,6 +36,13 @@ export default async function ClassConteudosPdfPage({ params }: PageProps) {
     notFound();
   }
 
+  // 🔥 CORREÇÃO PRINCIPAL
+  const hasAccess = await canAccessClass(user.id, classId);
+
+  if (!hasAccess) {
+    notFound();
+  }
+
   const [schoolMembership, groupMembership] = await Promise.all([
     prisma.schoolMember.findUnique({
       where: {
@@ -54,19 +62,12 @@ export default async function ClassConteudosPdfPage({ params }: PageProps) {
     }),
   ]);
 
-  const hasAccess = Boolean(schoolMembership) || Boolean(groupMembership);
-
-  if (!hasAccess) {
-    notFound();
-  }
+  const isTeacherOfClass = foundClass.teacherId === user.id;
 
   const canManageClass =
     Boolean(schoolMembership) ||
-    Boolean(groupMembership && canManageGroupRole(groupMembership.role));
-
-  if (!canManageClass && !schoolMembership && !groupMembership) {
-    notFound();
-  }
+    Boolean(groupMembership && canManageGroupRole(groupMembership.role)) ||
+    isTeacherOfClass;
 
   const contents = foundClass.contents.map((content) => ({
     id: content.id,
