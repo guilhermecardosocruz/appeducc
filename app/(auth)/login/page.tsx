@@ -8,7 +8,27 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const [recentLogins, setRecentLogins] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("recentLogins");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const router = useRouter();
+
+  function saveLogin(email: string) {
+    let list = [email, ...recentLogins.filter((e) => e !== email)];
+    list = list.slice(0, 2);
+
+    localStorage.setItem("recentLogins", JSON.stringify(list));
+    setRecentLogins(list);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,6 +49,8 @@ export default function LoginPage() {
       return;
     }
 
+    saveLogin(String(formData.get("email")));
+
     router.push(data.redirect);
   }
 
@@ -36,7 +58,6 @@ export default function LoginPage() {
     <main className="min-h-screen bg-slate-50">
       <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-4 py-10">
         
-        {/* LOGO / TÍTULO */}
         <div className="mb-10 text-center">
           <h1 className="text-5xl font-semibold tracking-[0.25em] text-sky-700">
             EDUCC
@@ -53,7 +74,8 @@ export default function LoginPage() {
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <div className="space-y-1.5">
+              
+              <div className="space-y-1.5 relative">
                 <label className="block text-sm font-medium text-slate-800">
                   E-mail
                 </label>
@@ -61,8 +83,29 @@ export default function LoginPage() {
                   name="email"
                   type="email"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   className="block w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
                 />
+
+                {showSuggestions && recentLogins.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-xl border bg-white shadow-md">
+                    {recentLogins.map((login) => (
+                      <div
+                        key={login}
+                        onClick={() => {
+                          setEmail(login);
+                          setShowSuggestions(false);
+                        }}
+                        className="cursor-pointer px-3 py-2 text-sm hover:bg-slate-100"
+                      >
+                        {login}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
