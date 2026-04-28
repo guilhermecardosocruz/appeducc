@@ -91,10 +91,14 @@ export default function AppTopbar({ userName, userEmail }: Props) {
 
       {/* MOBILE MENU BUTTON */}
       <button
-        className="md:hidden text-xl"
+        className="relative md:hidden text-xl"
         onClick={() => setOpenMenu((v) => !v)}
       >
         ☰
+
+        {count > 0 && (
+          <span className="absolute -top-1 -right-2 h-3 w-3 bg-red-500 rounded-full"></span>
+        )}
       </button>
 
       {/* MOBILE DROPDOWN */}
