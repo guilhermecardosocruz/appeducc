@@ -41,6 +41,19 @@ type AvailableClass = {
   };
 };
 
+type ApplyPlanningResponse = {
+  linkedClasses?: LinkedClass[];
+  availableClasses?: AvailableClass[];
+  error?: string;
+  needsConfirmation?: boolean;
+};
+
+type RemoveClassResponse = {
+  linkedClasses: LinkedClass[];
+  availableClasses: AvailableClass[];
+  error?: string;
+};
+
 type Props = {
   groupId: string;
   planId: string;
@@ -290,42 +303,44 @@ export default function ContentPlanDetailClient({
   }
 
   async function applyPlanningToClass(classId: string, force = false) {
-    const res = await fetch(
-      `/api/groups/${groupId}/content-plans/${planId}/classes`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ classId, force }),
-      }
-    );
-
-    const data = (await res.json().catch(() => null)) as
-      | {
-          linkedClasses?: LinkedClass[];
-          availableClasses?: AvailableClass[];
-          error?: string;
-          needsConfirmation?: boolean;
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/content-plans/${planId}/classes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ classId, force }),
         }
-      | null;
+      );
 
-    if (!res.ok) {
-      if (res.status === 409 && data?.needsConfirmation) {
-        const confirmed = window.confirm(
-          "Essa turma já possui conteúdos. Deseja substituir tudo pelo padrão deste planejamento?"
-        );
+      const data = (await res.json().catch(() => null)) as
+        | ApplyPlanningResponse
+        | null;
 
-        if (!confirmed) return;
+      if (!res.ok) {
+        console.error("Erro ao aplicar planejamento:", res.status, data);
 
-        await applyPlanningToClass(classId, true);
+        if (res.status === 409 && data?.needsConfirmation) {
+          const confirmed = window.confirm(
+            "Essa turma já possui conteúdos. Deseja substituir tudo pelo padrão deste planejamento?"
+          );
+
+          if (!confirmed) return;
+
+          await applyPlanningToClass(classId, true);
+          return;
+        }
+
+        setError(data?.error ?? "Erro ao aplicar planejamento na turma.");
         return;
       }
 
-      setError(data?.error ?? "Erro ao aplicar planejamento na turma.");
-      return;
+      setCurrentLinked(data?.linkedClasses ?? []);
+      setCurrentAvailable(data?.availableClasses ?? []);
+    } catch (err) {
+      console.error("Erro inesperado ao aplicar planejamento:", err);
+      setError("Erro inesperado ao aplicar planejamento na turma.");
     }
-
-    setCurrentLinked(data?.linkedClasses ?? []);
-    setCurrentAvailable(data?.availableClasses ?? []);
   }
 
   async function assignClass(classId: string) {
@@ -365,11 +380,7 @@ export default function ContentPlanDetailClient({
       );
 
       const data = (await res.json().catch(() => null)) as
-        | {
-            linkedClasses: LinkedClass[];
-            availableClasses: AvailableClass[];
-            error?: string;
-          }
+        | RemoveClassResponse
         | null;
 
       if (!res.ok) {
