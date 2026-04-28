@@ -26,15 +26,6 @@ type ClassPayloadItem = {
   status?: string;
 };
 
-async function getAccessibleGroupIds(userId: string) {
-  const memberships = await prisma.groupMember.findMany({
-    where: { userId },
-    select: { groupId: true },
-  });
-
-  return memberships.map((item) => item.groupId);
-}
-
 async function getPlanAccessibleByUser(
   userId: string,
   groupId: string,
@@ -72,17 +63,13 @@ async function getPlanAccessibleByUser(
   };
 }
 
-async function getPlanClassesPayload(userId: string, planId: string) {
-  const groupIds = await getAccessibleGroupIds(userId);
-
+async function getPlanClassesPayload(groupId: string, planId: string) {
   const linkedClassesRaw = await prisma.contentPlanClass.findMany({
     where: {
       contentPlanId: planId,
       class: {
         school: {
-          groupId: {
-            in: groupIds,
-          },
+          groupId,
         },
       },
     },
@@ -108,9 +95,7 @@ async function getPlanClassesPayload(userId: string, planId: string) {
         notIn: linkedClassIds,
       },
       school: {
-        groupId: {
-          in: groupIds,
-        },
+        groupId,
       },
     },
     include: {
@@ -163,7 +148,6 @@ export async function POST(
   { params }: { params: Promise<{ groupId: string; planId: string }> }
 ) {
   const user = await getSessionUser();
-
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -259,7 +243,7 @@ export async function POST(
     });
   });
 
-  const payload = await getPlanClassesPayload(user.id, planId);
+  const payload = await getPlanClassesPayload(groupId, planId);
   return NextResponse.json(payload);
 }
 
@@ -268,7 +252,6 @@ export async function DELETE(
   { params }: { params: Promise<{ groupId: string; planId: string }> }
 ) {
   const user = await getSessionUser();
-
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -313,6 +296,6 @@ export async function DELETE(
     },
   });
 
-  const payload = await getPlanClassesPayload(user.id, planId);
+  const payload = await getPlanClassesPayload(groupId, planId);
   return NextResponse.json(payload);
 }
