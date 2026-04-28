@@ -9,6 +9,7 @@ type Props = {
 
 export default function AppTopbar({ userName, userEmail }: Props) {
   const [count, setCount] = useState(0);
+  const [loadingLogout, setLoadingLogout] = useState(false);
 
   async function loadAlertsCount() {
     const res = await fetch("/api/alerts", { cache: "no-store" });
@@ -18,8 +19,26 @@ export default function AppTopbar({ userName, userEmail }: Props) {
     setCount(data.unreadCount || 0);
   }
 
+  async function handleLogout() {
+    setLoadingLogout(true);
+
+    try {
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        alert("Erro ao sair");
+        return;
+      }
+
+      window.location.href = "/login";
+    } finally {
+      setLoadingLogout(false);
+    }
+  }
+
   useEffect(() => {
-    // evita erro do React
     setTimeout(() => {
       loadAlertsCount();
     }, 0);
@@ -59,6 +78,14 @@ export default function AppTopbar({ userName, userEmail }: Props) {
         </a>
 
         <a href="/perfil">Minha conta</a>
+
+        <button
+          onClick={handleLogout}
+          disabled={loadingLogout}
+          className="text-red-600 text-sm hover:underline disabled:opacity-50"
+        >
+          {loadingLogout ? "Saindo..." : "Sair"}
+        </button>
       </div>
     </div>
   );
