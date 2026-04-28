@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type AlertItem = {
   id: string;
@@ -98,6 +99,17 @@ ${group.students
 
   return (
     <div className="p-4 space-y-4">
+
+      {/* BOTÃO VOLTAR */}
+      <div>
+        <Link
+          href="/dashboard"
+          className="text-sm text-sky-600 hover:underline"
+        >
+          ← Voltar
+        </Link>
+      </div>
+
       {groups.map((group) => (
         <div
           key={group.key}
