@@ -57,16 +57,15 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   await prisma.$transaction(async (tx) => {
-    // 🔥 remove conteúdos antigos
+    // 🔥 remove conteúdos antigos da turma
     await tx.content.deleteMany({
       where: { classId },
     });
 
-    // 🔥 recria conteúdos
+    // 🔥 recria conteúdos (sem seq)
     await tx.content.createMany({
-      data: plan.lessons.map((lesson, index) => ({
+      data: plan.lessons.map((lesson) => ({
         classId,
-        seq: index + 1,
         title: lesson.title,
         objectives: lesson.objectives,
         methodology: lesson.methodology,
@@ -76,7 +75,7 @@ export async function POST(req: Request, { params }: Params) {
       })),
     });
 
-    // 🔗 verifica se já existe vínculo
+    // 🔗 cria vínculo se não existir
     const existing = await tx.contentPlanClass.findFirst({
       where: {
         classId,
