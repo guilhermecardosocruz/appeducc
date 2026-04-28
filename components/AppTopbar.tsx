@@ -10,6 +10,7 @@ type Props = {
 export default function AppTopbar({ userName, userEmail }: Props) {
   const [count, setCount] = useState(0);
   const [loadingLogout, setLoadingLogout] = useState(false);
+  const [openMenu, setOpenMenu] = useState(false);
 
   async function loadAlertsCount() {
     const res = await fetch("/api/alerts", { cache: "no-store" });
@@ -55,7 +56,7 @@ export default function AppTopbar({ userName, userEmail }: Props) {
   }, []);
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
+    <div className="flex items-center justify-between px-4 py-2 bg-white border-b relative">
       {/* ESQUERDA */}
       <div>
         <div className="font-bold text-sm">EDUCC</div>
@@ -64,8 +65,8 @@ export default function AppTopbar({ userName, userEmail }: Props) {
         </div>
       </div>
 
-      {/* DIREITA */}
-      <div className="flex items-center gap-4">
+      {/* DESKTOP MENU */}
+      <div className="hidden md:flex items-center gap-4">
         <a href="/dashboard">🏠 Início</a>
 
         <a href="/alerts" className="relative">
@@ -87,6 +88,38 @@ export default function AppTopbar({ userName, userEmail }: Props) {
           {loadingLogout ? "Saindo..." : "Sair"}
         </button>
       </div>
+
+      {/* MOBILE MENU BUTTON */}
+      <button
+        className="md:hidden text-xl"
+        onClick={() => setOpenMenu((v) => !v)}
+      >
+        ☰
+      </button>
+
+      {/* MOBILE DROPDOWN */}
+      {openMenu && (
+        <div className="absolute right-4 top-14 w-56 bg-white border rounded-lg shadow-md p-3 flex flex-col gap-3 md:hidden z-50">
+          <a href="/dashboard" onClick={() => setOpenMenu(false)}>
+            🏠 Início
+          </a>
+
+          <a href="/alerts" onClick={() => setOpenMenu(false)}>
+            🔔 Avisos ({count})
+          </a>
+
+          <a href="/perfil" onClick={() => setOpenMenu(false)}>
+            Minha conta
+          </a>
+
+          <button
+            onClick={handleLogout}
+            className="text-left text-red-600"
+          >
+            {loadingLogout ? "Saindo..." : "Sair"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
