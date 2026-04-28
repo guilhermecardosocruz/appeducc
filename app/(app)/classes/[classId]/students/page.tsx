@@ -1,57 +1,89 @@
-import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import StudentsManagerClient from "@/components/StudentsManagerClient";
+import { getSessionUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-type StudentStatus =
-  | "ACTIVE"
-  | "PENDING_ENTRY"
-  | "PENDING_DELETE"
-  | "DELETED";
-
-export default async function StudentsPage({
-  params,
-}: {
+type PageProps = {
   params: Promise<{ classId: string }>;
-}) {
-  const { classId } = await params;
+};
 
+function isManagerRole(role: string | null | undefined) {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  return normalized === "OWNER" || normalized === "MANAGER";
+}
+
+export default async function StudentsPage({ params }: PageProps) {
   const user = await getSessionUser();
-  if (!user) return null;
+
+  if (!user) {
+    notFound();
+  }
+
+  const { classId } = await params;
 
   const foundClass = await prisma.class.findUnique({
     where: { id: classId },
-  });
-
-  if (!foundClass) return null;
-
-  const students = await prisma.student.findMany({
-    where: {
-      classId,
-      status: { not: "DELETED" },
+    include: {
+      school: true,
+      students: {
+        orderBy: { name: "asc" },
+      },
     },
-    orderBy: { name: "asc" },
   });
 
-  const initialStudents = students.map((s) => ({
-    id: s.id,
-    name: s.name,
-    status: s.status as StudentStatus,
-    createdAt: s.createdAt.toISOString(),
-    deletedAt: s.deletedAt ? s.deletedAt.toISOString() : null,
-    deletedReason: s.deletedReason,
-  }));
+  if (!foundClass) {
+    notFound();
+  }
 
-  const canManageStudents = !user.isTeacher;
-  const canImportSpreadsheet = !user.isTeacher;
-  const isManager = !user.isTeacher;
+  const [schoolMembership, groupMembership] = await Promise.all([
+    prisma.schoolMember.findUnique({
+      where: {
+        userId_schoolId: {
+          userId: user.id,
+          schoolId: foundClass.schoolId,
+        },
+      },
+    }),
+    prisma.groupMember.findUnique({
+      where: {
+        userId_groupId: {
+          userId: user.id,
+          groupId: foundClass.school.groupId,
+        },
+      },
+    }),
+  ]);
+
+  const isTeacherOfClass = foundClass.teacherId === user.id;
+
+  const canManageStudents =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && isManagerRole(groupMembership.role)) ||
+    isTeacherOfClass;
+
+  const canImportSpreadsheet =
+    Boolean(schoolMembership) ||
+    Boolean(groupMembership && isManagerRole(groupMembership.role));
+
+  const initialStudents = foundClass.students.map((student) => ({
+    id: student.id,
+    name: student.name,
+    status: student.status as
+      | "ACTIVE"
+      | "PENDING_ENTRY"
+      | "PENDING_DELETE"
+      | "DELETED",
+    createdAt: student.createdAt.toISOString(),
+    deletedAt: student.deletedAt?.toISOString() ?? null,
+    deletedReason: student.deletedReason ?? null,
+  }));
 
   return (
     <StudentsManagerClient
-      classId={foundClass.id}
+      classId={classId}
       className={foundClass.name}
       canImportSpreadsheet={canImportSpreadsheet}
       canManageStudents={canManageStudents}
-      isManager={isManager}
       initialStudents={initialStudents}
     />
   );

@@ -37,8 +37,10 @@ async function ensureClassAccess(userId: string, classId: string) {
   ]);
 
   const isTeacherOfClass = foundClass.teacherId === userId;
+
   const hasAccess =
     Boolean(schoolMembership) || Boolean(groupMembership) || isTeacherOfClass;
+
   const canManage =
     Boolean(schoolMembership) ||
     Boolean(groupMembership && isManagerRole(groupMembership.role)) ||
@@ -46,43 +48,7 @@ async function ensureClassAccess(userId: string, classId: string) {
 
   if (!hasAccess) return null;
 
-  return {
-    foundClass,
-    canManage,
-  };
-}
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ classId: string }> }
-) {
-  const user = await getSessionUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { classId } = await params;
-  const access = await ensureClassAccess(user.id, classId);
-
-  if (!access) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const students = await prisma.student.findMany({
-    where: { classId },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      status: true,
-      createdAt: true,
-      deletedAt: true,
-      deletedReason: true,
-    },
-  });
-
-  return NextResponse.json(students);
+  return { foundClass, canManage };
 }
 
 export async function POST(
@@ -98,11 +64,7 @@ export async function POST(
   const { classId } = await params;
   const access = await ensureClassAccess(user.id, classId);
 
-  if (!access) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  if (!access.canManage) {
+  if (!access || !access.canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -111,19 +73,16 @@ export async function POST(
   const attendanceId = String(data.attendanceId ?? "").trim();
 
   if (!name) {
-    return NextResponse.json({ error: "Missing student name" }, { status: 400 });
+    return NextResponse.json({ error: "Missing name" }, { status: 400 });
   }
 
   const existingStudent = await prisma.student.findFirst({
-    where: {
-      classId,
-      name,
-    },
+    where: { classId, name },
   });
 
   if (existingStudent) {
     return NextResponse.json(
-      { error: "Student already exists in this class" },
+      { error: "Student already exists" },
       { status: 409 }
     );
   }
@@ -139,10 +98,11 @@ export async function POST(
   let createdPresence = null;
 
   if (attendanceId) {
-    createdPresence = await prisma.attendancePresence.findFirst({
-      where: {
+    createdPresence = await prisma.attendancePresence.create({
+      data: {
         attendanceId,
         studentId: createdStudent.id,
+        present: true,
       },
       include: {
         student: {

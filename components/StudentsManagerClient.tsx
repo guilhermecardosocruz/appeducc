@@ -25,7 +25,6 @@ type Props = {
   className: string;
   canImportSpreadsheet: boolean;
   canManageStudents: boolean;
-  isManager: boolean;
   initialStudents: StudentItem[];
 };
 
@@ -35,7 +34,6 @@ export default function StudentsManagerClient({
   initialStudents,
   canManageStudents,
   canImportSpreadsheet,
-  isManager,
 }: Props) {
   const [students, setStudents] = useState<StudentItem[]>(initialStudents);
   const [openAddModal, setOpenAddModal] = useState(false);
@@ -148,7 +146,7 @@ export default function StudentsManagerClient({
                 Alunos — {className}
               </h1>
 
-              {isManager ? (
+              {canManageStudents ? (
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setOpenAddModal(true)}
@@ -235,11 +233,22 @@ export default function StudentsManagerClient({
         }}
       />
 
-      {isManager ? (
+      {canManageStudents ? (
         <AddStudentModal
           open={openAddModal}
           onClose={() => setOpenAddModal(false)}
-          onSubmit={async () => {
+          onSubmit={async (name) => {
+            const res = await fetch(`/api/classes/${classId}/students`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name }),
+            });
+
+            if (!res.ok) {
+              alert("Erro ao adicionar aluno");
+              return;
+            }
+
             await refreshStudents();
             setOpenAddModal(false);
           }}
