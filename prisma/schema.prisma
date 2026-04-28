@@ -301,3 +301,12 @@ model AlertSeen {
 
   @@unique([userId, classId, studentId])
 }
+
+model GroupBackup {
+  id        String   @id @default(cuid())
+  groupId   String
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([groupId])
+}
