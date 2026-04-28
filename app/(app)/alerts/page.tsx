@@ -61,7 +61,7 @@ export default function AlertsPage() {
 
   async function remove(group: Grouped) {
     const confirmed = confirm(
-      `Excluir ${group.students.length} aluno(s)?`
+      `Deseja excluir ${group.students.length} aviso(s)?`
     );
     if (!confirmed) return;
 
