@@ -14,6 +14,11 @@ type School = {
   };
 };
 
+type Backup = {
+  id: string;
+  createdAt: string;
+};
+
 type GroupMemberItem = {
   userId: string;
   name: string;
@@ -44,39 +49,62 @@ export default function GroupDetailClient({
 }: Props) {
   const [schools, setSchools] = useState<School[]>(initialSchools);
   const [members, setMembers] = useState<GroupMemberItem[]>(initialMembers);
+  const [backups, setBackups] = useState<Backup[]>([]);
+  const [openBackupModal, setOpenBackupModal] = useState(false);
   const [openSchoolModal, setOpenSchoolModal] = useState(false);
   const [openMembersModal, setOpenMembersModal] = useState(false);
-  const [loadingList, setLoadingList] = useState(false);
+  const [loadingBackup, setLoadingBackup] = useState(false);
+
+  async function loadBackups() {
+    const res = await fetch(`/api/groups/${groupId}/backup`);
+    if (res.ok) {
+      const data = await res.json();
+      setBackups(data);
+    }
+  }
+
+  async function handleOpenBackup() {
+    setOpenBackupModal(true);
+    await loadBackups();
+  }
+
+  async function createBackup() {
+    setLoadingBackup(true);
+    await fetch(`/api/groups/${groupId}/backup/create`, {
+      method: "POST",
+    });
+    await loadBackups();
+    setLoadingBackup(false);
+  }
+
+  async function restoreBackup(id: string) {
+    const confirmed = window.confirm(
+      "Tem certeza que deseja restaurar este backup? Isso substituirá todos os dados do grupo."
+    );
+
+    if (!confirmed) return;
+
+    await fetch(`/api/groups/${groupId}/backup/${id}/restore`, {
+      method: "POST",
+    });
+
+    alert("Backup restaurado com sucesso!");
+    location.reload();
+  }
 
   async function refreshSchools() {
-    setLoadingList(true);
-    try {
-      const res = await fetch(`/api/groups/${groupId}/schools`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      });
-
-      if (res.ok) {
-        const data = (await res.json()) as School[];
-        setSchools(data);
-      }
-    } finally {
-      setLoadingList(false);
+    const res = await fetch(`/api/groups/${groupId}/schools`);
+    if (res.ok) {
+      const data = await res.json();
+      setSchools(data);
     }
   }
 
   async function refreshMembers() {
     if (!canManageMembers) return;
-
-    const res = await fetch(`/api/groups/${groupId}/members`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    });
-
+    const res = await fetch(`/api/groups/${groupId}/members`);
     if (res.ok) {
-      const data = (await res.json()) as GroupMemberItem[];
+      const data = await res.json();
       setMembers(data);
     }
   }
@@ -87,7 +115,7 @@ export default function GroupDetailClient({
     role: string
   ) {
     if (role === "OWNER") {
-      alert("O OWNER não pode ser removido nesta versão.");
+      alert("O OWNER não pode ser removido.");
       return;
     }
 
@@ -97,15 +125,9 @@ export default function GroupDetailClient({
 
     if (!confirmed) return;
 
-    const res = await fetch(`/api/groups/${groupId}/members/${memberUserId}`, {
+    await fetch(`/api/groups/${groupId}/members/${memberUserId}`, {
       method: "DELETE",
     });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      alert(data?.error ?? "Não foi possível remover o membro.");
-      return;
-    }
 
     await refreshMembers();
   }
@@ -114,130 +136,100 @@ export default function GroupDetailClient({
     <>
       <main className="min-h-screen bg-slate-50 px-4 py-10">
         <div className="mx-auto w-full max-w-4xl">
+
           <div className="mb-6">
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-sky-700 hover:text-sky-800"
-            >
-              ← Voltar para grupos
+            <Link href="/dashboard" className="text-sm text-sky-700">
+              ← Voltar
             </Link>
           </div>
 
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-slate-900">
-                {groupName}
-              </h1>
-              <p className="mt-2 text-sm text-slate-500">
-                Aqui você cadastra e organiza as escolas pertencentes a este grupo.
-              </p>
-            </div>
+          <div className="flex flex-wrap justify-between gap-4">
+            <h1 className="text-2xl font-semibold">{groupName}</h1>
 
             <div className="flex flex-wrap gap-2">
-              {canManageMembers ? (
-                <Link
-                  href={`/groups/${groupId}/teachers`}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  Professores
-                </Link>
-              ) : null}
 
-              {canManageMembers ? (
-                <Link
-                  href={`/groups/${groupId}/reports`}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  Relatórios
-                </Link>
-              ) : null}
-
-              {canManageMembers ? (
-                <Link
-                  href={`/groups/${groupId}/content-plans`}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  Planejamentos
-                </Link>
-              ) : null}
-
-              <Link
-                href={`/groups/${groupId}/horarios`}
-                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-              >
-                Horários
-              </Link>
-
-              {canManageMembers ? (
+              {canManageMembers && (
                 <button
-                  type="button"
-                  onClick={() => setOpenMembersModal(true)}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                  onClick={handleOpenBackup}
+                  className="px-4 py-2 bg-purple-600 text-white rounded"
                 >
-                  Compartilhar gestão
+                  Backup
                 </button>
-              ) : null}
+              )}
 
-              {canManageMembers ? (
+              {canManageMembers && (
                 <button
-                  type="button"
                   onClick={() => setOpenSchoolModal(true)}
-                  className="inline-flex items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+                  className="px-4 py-2 bg-sky-600 text-white rounded"
                 >
                   + Criar escola
                 </button>
-              ) : null}
+              )}
             </div>
           </div>
 
-          <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            {loadingList && (
-              <p className="mb-3 text-sm text-slate-500">Atualizando escolas…</p>
-            )}
-
-            {schools.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                Nenhuma escola visível para este acesso neste grupo.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {schools.map((school) => (
-                  <li key={school.id}>
-                    <Link
-                      href={`/schools/${school.id}`}
-                      className="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3 transition hover:bg-slate-50"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
-                          {school.name}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {school._count.classes} turmas cadastradas
-                        </p>
-                      </div>
-
-                      <span className="text-sm font-medium text-sky-700">
-                        Abrir
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="mt-8 bg-white p-4 rounded border">
+            {schools.map((s) => (
+              <div key={s.id} className="border-b py-2">
+                {s.name}
+              </div>
+            ))}
           </div>
         </div>
-
-        {canManageMembers ? (
-          <CreateSchoolModal
-            groupId={groupId}
-            open={openSchoolModal}
-            onClose={() => setOpenSchoolModal(false)}
-            onCreated={refreshSchools}
-          />
-        ) : null}
       </main>
 
-      {canManageMembers ? (
+      {openBackupModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded w-full max-w-md space-y-4">
+            <h2 className="text-lg font-semibold">Backups</h2>
+
+            <button
+              onClick={createBackup}
+              disabled={loadingBackup}
+              className="w-full bg-green-600 text-white px-4 py-2 rounded"
+            >
+              {loadingBackup ? "Criando..." : "Criar Backup"}
+            </button>
+
+            <div className="space-y-2 max-h-60 overflow-auto">
+              {backups.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex justify-between items-center border p-2 rounded"
+                >
+                  <span className="text-sm">
+                    {new Date(b.createdAt).toLocaleString()}
+                  </span>
+                  <button
+                    onClick={() => restoreBackup(b.id)}
+                    className="text-red-600 text-sm"
+                  >
+                    Restaurar
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setOpenBackupModal(false)}
+              className="w-full border px-4 py-2 rounded"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {canManageMembers && (
+        <CreateSchoolModal
+          groupId={groupId}
+          open={openSchoolModal}
+          onClose={() => setOpenSchoolModal(false)}
+          onCreated={refreshSchools}
+        />
+      )}
+
+      {canManageMembers && (
         <ManageGroupMembersModal
           groupId={groupId}
           open={openMembersModal}
@@ -247,7 +239,7 @@ export default function GroupDetailClient({
           currentUserId={currentUserId}
           onRemoveMember={handleRemoveMember}
         />
-      ) : null}
+      )}
     </>
   );
 }
