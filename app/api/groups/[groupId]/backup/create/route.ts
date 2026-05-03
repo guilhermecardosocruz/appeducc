@@ -2,17 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
-type Params = {
-  params: Promise<{ groupId: string }>;
-};
-
-export async function POST(_req: Request, { params }: Params) {
+export async function POST(
+  _req: Request,
+  context: unknown
+) {
   const user = await getSessionUser();
+
   if (!user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const { groupId } = await params;
+  const { params } = context as { params: { groupId: string } };
+  const { groupId } = params;
 
   const group = await prisma.group.findUnique({
     where: { id: groupId },
